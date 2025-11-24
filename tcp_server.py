@@ -3,7 +3,8 @@ import random
 import time
 import threading
 from lakeshore370 import LakeShore370
-from default_config import DEFAULT_PID, CURRENT_RANGE_LIST, DEFAULT_MXC_RESISTANCE_RANGE_SETTINGS, SENSOR_RESISTANCE_RANGE_LIST, DEFAULT_CHANNELS, DEFAULT_CHANNELS_ID, DEFAULT_SETTINGS
+from default_config import (DEFAULT_PID, CURRENT_RANGE_LIST, DEFAULT_MXC_RESISTANCE_RANGE_SETTINGS, SENSOR_RESISTANCE_RANGE_LIST, DEFAULT_CHANNELS, 
+DEFAULT_CHANNELS_ID, DEFAULT_SETTINGS, DEFAULT_MXC_SETPOINT_MK, DEFAULT_MXC_HEATER_RANGE)
 
 ls = LakeShore370()
 
@@ -79,7 +80,10 @@ def apply_default_mxc_settings() -> None:
                 settings=DEFAULT_MXC_RESISTANCE_RANGE_SETTINGS,
             )
 
-        print("✅ Applied default MXC PID and resistance settings")
+            ls.set_channel_setpoint(DEFAULT_MXC_SETPOINT_MK)
+            ls.set_control_range(DEFAULT_MXC_HEATER_RANGE)
+
+        print("✅ Applied default MXC settings")
     except Exception as e:
         print(f"Error applying default MXC settings: {e}")
 
