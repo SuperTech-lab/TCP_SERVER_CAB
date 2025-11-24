@@ -5,7 +5,7 @@ import threading
 import time
 
 # Configuration for the TCP socket server
-TCP_HOST = '127.0.0.1'      #Replace with the Raspberry Pi's IP address: 192.168.38.3
+TCP_HOST = '192.168.38.3'      #Replace with the Raspberry Pi's IP address: 192.168.38.3
 TCP_PORT = 65432 
 
 # Global variables to store the latest temperature data
@@ -58,7 +58,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header('Content-type', 'text/html')
             self.end_headers()
-            with open('C:\CuartoInformatica\Practicas_CAB\TCP_SERVER\index.html', 'rb') as file:       #/home/SuperTech/TCP_SERVER_CAB/index.html
+            with open('/home/SuperTech/TCP_SERVER_CAB/index.html', 'rb') as file:       #C:\CuartoInformatica\Practicas_CAB\TCP_SERVER\index.html
                 self.wfile.write(file.read())
 
         elif self.path == '/get-data':
