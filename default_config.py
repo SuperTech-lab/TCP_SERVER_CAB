@@ -61,3 +61,18 @@ DEFAULT_CHANNELS = [1, 2, 5, 6]
 DEFAULT_CHANNELS_ID = ["50K", "4K", "STILL", "MXC"]
 DEFAULT_MXC_SETPOINT_MK = 100.0
 DEFAULT_MXC_HEATER_RANGE = "5"
+
+DEFAULT_SENSOR_RESISTANCE_SETTINGS = {
+    1: {  # 50K
+        "excitation_mode": 0,   # 0 = voltage, 1 = current
+        "excitation_range": 5,  # por ejemplo, la misma que MXC o la que tú quieras
+    },
+    2: {  # 4K
+        "excitation_mode": 0,
+        "excitation_range": 5,
+    },
+    5: {  # STILL
+        "excitation_mode": 0,
+        "excitation_range": 5,
+    },
+}

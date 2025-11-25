@@ -5,6 +5,51 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SCLab Temperature Controller</title>
     <style>
+      .channel-dropdown {
+        position: relative;
+        display: inline-block;
+      }
+
+      .channel-dropdown summary {
+        list-style: none;
+      }
+
+      .channel-dropdown summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .channel-dropdown-summary {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-width: 150px;
+        padding: 4px 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        background-color: #fff;
+        font-size: 14px;
+        cursor: pointer;
+      }
+
+      .channel-dropdown-arrow {
+        margin-left: 8px;
+        font-size: 10px;
+      }
+
+      .channel-dropdown-menu {
+        position: relative;
+        margin-top: 4px;
+        padding: 8px 10px;
+        background-color: #fff;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+        min-width: 170px;
+      }
+
+      .channel-dropdown-menu .control-row {
+        justify-content: space-between;
+      }
       body {
         font-family: Arial, sans-serif;
         margin: 20px;
@@ -325,6 +370,10 @@
         font-size: 0.9rem;
         margin-top: 4px;
       }
+      .lakeshore-control-panel,
+      .lakeshore-control-panel .section-content {
+        overflow: visible !important;
+      }
     </style>
   </head>
 
@@ -342,6 +391,91 @@
 
     <div id="lakeshore-tab" class="tab-content active">
       <div class="container lakeshore-container">
+        <!-- Global Settings Bar -->
+        <div class="row-container">
+          <div class="lakeshore-control-panel">
+            <div class="section-title">
+              <strong>GLOBAL SETTINGS</strong>
+            </div>
+            <div class="section-content">
+              <div
+                class="control-row"
+                style="align-items: flex-start; gap: 25px"
+              >
+                <!-- Autoscan -->
+                <div style="display: flex; align-items: center; gap: 10px">
+                  <label for="autoscanToggle">Autoscan</label>
+                  <label class="switch">
+                    <input
+                      type="checkbox"
+                      id="autoscanToggle"
+                      onchange="toggleAutoscan()"
+                    />
+                    <span class="slider round"></span>
+                  </label>
+                </div>
+
+                <!-- Desplegable de canales -->
+                <details class="channel-dropdown" style="position: relative">
+                  <summary class="channel-dropdown-summary">
+                    <strong>CHANNEL ON/OFF </strong>
+                    <span class="channel-dropdown-arrow">▾</span>
+                  </summary>
+
+                  <div class="channel-dropdown-menu">
+                    <div class="control-row">
+                      <label>MXC</label>
+                      <label class="switch">
+                        <input
+                          type="checkbox"
+                          id="toggleMXCGlobal"
+                          onchange="globalToggleChannel('MXC')"
+                        />
+                        <span class="slider round"></span>
+                      </label>
+                    </div>
+
+                    <div class="control-row">
+                      <label>50K</label>
+                      <label class="switch">
+                        <input
+                          type="checkbox"
+                          id="toggle50KGlobal"
+                          onchange="globalToggleChannel('50K')"
+                        />
+                        <span class="slider round"></span>
+                      </label>
+                    </div>
+
+                    <div class="control-row">
+                      <label>4K</label>
+                      <label class="switch">
+                        <input
+                          type="checkbox"
+                          id="toggle4kGlobal"
+                          onchange="globalToggleChannel('4K')"
+                        />
+                        <span class="slider round"></span>
+                      </label>
+                    </div>
+
+                    <div class="control-row">
+                      <label>STILL</label>
+                      <label class="switch">
+                        <input
+                          type="checkbox"
+                          id="toggleSTILLGlobal"
+                          onchange="globalToggleChannel('STILL')"
+                        />
+                        <span class="slider round"></span>
+                      </label>
+                    </div>
+                  </div>
+                </details>
+              </div>
+            </div>
+          </div>
+        </div>
         <!-- Fridge Control Panel Structure
             Fridge Tab
             ├── System Log row (new)
@@ -361,8 +495,8 @@
         </div>
         <!-- ------------------------- -->
 
-        <div class="section-title"><h2>MXC Stage</h2></div>
-        <div class="section-content row-container">
+        <div class="section-title stage-mxc"><h2>MXC Stage</h2></div>
+        <div class="section-content row-container stage-mxc">
           <div class="lakeshore-control-panel">
             <div class="control-group">
               <!-- Temperature control -->
@@ -460,16 +594,19 @@
 
               <!-- Barra de progreso -->
               <div
-                id="progressContainer"
+                id="progressContainerMXC"
                 style="display: none; margin-top: 10px"
               >
                 <div style="width: 100%; background-color: #ddd">
                   <div
-                    id="progressBar"
+                    id="progressBarMXC"
                     style="width: 0%; height: 20px; background-color: #4caf50"
                   ></div>
                 </div>
-                <div id="progressText" style="font-size: 12px; margin-top: 5px">
+                <div
+                  id="progressTextMXC"
+                  style="font-size: 12px; margin-top: 5px"
+                >
                   Processing...
                 </div>
               </div>
@@ -620,8 +757,8 @@
           </div>
         </div>
 
-        <div class="section-title">STILL Stage</div>
-        <div class="section-content row-container">
+        <div class="section-title stage-still"><h2>STILL Stage</h2></div>
+        <div class="section-content row-container stage-still">
           <div class="lakeshore-control-panel">
             <div class="control-group">
               <div class="control-row">
@@ -647,7 +784,52 @@
                 />
               </div>
               <div class="control-row">
+                <label for="sensorRangeSTILL">Excitation:</label>
+                <select
+                  id="sensorRangeSTILL"
+                  class="control-input"
+                  style="width: 160px"
+                >
+                  <option value="1">2.00 uV and 1.00 pA</option>
+                  <option value="2">6.32 uV and 3.16 pA</option>
+                  <option value="3">20.0 uV and 10.0 pA</option>
+                  <option value="4">63.2 uV and 31.6 pA</option>
+                  <option value="5">200 uV and 100 pA</option>
+                  <option value="6">632 uV and 316 pA</option>
+                  <option value="7">2.00 mV and 1.00 nA</option>
+                  <option value="8">6.32 mV and 3.16 nA</option>
+                </select>
+              </div>
+              <div class="control-row">
+                <label for="sensorModeSTILL">Mode:</label>
+                <select
+                  id="sensorModeSTILL"
+                  class="control-input"
+                  style="width: 90px"
+                >
+                  <option value="0">Voltage</option>
+                  <option value="1">Current</option>
+                </select>
+              </div>
+              <div class="control-row">
                 <button onclick="writeSettingsSTILL()">Write Settings</button>
+              </div>
+              <div
+                id="progressContainerSTILL"
+                style="display: none; margin-top: 10px"
+              >
+                <div style="width: 100%; background-color: #ddd">
+                  <div
+                    id="progressBarSTILL"
+                    style="width: 0%; height: 20px; background-color: #4caf50"
+                  ></div>
+                </div>
+                <div
+                  id="progressTextSTILL"
+                  style="font-size: 12px; margin-top: 5px"
+                >
+                  Processing...
+                </div>
               </div>
             </div>
           </div>
@@ -668,6 +850,24 @@
                 <input type="checkbox" id="reset-still" checked />
                 Reset when switching on
               </label>
+              <label
+                for="timeRangeSTILL"
+                style="margin-left: 30px; margin-right: 0px"
+              >
+                Time Range:
+              </label>
+              <select
+                id="timeRangeSTILL"
+                style="margin-right: 50px"
+                onchange="updateTimeRangeSTILL()"
+              >
+                <option value="60" selected>1 Minute</option>
+                <option value="300">5 Minutes</option>
+                <option value="900">15 Minutes</option>
+                <option value="1800">30 Minutes</option>
+                <option value="3600">1 Hour</option>
+                <option value="21600">6 Hours</option>
+              </select>
             </div>
             <canvas
               id="temperatureChartSTILL"
@@ -677,8 +877,8 @@
           </div>
         </div>
 
-        <div class="section-title">4K Stage</div>
-        <div class="section-content row-container">
+        <div class="section-title stage-4k"><h2>4K Stage</h2></div>
+        <div class="section-content row-container stage-4k">
           <div class="lakeshore-control-panel">
             <div class="control-group">
               <div class="control-row">
@@ -704,7 +904,52 @@
                 />
               </div>
               <div class="control-row">
+                <label for="sensorRange4K">Excitation:</label>
+                <select
+                  id="sensorRange4K"
+                  class="control-input"
+                  style="width: 160px"
+                >
+                  <option value="1">2.00 uV and 1.00 pA</option>
+                  <option value="2">6.32 uV and 3.16 pA</option>
+                  <option value="3">20.0 uV and 10.0 pA</option>
+                  <option value="4">63.2 uV and 31.6 pA</option>
+                  <option value="5">200 uV and 100 pA</option>
+                  <option value="6">632 uV and 316 pA</option>
+                  <option value="7">2.00 mV and 1.00 nA</option>
+                  <option value="8">6.32 mV and 3.16 nA</option>
+                </select>
+              </div>
+              <div class="control-row">
+                <label for="sensorMode4K">Mode:</label>
+                <select
+                  id="sensorMode4K"
+                  class="control-input"
+                  style="width: 90px"
+                >
+                  <option value="0">Voltage</option>
+                  <option value="1">Current</option>
+                </select>
+              </div>
+              <div class="control-row">
                 <button onclick="writeSettings4K()">Write Settings</button>
+              </div>
+              <div
+                id="progressContainer4K"
+                style="display: none; margin-top: 10px"
+              >
+                <div style="width: 100%; background-color: #ddd">
+                  <div
+                    id="progressBar4K"
+                    style="width: 0%; height: 20px; background-color: #4caf50"
+                  ></div>
+                </div>
+                <div
+                  id="progressText4K"
+                  style="font-size: 12px; margin-top: 5px"
+                >
+                  Processing...
+                </div>
               </div>
             </div>
           </div>
@@ -725,13 +970,31 @@
                 <input type="checkbox" id="reset-4k" checked />
                 Reset when switching on
               </label>
+              <label
+                for="timeRange4K"
+                style="margin-left: 30px; margin-right: 0px"
+              >
+                Time Range:
+              </label>
+              <select
+                id="timeRange4K"
+                style="margin-right: 50px"
+                onchange="updateTimeRange4K()"
+              >
+                <option value="60" selected>1 Minute</option>
+                <option value="300">5 Minutes</option>
+                <option value="900">15 Minutes</option>
+                <option value="1800">30 Minutes</option>
+                <option value="3600">1 Hour</option>
+                <option value="21600">6 Hours</option>
+              </select>
             </div>
             <canvas id="temperatureChart4K" width="800" height="200"></canvas>
           </div>
         </div>
 
-        <div class="section-title">50K Stage</div>
-        <div class="section-content row-container">
+        <div class="section-title stage-50k"><h2>50K Stage</h2></div>
+        <div class="section-content row-container stage-50k">
           <div class="lakeshore-control-panel">
             <div class="control-group">
               <div class="control-row">
@@ -757,7 +1020,52 @@
                 />
               </div>
               <div class="control-row">
+                <label for="sensorRange50K">Excitation:</label>
+                <select
+                  id="sensorRange50K"
+                  class="control-input"
+                  style="width: 160px"
+                >
+                  <option value="1">2.00 uV and 1.00 pA</option>
+                  <option value="2">6.32 uV and 3.16 pA</option>
+                  <option value="3">20.0 uV and 10.0 pA</option>
+                  <option value="4">63.2 uV and 31.6 pA</option>
+                  <option value="5">200 uV and 100 pA</option>
+                  <option value="6">632 uV and 316 pA</option>
+                  <option value="7">2.00 mV and 1.00 nA</option>
+                  <option value="8">6.32 mV and 3.16 nA</option>
+                </select>
+              </div>
+              <div class="control-row">
+                <label for="sensorMode50K">Mode:</label>
+                <select
+                  id="sensorMode50K"
+                  class="control-input"
+                  style="width: 90px"
+                >
+                  <option value="0">Voltage</option>
+                  <option value="1">Current</option>
+                </select>
+              </div>
+              <div class="control-row">
                 <button onclick="writeSettings50K()">Write Settings</button>
+              </div>
+              <div
+                id="progressContainer50K"
+                style="display: none; margin-top: 10px"
+              >
+                <div style="width: 100%; background-color: #ddd">
+                  <div
+                    id="progressBar50K"
+                    style="width: 0%; height: 20px; background-color: #4caf50"
+                  ></div>
+                </div>
+                <div
+                  id="progressText50K"
+                  style="font-size: 12px; margin-top: 5px"
+                >
+                  Processing...
+                </div>
               </div>
             </div>
           </div>
@@ -787,7 +1095,7 @@
               <select
                 id="timeRange50K"
                 style="margin-right: 50px"
-                onchange="updateTimeRange50k()"
+                onchange="updateTimeRange50K()"
               >
                 <option value="60" selected>1 Minute</option>
                 <option value="300">5 Minutes</option>
@@ -958,11 +1266,17 @@
       let currentTimeRangeBB = 60; // Start with 1 minute as default
       let currentTimeRangeMXC = 60; // Start with 1 minute as default
       let currentTimeRange50K = 60; //Start with 1 minute as default
+      let currentTimeRange4K = 60; //Start with 1 minute as default
+      let currentTimeRangeSTILL = 60; //Start with 1 minute as default
       let tcpConnectionStatus = null;
       let firstDataTime = null;
       let lastUpdateTime = null;
       let initialParametersLoaded = false;
       let pendingMXCToggle = false;
+      let pending50KToggle = false;
+      let pending4KToggle = false;
+      let pendingSTILLToggle = false;
+      let pendingAutoscanToggle = false;
 
       // Variables to store temperature data and timestamps
       let temperatureData = [];
@@ -1008,6 +1322,18 @@
         enabled50K: null,
         enabled4K: null,
         enabledSTILL: null,
+        dwell50K: null,
+        pause50K: null,
+        dwell4K: null,
+        pause4K: null,
+        dwellSTILL: null,
+        pauseSTILL: null,
+        mode50K: null,
+        range50K: null,
+        mode4K: null,
+        range4K: null,
+        modeSTILL: null,
+        rangeSTILL: null,
       };
 
       // Track last sent values
@@ -1197,6 +1523,92 @@
         }
       }
 
+      function updateTimeRangeOptions4K() {
+        const select = document.getElementById("timeRange4K");
+        const store = chartDataStore["4K"];
+        if (!store || !store.startTime) return;
+
+        const totalElapsedSec = Math.max(
+          0,
+          (Date.now() - store.startTime) / 1000
+        );
+
+        select.innerHTML = "";
+
+        for (let i = 0; i < timeRangeOptions.length; i++) {
+          const option = timeRangeOptions[i];
+          const opt = document.createElement("option");
+          opt.value = option.value;
+          opt.textContent = option.label;
+
+          if (i === 0) {
+            opt.disabled = false;
+          } else {
+            const prevValue = timeRangeOptions[i - 1].value;
+            opt.disabled = totalElapsedSec < prevValue;
+          }
+
+          if (parseInt(option.value, 10) === currentTimeRange4K) {
+            opt.selected = true;
+          }
+
+          select.appendChild(opt);
+        }
+
+        if (select.options[select.selectedIndex]?.disabled) {
+          for (let i = select.options.length - 1; i >= 0; i--) {
+            if (!select.options[i].disabled) {
+              select.selectedIndex = i;
+              currentTimeRange4K = parseInt(select.options[i].value, 10);
+              break;
+            }
+          }
+        }
+      }
+
+      function updateTimeRangeOptionsSTILL() {
+        const select = document.getElementById("timeRangeSTILL");
+        const store = chartDataStore["STILL"];
+        if (!store || !store.startTime) return;
+
+        const totalElapsedSec = Math.max(
+          0,
+          (Date.now() - store.startTime) / 1000
+        );
+
+        select.innerHTML = "";
+
+        for (let i = 0; i < timeRangeOptions.length; i++) {
+          const option = timeRangeOptions[i];
+          const opt = document.createElement("option");
+          opt.value = option.value;
+          opt.textContent = option.label;
+
+          if (i === 0) {
+            opt.disabled = false;
+          } else {
+            const prevValue = timeRangeOptions[i - 1].value;
+            opt.disabled = totalElapsedSec < prevValue;
+          }
+
+          if (parseInt(option.value, 10) === currentTimeRangeSTILL) {
+            opt.selected = true;
+          }
+
+          select.appendChild(opt);
+        }
+
+        if (select.options[select.selectedIndex]?.disabled) {
+          for (let i = select.options.length - 1; i >= 0; i--) {
+            if (!select.options[i].disabled) {
+              select.selectedIndex = i;
+              currentTimeRangeSTILL = parseInt(select.options[i].value, 10);
+              break;
+            }
+          }
+        }
+      }
+
       // Function to update UI controls with current parameter values
       function updateParameterControls() {
         // Update input fields with server values on first load
@@ -1273,6 +1685,56 @@
             document.getElementById("autorangeMXC").checked =
               currentParameters.autorangeMXC;
           }
+          if (currentParameters.dwell50K !== null) {
+            document.getElementById("dwell50K").value =
+              currentParameters.dwell50K;
+          }
+          if (currentParameters.pause50K !== null) {
+            document.getElementById("pause50K").value =
+              currentParameters.pause50K;
+          }
+
+          if (currentParameters.dwell4K !== null) {
+            document.getElementById("dwell4K").value =
+              currentParameters.dwell4K;
+          }
+          if (currentParameters.pause4K !== null) {
+            document.getElementById("pause4K").value =
+              currentParameters.pause4K;
+          }
+
+          if (currentParameters.dwellSTILL !== null) {
+            document.getElementById("dwellSTILL").value =
+              currentParameters.dwellSTILL;
+          }
+          if (currentParameters.pauseSTILL !== null) {
+            document.getElementById("pauseSTILL").value =
+              currentParameters.pauseSTILL;
+          }
+          if (currentParameters.range50K !== null) {
+            document.getElementById("sensorRange50K").value =
+              currentParameters.range50K;
+          }
+          if (currentParameters.mode50K !== null) {
+            document.getElementById("sensorMode50K").value =
+              currentParameters.mode50K;
+          }
+          if (currentParameters.range4K !== null) {
+            document.getElementById("sensorRange4K").value =
+              currentParameters.range4K;
+          }
+          if (currentParameters.mode4K !== null) {
+            document.getElementById("sensorMode4K").value =
+              currentParameters.mode4K;
+          }
+          if (currentParameters.rangeSTILL !== null) {
+            document.getElementById("sensorRangeSTILL").value =
+              currentParameters.rangeSTILL;
+          }
+          if (currentParameters.modeSTILL !== null) {
+            document.getElementById("sensorModeSTILL").value =
+              currentParameters.modeSTILL;
+          }
           initialParametersLoaded = true;
         }
 
@@ -1348,6 +1810,54 @@
         if (currentParameters.autorangeMXC !== null) {
           document.getElementById("autorangeMXC").checked =
             currentParameters.autorangeMXC;
+        }
+        if (currentParameters.dwell50K !== null) {
+          document.getElementById("dwell50K").value =
+            currentParameters.dwell50K;
+        }
+        if (currentParameters.pause50K !== null) {
+          document.getElementById("pause50K").value =
+            currentParameters.pause50K;
+        }
+
+        if (currentParameters.dwell4K !== null) {
+          document.getElementById("dwell4K").value = currentParameters.dwell4K;
+        }
+        if (currentParameters.pause4K !== null) {
+          document.getElementById("pause4K").value = currentParameters.pause4K;
+        }
+
+        if (currentParameters.dwellSTILL !== null) {
+          document.getElementById("dwellSTILL").value =
+            currentParameters.dwellSTILL;
+        }
+        if (currentParameters.pauseSTILL !== null) {
+          document.getElementById("pauseSTILL").value =
+            currentParameters.pauseSTILL;
+        }
+        if (currentParameters.range50K !== null) {
+          document.getElementById("sensorRange50K").value =
+            currentParameters.range50K;
+        }
+        if (currentParameters.mode50K !== null) {
+          document.getElementById("sensorMode50K").value =
+            currentParameters.mode50K;
+        }
+        if (currentParameters.range4K !== null) {
+          document.getElementById("sensorRange4K").value =
+            currentParameters.range4K;
+        }
+        if (currentParameters.mode4K !== null) {
+          document.getElementById("sensorMode4K").value =
+            currentParameters.mode4K;
+        }
+        if (currentParameters.rangeSTILL !== null) {
+          document.getElementById("sensorRangeSTILL").value =
+            currentParameters.rangeSTILL;
+        }
+        if (currentParameters.modeSTILL !== null) {
+          document.getElementById("sensorModeSTILL").value =
+            currentParameters.modeSTILL;
         }
       }
 
@@ -1549,6 +2059,10 @@
           updateTimeRangeOptions();
         } else if (chartId === "50K") {
           updateTimeRangeOptions50K();
+        } else if (chartId === "4K") {
+          updateTimeRangeOptions4K();
+        } else if (chartId === "STILL") {
+          updateTimeRangeOptionsSTILL();
         }
 
         console.log(
@@ -1558,9 +2072,20 @@
         );
         console.log(`✅ Store after push (${chartId}):`, store);
 
-        const currentRange =
-          chartId === "50K" ? currentTimeRange50K : currentTimeRangeMXC;
-
+        let currentRange;
+        if (chartId === "MXC") {
+          currentRange = currentTimeRangeMXC;
+        } else if (chartId === "50K") {
+          currentRange = currentTimeRange50K;
+        } else if (chartId === "4K") {
+          currentRange = currentTimeRange4K;
+        } else if (chartId === "STILL") {
+          currentRange = currentTimeRangeSTILL;
+        } else if (chartId === "BB") {
+          currentRange = currentTimeRangeBB;
+        } else {
+          currentRange = 60; // fallback por si acaso
+        }
         const displayTimeStart = Math.max(0, relTime - currentRange);
         const labelsFiltered = [];
         const tempFiltered = [];
@@ -1609,6 +2134,18 @@
         redrawFromStore("50K");
       }
 
+      function updateTimeRange4K() {
+        const timeRangeSelect = document.getElementById("timeRange4K");
+        currentTimeRange4K = parseInt(timeRangeSelect.value, 10);
+        redrawFromStore("4K");
+      }
+
+      function updateTimeRangeSTILL() {
+        const timeRangeSelect = document.getElementById("timeRangeSTILL");
+        currentTimeRangeSTILL = parseInt(timeRangeSelect.value, 10);
+        redrawFromStore("STILL");
+      }
+
       function updateMXCTemperature(value_mK) {
         document.getElementById("currentTemperatureMXC").textContent =
           value_mK.toFixed(4);
@@ -1638,7 +2175,21 @@
 
         const now = Date.now();
         const relTime = (now - store.startTime) / 1000;
-        const displayTimeStart = Math.max(0, relTime - currentTimeRangeMXC);
+        let currentRange;
+        if (chartId === "MXC") {
+          currentRange = currentTimeRangeMXC;
+        } else if (chartId === "50K") {
+          currentRange = currentTimeRange50K;
+        } else if (chartId === "4K") {
+          currentRange = currentTimeRange4K;
+        } else if (chartId === "STILL") {
+          currentRange = currentTimeRangeSTILL;
+        } else if (chartId === "BB") {
+          currentRange = currentTimeRangeBB;
+        } else {
+          currentRange = 60;
+        }
+        const displayTimeStart = Math.max(0, relTime - currentRange);
 
         const labelsFiltered = [];
         const tempFiltered = [];
@@ -1660,7 +2211,7 @@
         }
 
         chart.options.scales.x.min = 0;
-        chart.options.scales.x.max = currentTimeRangeMXC;
+        chart.options.scales.x.max = currentRange;
         chart.update("none");
       }
 
@@ -1995,6 +2546,49 @@
           if (data.autorangeMXC !== undefined) {
             currentParameters.autorangeMXC = parseInt(data.autorangeMXC);
           }
+          if (data.dwell50K !== undefined) {
+            currentParameters.dwell50K = parseFloat(data.dwell50K);
+          }
+          if (data.pause50K !== undefined) {
+            currentParameters.pause50K = parseFloat(data.pause50K);
+          }
+
+          if (data.dwell4K !== undefined) {
+            currentParameters.dwell4K = parseFloat(data.dwell4K);
+          }
+          if (data.pause4K !== undefined) {
+            currentParameters.pause4K = parseFloat(data.pause4K);
+          }
+
+          if (data.dwellSTILL !== undefined) {
+            currentParameters.dwellSTILL = parseFloat(data.dwellSTILL);
+          }
+          if (data.pauseSTILL !== undefined) {
+            currentParameters.pauseSTILL = parseFloat(data.pauseSTILL);
+          }
+          if (data.mode50K !== undefined) {
+            currentParameters.mode50K = parseInt(data.mode50K);
+          }
+          if (data.range50K !== undefined) {
+            currentParameters.range50K = parseInt(data.range50K);
+          }
+
+          if (data.mode4K !== undefined) {
+            currentParameters.mode4K = parseInt(data.mode4K);
+          }
+          if (data.range4K !== undefined) {
+            currentParameters.range4K = parseInt(data.range4K);
+          }
+
+          if (data.modeSTILL !== undefined) {
+            currentParameters.modeSTILL = parseInt(data.modeSTILL);
+          }
+          if (data.rangeSTILL !== undefined) {
+            currentParameters.rangeSTILL = parseInt(data.rangeSTILL);
+          }
+          if (data.autoscan !== undefined) {
+            currentParameters.autoscan = data.autoscan;
+          }
 
           // Update UI controls if parameters changed every minute
           // (or the time specified in parameterBoxUpdateInterval variable)
@@ -2067,56 +2661,138 @@
           }
 
           const toggleMXC = document.getElementById("toggleMXC");
-          const enabledMXC = !!currentParameters.enabledMXC; // number to bool - data from controller
-          const enabledButtonMXC = toggleMXC.checked;
+          const enabledMXC = !!currentParameters.enabledMXC;
 
-          if (toggleMXC.checked !== enabledMXC) {
-            toggleMXC.checked = enabledMXC;
-            console.log(
-              `🔁 Sync MXC toggle -> ${
-                enabledMXC ? "ON" : "OFF"
-              } (from controller)`
-            );
-          } else {
+          if (pendingMXCToggle) {
             if (toggleMXC.checked === enabledMXC) {
               pendingMXCToggle = false;
+              console.log(
+                `✅ MXC backend synced with UI (${enabledMXC ? "ON" : "OFF"})`
+              );
+            } else {
+              console.log("⏳ Waiting for MXC backend to catch up...");
+            }
+          } else {
+            if (toggleMXC.checked !== enabledMXC) {
+              toggleMXC.checked = enabledMXC;
+              console.log(
+                `🔁 Sync MXC toggle -> ${
+                  enabledMXC ? "ON" : "OFF"
+                } (from controller)`
+              );
             }
           }
 
           const toggle50K = document.getElementById("toggle50K");
           const enabled50K = !!currentParameters.enabled50K;
 
-          if (toggle50K.checked !== enabled50K) {
-            toggle50K.checked = enabled50K;
-            console.log(
-              `🔁 Sync 50K toggle -> ${
-                enabled50K ? "ON" : "OFF"
-              } (from controller)`
-            );
+          if (pending50KToggle) {
+            if (toggle50K.checked === enabled50K) {
+              pending50KToggle = false;
+              console.log(
+                `✅ 50K backend synced with UI (${enabled50K ? "ON" : "OFF"})`
+              );
+            } else {
+              console.log("⏳ Waiting for 50K backend to catch up...");
+            }
+          } else {
+            if (toggle50K.checked !== enabled50K) {
+              toggle50K.checked = enabled50K;
+              console.log(
+                `🔁 Sync 50K toggle -> ${
+                  enabled50K ? "ON" : "OFF"
+                } (from controller)`
+              );
+            }
           }
 
           const toggleSTILL = document.getElementById("toggleSTILL");
           const enabledSTILL = !!currentParameters.enabledSTILL;
 
-          if (toggleSTILL.checked !== enabledSTILL) {
-            toggleSTILL.checked = enabledSTILL;
-            console.log(
-              `🔁 Sync STILL toggle -> ${
-                enabledSTILL ? "ON" : "OFF"
-              } (from controller)`
-            );
+          if (pendingSTILLToggle) {
+            if (toggleSTILL.checked === enabledSTILL) {
+              pendingSTILLToggle = false;
+              console.log(
+                `✅ STILL backend synced with UI (${
+                  enabledSTILL ? "ON" : "OFF"
+                })`
+              );
+            } else {
+              console.log("⏳ Waiting for STILL backend to catch up...");
+            }
+          } else {
+            if (toggleSTILL.checked !== enabledSTILL) {
+              toggleSTILL.checked = enabledSTILL;
+              console.log(
+                `🔁 Sync STILL toggle -> ${
+                  enabledSTILL ? "ON" : "OFF"
+                } (from controller)`
+              );
+            }
           }
 
           const toggle4k = document.getElementById("toggle4k");
           const enabled4k = !!currentParameters.enabled4K;
 
-          if (toggle4k.checked !== enabled4k) {
-            toggle4k.checked = enabled4k;
-            console.log(
-              `🔁 Sync 4k toggle -> ${
-                enabled4k ? "ON" : "OFF"
-              } (from controller)`
-            );
+          if (pending4KToggle) {
+            if (toggle4k.checked === enabled4k) {
+              pending4KToggle = false;
+              console.log(
+                `✅ 4K backend synced with UI (${enabled4k ? "ON" : "OFF"})`
+              );
+            } else {
+              console.log("⏳ Waiting for 4K backend to catch up...");
+            }
+          } else {
+            if (toggle4k.checked !== enabled4k) {
+              toggle4k.checked = enabled4k;
+              console.log(
+                `🔁 Sync 4K toggle -> ${
+                  enabled4k ? "ON" : "OFF"
+                } (from controller)`
+              );
+            }
+          }
+
+          const gMXC = document.getElementById("toggleMXCGlobal");
+          if (gMXC) gMXC.checked = !!currentParameters.enabledMXC;
+
+          const g50K = document.getElementById("toggle50KGlobal");
+          if (g50K) g50K.checked = !!currentParameters.enabled50K;
+
+          const g4K = document.getElementById("toggle4kGlobal");
+          if (g4K) g4K.checked = !!currentParameters.enabled4K;
+
+          const gSTILL = document.getElementById("toggleSTILLGlobal");
+          if (gSTILL) gSTILL.checked = !!currentParameters.enabledSTILL;
+
+          updateStageVisibility();
+
+          const autoscanToggle = document.getElementById("autoscanToggle");
+          if (autoscanToggle && currentParameters.autoscan !== undefined) {
+            const backendAutoscanOn = currentParameters.autoscan === "on";
+
+            if (pendingAutoscanToggle) {
+              if (autoscanToggle.checked === backendAutoscanOn) {
+                pendingAutoscanToggle = false;
+                console.log(
+                  `✅ Autoscan backend synced with UI (${
+                    backendAutoscanOn ? "ON" : "OFF"
+                  })`
+                );
+              } else {
+                console.log("⏳ Waiting for Autoscan backend to catch up...");
+              }
+            } else {
+              if (autoscanToggle.checked !== backendAutoscanOn) {
+                autoscanToggle.checked = backendAutoscanOn;
+                console.log(
+                  `🔁 Sync Autoscan toggle -> ${
+                    backendAutoscanOn ? "ON" : "OFF"
+                  } (from controller)`
+                );
+              }
+            }
           }
 
           if (tcpConnectionStatus === false) {
@@ -2195,6 +2871,7 @@
         const command = `set_channel_50k:${value}:${resetFlag}`;
 
         try {
+          pending50KToggle = true;
           addLogEntry(`Sending 50K command: ${command}`, "sent");
           const response = await sendCommandToServer(command);
           addLogEntry(`Server response: ${response}`, "received");
@@ -2205,10 +2882,13 @@
           console.log(response);
 
           if (value === 1 && resetFlag === 1) {
-            fetchSensorData(true);
+            setTimeout(() => {
+              fetchSensorData(true);
+            }, 300);
           }
         } catch (error) {
           checkbox.checked = !checkbox.checked;
+          pending50KToggle = false;
           addLogEntry(
             `Error sending set_channel_50k: ${error.message}`,
             "received"
@@ -2225,6 +2905,8 @@
         const command = `set_channel_mxc:${value}:${resetFlag}`;
 
         try {
+          pendingMXCToggle = true;
+
           addLogEntry(`Sending MXC command: ${command}`, "sent");
           const response = await sendCommandToServer(command);
           addLogEntry(`Server response: ${response}`, "received");
@@ -2234,10 +2916,13 @@
           );
           console.log(response);
           if (value === 1 && resetFlag === 1) {
-            fetchSensorData(true);
+            setTimeout(() => {
+              fetchSensorData(true);
+            }, 300);
           }
         } catch (error) {
           checkbox.checked = !checkbox.checked;
+          pendingMXCToggle = false;
           addLogEntry(
             `Error sending set_channel_mxc: ${error.message}`,
             "received"
@@ -2255,14 +2940,18 @@
         const command = `set_channel_still:${value}:${resetFlag}`;
 
         try {
+          pendingSTILLToggle = true;
           addLogEntry(`Sending STILL command: ${command}`, "sent");
           const response = await sendCommandToServer(command);
           addLogEntry(`Server response: ${response}`, "received");
           if (value === 1 && resetFlag === 1) {
-            fetchSensorData(true);
+            setTimeout(() => {
+              fetchSensorData(true);
+            }, 300);
           }
         } catch (error) {
           checkbox.checked = !checkbox.checked;
+          pendingSTILLToggle = false;
           addLogEntry(
             `Error sending set_channel_still: ${error.message}`,
             "received"
@@ -2278,6 +2967,7 @@
         const command = `set_channel_4k:${value}:${resetFlag}`;
 
         try {
+          pending4KToggle = true;
           addLogEntry(`Sending 4k command: ${command}`, "sent");
           const response = await sendCommandToServer(command);
           addLogEntry(`Server response: ${response}`, "received");
@@ -2286,6 +2976,7 @@
           }
         } catch (error) {
           checkbox.checked = !checkbox.checked;
+          pending4KToggle = false;
           addLogEntry(
             `Error sending set_channel_4k: ${error.message}`,
             "received"
@@ -2323,6 +3014,42 @@
             "received"
           );
           cb.checked = !cb.checked;
+          console.error(error);
+        }
+      }
+
+      async function toggleAutoscan() {
+        console.log("Toggling Autoscan...");
+
+        const cb = document.getElementById("autoscanToggle");
+        const desiredState = cb.checked;
+
+        if (tcpConnectionStatus === false) {
+          addLogEntry(
+            "Cannot send Autoscan command: No connection to TCP server",
+            "status"
+          );
+          cb.checked = !desiredState;
+          return;
+        }
+
+        const valueStr = desiredState ? "on" : "off";
+        const command = `set_autoscan:${valueStr}`;
+
+        pendingAutoscanToggle = true;
+
+        try {
+          addLogEntry(`Sending Autoscan command: ${command}`, "sent");
+          const response = await sendCommandToServer(command);
+          addLogEntry(`Server response: ${response}`, "received");
+          console.log(response);
+        } catch (error) {
+          addLogEntry(
+            `Error sending Autoscan command: ${error.message}`,
+            "received"
+          );
+          cb.checked = !desiredState;
+          pendingAutoscanToggle = false;
           console.error(error);
         }
       }
@@ -2415,9 +3142,11 @@
           return;
         }
 
-        const progressContainer = document.getElementById("progressContainer");
-        const progressBar = document.getElementById("progressBar");
-        const progressText = document.getElementById("progressText");
+        const progressContainer = document.getElementById(
+          "progressContainerMXC"
+        );
+        const progressBar = document.getElementById("progressBarMXC");
+        const progressText = document.getElementById("progressTextMXC");
 
         progressContainer.style.display = "block";
         progressBar.style.width = "0%";
@@ -2573,9 +3302,11 @@
           });
         }
 
-        const progressContainer = document.getElementById("progressContainer");
-        const progressBar = document.getElementById("progressBar");
-        const progressText = document.getElementById("progressText");
+        const progressContainer = document.getElementById(
+          "progressContainerMXC"
+        );
+        const progressBar = document.getElementById("progressBarMXC");
+        const progressText = document.getElementById("progressTextMXC");
         progressContainer.style.display = "block";
         progressBar.style.width = "0%";
         progressText.textContent = "Processing...";
@@ -2618,6 +3349,14 @@
 
         const dwell = parseFloat(document.getElementById("dwellSTILL").value);
         const pause = parseFloat(document.getElementById("pauseSTILL").value);
+        const range = parseInt(
+          document.getElementById("sensorRangeSTILL").value,
+          10
+        );
+        const mode = parseInt(
+          document.getElementById("sensorModeSTILL").value,
+          10
+        );
         const commands = [];
 
         if (!isNaN(dwell)) {
@@ -2642,10 +3381,42 @@
           commands.push(`set_pause_still:${pause}`);
         }
 
+        if (!isNaN(range)) {
+          if (range < 1 || range > 8) {
+            addLogEntry(
+              "Error: STILL Sensor Range must be between 1 and 8",
+              "received"
+            );
+            return;
+          }
+          commands.push(`set_sensor_range_still:${range}`);
+        }
+
+        if (!isNaN(mode)) {
+          if (mode !== 0 && mode !== 1) {
+            addLogEntry(
+              "Error: STILL Sensor Mode must be 0 (Voltage) or 1 (Current)",
+              "received"
+            );
+            return;
+          }
+          commands.push(`set_sensor_mode_still:${mode}`);
+        }
+
         if (commands.length === 0) {
           addLogEntry("No STILL sensor parameter changes detected", "status");
           return;
         }
+
+        const progressContainer = document.getElementById(
+          "progressContainerSTILL"
+        );
+        const progressBar = document.getElementById("progressBarSTILL");
+        const progressText = document.getElementById("progressTextSTILL");
+
+        progressContainer.style.display = "block";
+        progressBar.style.width = "0%";
+        progressText.textContent = "Processing STILL settings...";
 
         for (const cmd of commands) {
           try {
@@ -2658,7 +3429,18 @@
               "received"
             );
           }
+
+          const progress =
+            ((commands.indexOf(cmd) + 1) / commands.length) * 100;
+          progressBar.style.width = `${progress}%`;
+          progressText.textContent = `Processing STILL settings... ${Math.round(
+            progress
+          )}%`;
         }
+
+        setTimeout(() => {
+          progressContainer.style.display = "none";
+        }, 1000);
       }
 
       async function writeSettings50K() {
@@ -2672,6 +3454,14 @@
 
         const dwell = parseFloat(document.getElementById("dwell50K").value);
         const pause = parseFloat(document.getElementById("pause50K").value);
+        const range = parseInt(
+          document.getElementById("sensorRange50K").value,
+          10
+        );
+        const mode = parseInt(
+          document.getElementById("sensorMode50K").value,
+          10
+        );
         const commands = [];
 
         if (!isNaN(dwell)) {
@@ -2696,10 +3486,42 @@
           commands.push(`set_pause_50k:${pause}`);
         }
 
+        if (!isNaN(range)) {
+          if (range < 1 || range > 8) {
+            addLogEntry(
+              "Error: 50K Sensor Range must be between 1 and 8",
+              "received"
+            );
+            return;
+          }
+          commands.push(`set_sensor_range_50k:${range}`);
+        }
+
+        if (!isNaN(mode)) {
+          if (mode !== 0 && mode !== 1) {
+            addLogEntry(
+              "Error: 50K Sensor Mode must be 0 (Voltage) or 1 (Current)",
+              "received"
+            );
+            return;
+          }
+          commands.push(`set_sensor_mode_50k:${mode}`);
+        }
+
         if (commands.length === 0) {
           addLogEntry("No 50K sensor parameter changes detected", "status");
           return;
         }
+
+        const progressContainer = document.getElementById(
+          "progressContainer50K"
+        );
+        const progressBar = document.getElementById("progressBar50K");
+        const progressText = document.getElementById("progressText50K");
+
+        progressContainer.style.display = "block";
+        progressBar.style.width = "0%";
+        progressText.textContent = "Processing 50K settings...";
 
         for (const cmd of commands) {
           try {
@@ -2712,7 +3534,18 @@
               "received"
             );
           }
+
+          const progress =
+            ((commands.indexOf(cmd) + 1) / commands.length) * 100;
+          progressBar.style.width = `${progress}%`;
+          progressText.textContent = `Processing 50K settings... ${Math.round(
+            progress
+          )}%`;
         }
+
+        setTimeout(() => {
+          progressContainer.style.display = "none";
+        }, 1000);
       }
 
       async function writeSettings4K() {
@@ -2726,6 +3559,14 @@
 
         const dwell = parseFloat(document.getElementById("dwell4K").value);
         const pause = parseFloat(document.getElementById("pause4K").value);
+        const range = parseInt(
+          document.getElementById("sensorRange4K").value,
+          10
+        );
+        const mode = parseInt(
+          document.getElementById("sensorMode4K").value,
+          10
+        );
         const commands = [];
 
         if (!isNaN(dwell)) {
@@ -2750,10 +3591,42 @@
           commands.push(`set_pause_4k:${pause}`);
         }
 
+        if (!isNaN(range)) {
+          if (range < 1 || range > 8) {
+            addLogEntry(
+              "Error: 4K Sensor Range must be between 1 and 8",
+              "received"
+            );
+            return;
+          }
+          commands.push(`set_sensor_range_4k:${range}`);
+        }
+
+        if (!isNaN(mode)) {
+          if (mode !== 0 && mode !== 1) {
+            addLogEntry(
+              "Error: 4K Sensor Mode must be 0 (Voltage) or 1 (Current)",
+              "received"
+            );
+            return;
+          }
+          commands.push(`set_sensor_mode_4k:${mode}`);
+        }
+
         if (commands.length === 0) {
           addLogEntry("No 4K sensor parameter changes detected", "status");
           return;
         }
+
+        const progressContainer = document.getElementById(
+          "progressContainer4K"
+        );
+        const progressBar = document.getElementById("progressBar4K");
+        const progressText = document.getElementById("progressText4K");
+
+        progressContainer.style.display = "block";
+        progressBar.style.width = "0%";
+        progressText.textContent = "Processing 4K settings...";
 
         for (const cmd of commands) {
           try {
@@ -2766,7 +3639,18 @@
               "received"
             );
           }
+
+          const progress =
+            ((commands.indexOf(cmd) + 1) / commands.length) * 100;
+          progressBar.style.width = `${progress}%`;
+          progressText.textContent = `Processing 4K settings... ${Math.round(
+            progress
+          )}%`;
         }
+
+        setTimeout(() => {
+          progressContainer.style.display = "none";
+        }, 1000);
       }
     </script>
 
@@ -2791,6 +3675,58 @@
           }
         });
       });
+
+      function globalToggleChannel(channel) {
+        const map = {
+          MXC: { main: "toggleMXC", global: "toggleMXCGlobal" },
+          "50K": { main: "toggle50K", global: "toggle50KGlobal" },
+          "4K": { main: "toggle4k", global: "toggle4kGlobal" },
+          STILL: { main: "toggleSTILL", global: "toggleSTILLGlobal" },
+        };
+
+        const entry = map[channel];
+        if (!entry) return;
+
+        const mainCheckbox = document.getElementById(entry.main);
+        const globalCheckbox = document.getElementById(entry.global);
+        if (!mainCheckbox || !globalCheckbox) return;
+
+        mainCheckbox.checked = globalCheckbox.checked;
+
+        switch (channel) {
+          case "MXC":
+            toggleChannelMXC();
+            break;
+          case "50K":
+            toggleChannel50K();
+            break;
+          case "4K":
+            toggleChannel4k();
+            break;
+          case "STILL":
+            toggleChannelSTILL();
+            break;
+        }
+      }
+
+      function toggleStageElements(stageClass, visible) {
+        const els = document.getElementsByClassName(stageClass);
+        for (const el of els) {
+          el.style.display = visible ? "" : "none";
+        }
+      }
+
+      function updateStageVisibility() {
+        const enabledMXC = !!currentParameters.enabledMXC;
+        const enabled50K = !!currentParameters.enabled50K;
+        const enabled4K = !!currentParameters.enabled4K;
+        const enabledSTILL = !!currentParameters.enabledSTILL;
+
+        toggleStageElements("stage-mxc", enabledMXC);
+        toggleStageElements("stage-50k", enabled50K);
+        toggleStageElements("stage-4k", enabled4K);
+        toggleStageElements("stage-still", enabledSTILL);
+      }
     </script>
   </body>
 </html>

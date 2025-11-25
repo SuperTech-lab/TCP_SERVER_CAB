@@ -5,7 +5,7 @@ import threading
 import time
 
 # Configuration for the TCP socket server
-TCP_HOST = '192.168.38.3'      #Replace with the Raspberry Pi's IP address: 192.168.38.3
+TCP_HOST = '127.0.0.1'      #Replace with the Raspberry Pi's IP address: 192.168.38.3
 TCP_PORT = 65432 
 
 # Global variables to store the latest temperature data
@@ -23,6 +23,12 @@ current_pause_MXC = None
 current_excitation_mode_MXC = None
 current_excitation_range_MXC = None
 current_excitation_autorange_MXC = None
+current_excitation_mode_50K = None
+current_excitation_range_50K = None
+current_excitation_mode_4K = None
+current_excitation_range_4K = None
+current_excitation_mode_STILL = None
+current_excitation_range_STILL = None
 current_dwell_50K = None
 current_dwell_4K = None
 current_dwell_STILL = None
@@ -49,6 +55,7 @@ current_enabled_MXC = None
 current_enabled_50K = None
 current_enabled_4K = None
 current_enabled_STILL = None
+current_autoscan = "off"
 
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
 
@@ -58,7 +65,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header('Content-type', 'text/html')
             self.end_headers()
-            with open('/home/SuperTech/TCP_SERVER_CAB/index.html', 'rb') as file:       #C:\CuartoInformatica\Practicas_CAB\TCP_SERVER\index.html
+            with open('C:\CuartoInformatica\Practicas_CAB\TCP_SERVER\index.html', 'rb') as file:       #/home/SuperTech/TCP_SERVER_CAB/index.html
                 self.wfile.write(file.read())
 
         elif self.path == '/get-data':
@@ -101,8 +108,14 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
                                    "enabledMXC": current_enabled_MXC,
                                    "enabled50K": current_enabled_50K,
                                    "enabled4K": current_enabled_4K,
-                                   "enabledSTILL": current_enabled_STILL
-                                })
+                                   "enabledSTILL": current_enabled_STILL,
+                                   "autoscan": current_autoscan,
+                                   "mode50K": current_excitation_mode_50K,
+                                   "range50K": current_excitation_range_50K,
+                                   "mode4K": current_excitation_mode_4K,
+                                   "range4K": current_excitation_range_4K,
+                                   "modeSTILL": current_excitation_mode_STILL,
+                                   "rangeSTILL": current_excitation_range_STILL      })
                                    
             self.wfile.write(response.encode('utf-8'))
         else:
@@ -209,6 +222,12 @@ def receive_sensor_data(tcp_socket):
     global current_excitation_mode_MXC
     global current_excitation_range_MXC
     global current_excitation_autorange_MXC
+    global current_excitation_mode_50K
+    global current_excitation_range_50K
+    global current_excitation_mode_4K
+    global current_excitation_range_4K
+    global current_excitation_mode_STILL
+    global current_excitation_range_STILL
     global current_dwell_50K
     global current_dwell_4K
     global current_dwell_STILL
@@ -223,6 +242,7 @@ def receive_sensor_data(tcp_socket):
     global current_proportional_gain
     global current_integral_gain
     global current_derivative_gain
+    global current_autoscan
 
     buf = b""
     while True:
@@ -269,7 +289,7 @@ def receive_sensor_data(tcp_socket):
                     continue
 
                 try:
-                    still_params = _organize_still_params(params[14:16])
+                    still_params = _organize_still_params([params[16], params[19]])
                     current_dwell_STILL = still_params[0]
                     current_pause_STILL = still_params[1]
                 except Exception as e:
@@ -277,7 +297,7 @@ def receive_sensor_data(tcp_socket):
                     continue
 
                 try:
-                    fourK_params = _organize_4k_params(params[16:18])
+                    fourK_params = _organize_4k_params([params[15], params[18]])
                     current_dwell_4K = fourK_params[0]
                     current_pause_4K = fourK_params[1]
                 except Exception as e:
@@ -285,12 +305,16 @@ def receive_sensor_data(tcp_socket):
                     continue
 
                 try:
-                    fiftyK_params = _organize_50k_params(params[18:20])
+                    fiftyK_params = _organize_50k_params([params[14], params[17]])
                     current_dwell_50K = fiftyK_params[0]
                     current_pause_50K = fiftyK_params[1]
                 except Exception as e:
                     print(f"Error parsing 50K parameters: {e}")
-                    continue                    
+                    continue
+
+                except Exception as e:
+                    print(f"Error parsing dwell/pause 50K/4K/STILL variables: {e}")
+                    continue                 
 
                 try:
                     current_temperature_setpoint = float(params[20].split(':')[-1])
@@ -329,6 +353,25 @@ def receive_sensor_data(tcp_socket):
                 except Exception as e:
                     print(f"Error parsing enabled 50K/4K/STILL variables: {e}")
 
+                try:
+                    autoscan_raw = int(params[28].split(':')[-1])
+                    current_autoscan = "on" if autoscan_raw == 1 else "off"
+                except Exception as e:
+                    print(f"Error parsing autoscan variable: {e}")
+                    current_autoscan = "off"
+                
+                try:
+                    current_excitation_mode_50K = params[41].split(':')[-1].strip()
+                    current_excitation_range_50K = params[42].split(':')[-1].strip()
+
+                    current_excitation_mode_4K = params[43].split(':')[-1].strip()
+                    current_excitation_range_4K = params[44].split(':')[-1].strip()
+
+                    current_excitation_mode_STILL = params[45].split(':')[-1].strip()
+                    current_excitation_range_STILL = params[46].split(':')[-1].strip()
+
+                except Exception as e:
+                    print(f"Error parsing excitation/mode 50K/4K/STILL: {e}")
 
         except Exception as e:
             print(f"Error receiving LakeShore370 data: {e}")

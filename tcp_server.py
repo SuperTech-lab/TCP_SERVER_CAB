@@ -2,9 +2,9 @@ import socket
 import random
 import time
 import threading
-from lakeshore370 import LakeShore370
+from lakeshore370_dummy import LakeShore370
 from default_config import (DEFAULT_PID, CURRENT_RANGE_LIST, DEFAULT_MXC_RESISTANCE_RANGE_SETTINGS, SENSOR_RESISTANCE_RANGE_LIST, DEFAULT_CHANNELS, 
-DEFAULT_CHANNELS_ID, DEFAULT_SETTINGS, DEFAULT_MXC_SETPOINT_MK, DEFAULT_MXC_HEATER_RANGE)
+DEFAULT_CHANNELS_ID, DEFAULT_SETTINGS, DEFAULT_MXC_SETPOINT_MK, DEFAULT_MXC_HEATER_RANGE, DEFAULT_SENSOR_RESISTANCE_SETTINGS)
 
 ls = LakeShore370()
 
@@ -19,24 +19,37 @@ heater_mutex = threading.Lock()
 
 
 
+from default_config import DEFAULT_SETTINGS, DEFAULT_SENSOR_RESISTANCE_SETTINGS
+
 def apply_default_channel_timing(channel: int) -> bool:
     """
     Aplica los tiempos por defecto (dwell y pause) de DEFAULT_SETTINGS
-    al canal indicado del LakeShore.
+    y también el excitation_mode / excitation_range de
+    DEFAULT_SENSOR_RESISTANCE_SETTINGS al canal indicado del LakeShore.
     """
     try:
-        # DEFAULT_SETTINGS[channel] = ['010, 003, 01, 2']
         config_str = DEFAULT_SETTINGS[channel][0]
         parts = [x.strip() for x in config_str.split(",")]
-        dwell_str, pause_str = parts[0], parts[1]
 
+        dwell_str, pause_str = parts[0], parts[1]
         dwell = float(dwell_str)
         pause = float(pause_str)
     except Exception as e:
         print(f"Error parsing DEFAULT_SETTINGS for channel {channel}: {e}")
         return False
 
+    excitation_mode = None
+    excitation_range = None
+    try:
+        sensor_defaults = DEFAULT_SENSOR_RESISTANCE_SETTINGS.get(channel)
+        if sensor_defaults is not None:
+            excitation_mode = int(sensor_defaults["excitation_mode"])
+            excitation_range = int(sensor_defaults["excitation_range"])
+    except Exception as e:
+        print(f"Error parsing DEFAULT_SENSOR_RESISTANCE_SETTINGS for channel {channel}: {e}")
+
     ok = True
+
     try:
         with heater_mutex:
             ok_dwell = ls.set_channel_dwell_time(dwell, channel=channel)
@@ -55,13 +68,44 @@ def apply_default_channel_timing(channel: int) -> bool:
         print(f"Error applying default pause to channel {channel}: {e}")
         ok = False
 
-    if ok:
-        print(f"✅ Applied default timing to channel {channel}: dwell={dwell}s, pause={pause}s")
+    if excitation_mode is not None and excitation_range is not None:
+        try:
+            with heater_mutex:
+                current_settings = ls.get_sensor_resistance_settings(
+                    channel=channel, return_dict=True
+                )
+
+            current_settings["excitation_mode"] = excitation_mode
+            current_settings["excitation_range"] = excitation_range
+
+            time.sleep(0.1)
+
+            with heater_mutex:
+                ok_sensor = ls.set_sensor_resistance_settings(
+                    channel=channel, settings=current_settings
+                )
+
+            if not ok_sensor:
+                ok = False
+
+        except Exception as e:
+            print(f"Error applying default excitation settings to channel {channel}: {e}")
+            ok = False
     else:
-        print(f"⚠️ Could not fully apply default timing to channel {channel}")
+        print(f"(Info) No default excitation settings defined for channel {channel}")
+
+    if ok:
+        print(
+            f"✅ Applied default settings to channel {channel}: "
+            f"dwell={dwell}s, pause={pause}s, "
+            f"mode={excitation_mode}, range={excitation_range}"
+        )
+    else:
+        print(f"⚠️ Could not fully apply default settings to channel {channel}")
 
     print(f"🔧 Channel {channel} initialised to default settings")
     return ok
+
 
 def apply_default_mxc_settings() -> None:
     """
@@ -649,6 +693,70 @@ def handle_command(command):
             message = f"❌ Error setting sensor range for MXC: {e}"
             print(message)
             return message
+    
+    elif command.startswith("set_sensor_range_50k"):
+        try:
+            new_range = str(command.split(":")[-1])
+            if 1 <= int(new_range) <= 8:
+                with heater_mutex:
+                    current_sensor_settings = ls.get_sensor_resistance_settings(channel=1, return_dict=True)
+                time.sleep(0.1)
+                current_sensor_settings['excitation_range'] = new_range
+                with heater_mutex:
+                    success = ls.set_sensor_resistance_settings(channel=1, settings=current_sensor_settings)
+                if success:
+                    message = f"✅ Sensor range for 50K succesfully set to {SENSOR_RESISTANCE_RANGE_LIST[str(new_range)][0]} {SENSOR_RESISTANCE_RANGE_LIST[str(new_range)][1]}"
+                else:
+                    message = "❌ Failed to set sensor range for 50K"
+                print(message)
+                return message
+        except Exception as e:
+            message = f"❌ Error setting sensor range for 50K: {e}"
+            print(message)
+            return message
+
+    elif command.startswith("set_sensor_range_4k"):
+        try:
+            new_range = str(command.split(":")[-1])
+            if 1 <= int(new_range) <= 8:
+                with heater_mutex:
+                    current_sensor_settings = ls.get_sensor_resistance_settings(channel=2, return_dict=True)
+                time.sleep(0.1)
+                current_sensor_settings['excitation_range'] = new_range
+                with heater_mutex:
+                    success = ls.set_sensor_resistance_settings(channel=2, settings=current_sensor_settings)
+                if success:
+                    message = f"✅ Sensor range for 4K succesfully set to {SENSOR_RESISTANCE_RANGE_LIST[str(new_range)][0]} {SENSOR_RESISTANCE_RANGE_LIST[str(new_range)][1]}"
+                else:
+                    message = "❌ Failed to set sensor range for 4K"
+                print(message)
+                return message
+        except Exception as e:
+            message = f"❌ Error setting sensor range for 4K: {e}"
+            print(message)
+            return message
+
+    elif command.startswith("set_sensor_range_still"):
+        try:
+            new_range = str(command.split(":")[-1])
+            if 1 <= int(new_range) <= 8:
+                with heater_mutex:
+                    current_sensor_settings = ls.get_sensor_resistance_settings(channel=5, return_dict=True)
+                time.sleep(0.1)
+                current_sensor_settings['excitation_range'] = new_range
+                with heater_mutex:
+                    success = ls.set_sensor_resistance_settings(channel=5, settings=current_sensor_settings)
+                if success:
+                    message = f"✅ Sensor range for STILL succesfully set to {SENSOR_RESISTANCE_RANGE_LIST[str(new_range)][0]} {SENSOR_RESISTANCE_RANGE_LIST[str(new_range)][1]}"
+                else:
+                    message = "❌ Failed to set sensor range for STILL"
+                print(message)
+                return message
+        except Exception as e:
+            message = f"❌ Error setting sensor range for STILL: {e}"
+            print(message)
+            return message
+
     elif command.startswith("set_channel_mxc"):
         try:
             parts = command.split(":")
@@ -862,6 +970,102 @@ def handle_command(command):
             print(message)
             return message
             
+    elif command.startswith("set_sensor_mode_50k"):
+        try:
+            new_mode = int(command.split(":")[-1])
+
+            if new_mode not in (0, 1):
+                message = "❌ Sensor mode for 50K must be 0 (voltage) or 1 (current)"
+                print(message)
+                return message
+
+            with heater_mutex:
+                current_settings = ls.get_sensor_resistance_settings(channel=1, return_dict=True)
+
+            time.sleep(0.1)
+            current_settings['excitation_mode'] = new_mode
+
+            with heater_mutex:
+                success = ls.set_sensor_resistance_settings(channel=1, settings=current_settings)
+
+            if success:
+                mode_str = "voltage" if new_mode == 0 else "current"
+                message = f"✅ Sensor mode for 50K succesfully set to {mode_str}"
+            else:
+                message = "❌ Failed to set sensor mode for 50K"
+
+            print(message)
+            return message
+
+        except Exception as e:
+            message = f"❌ Error setting sensor mode for 50K: {e}"
+            print(message)
+            return message
+
+    elif command.startswith("set_sensor_mode_4k"):
+        try:
+            new_mode = int(command.split(":")[-1])
+
+            if new_mode not in (0, 1):
+                message = "❌ Sensor mode for 4K must be 0 (voltage) or 1 (current)"
+                print(message)
+                return message
+
+            with heater_mutex:
+                current_settings = ls.get_sensor_resistance_settings(channel=2, return_dict=True)
+
+            time.sleep(0.1)
+            current_settings['excitation_mode'] = new_mode
+
+            with heater_mutex:
+                success = ls.set_sensor_resistance_settings(channel=2, settings=current_settings)
+
+            if success:
+                mode_str = "voltage" if new_mode == 0 else "current"
+                message = f"✅ Sensor mode for 4K succesfully set to {mode_str}"
+            else:
+                message = "❌ Failed to set sensor mode for 4K"
+
+            print(message)
+            return message
+
+        except Exception as e:
+            message = f"❌ Error setting sensor mode for 4K: {e}"
+            print(message)
+            return message
+
+    elif command.startswith("set_sensor_mode_still"):
+        try:
+            new_mode = int(command.split(":")[-1])
+
+            if new_mode not in (0, 1):
+                message = "❌ Sensor mode for STILL must be 0 (voltage) or 1 (current)"
+                print(message)
+                return message
+
+            with heater_mutex:
+                current_settings = ls.get_sensor_resistance_settings(channel=5, return_dict=True)
+
+            time.sleep(0.1)
+            current_settings['excitation_mode'] = new_mode
+
+            with heater_mutex:
+                success = ls.set_sensor_resistance_settings(channel=5, settings=current_settings)
+
+            if success:
+                mode_str = "voltage" if new_mode == 0 else "current"
+                message = f"✅ Sensor mode for STILL succesfully set to {mode_str}"
+            else:
+                message = "❌ Failed to set sensor mode for STILL"
+
+            print(message)
+            return message
+
+        except Exception as e:
+            message = f"❌ Error setting sensor mode for STILL: {e}"
+            print(message)
+            return message
+
     elif command.startswith("set_autorange_mxc"):
         try:
             new_value = int(command.split(":")[-1])
@@ -895,6 +1099,84 @@ def handle_command(command):
             print(message)
             return message
         
+    elif command.startswith("set_autoscan"):
+        try:
+            parts = command.split(":")
+            if len(parts) < 2:
+                message = (
+                    "❌ Invalid syntax for set_autoscan. "
+                    "Use 'set_autoscan:on' or 'set_autoscan:off'"
+                )
+                print(message)
+                return message
+
+            flag_str = parts[1].strip().lower() #ON, OFF, on or off
+
+            if flag_str not in ("on", "off"):
+                message = "❌ Autoscan value must be 'on' or 'off'"
+                print(message)
+                return message
+
+            if flag_str == "off":
+                with heater_mutex:
+                    success = ls.set_autoscan("off")
+
+                if success:
+                    message = "✅ Autoscan disabled"
+                else:
+                    message = "❌ Failed to disable autoscan"
+
+                print(message)
+                return message
+
+            enabled_channels = []
+            with heater_mutex:
+                for ch in sorted(DEFAULT_CHANNELS):
+                    try:
+                        if int(ls.get_channel_status(channel=ch)) == 1:
+                            enabled_channels.append(ch)
+                    except Exception as e:
+                        print(f"⚠️ Warning checking channel {ch} status: {e}")
+
+            if not enabled_channels:
+                message = "❌ Cannot enable autoscan: no channels are ON"
+                print(message)
+                return message
+
+            start_channel = enabled_channels[0]
+
+            with heater_mutex:
+                success = ls.set_autoscan("on", start_channel)
+
+            if success:
+                time.sleep(0.1)
+                try:
+                    with heater_mutex:
+                        autoscan_status = ls.get_autoscan()
+                except Exception:
+                    autoscan_status = None
+
+                if isinstance(autoscan_status, (list, tuple)) and len(autoscan_status) >= 2:
+                    ch = int(autoscan_status[0])
+                    en = int(autoscan_status[1])
+                else:
+                    ch = start_channel
+                    en = 0
+
+                state_str = "ON" if en == 1 else "OFF"
+                message = f"✅ Autoscan {state_str} starting at channel {ch}"
+            else:
+                message = "❌ Failed to enable autoscan"
+
+            print(message)
+            return message
+
+        except Exception as e:
+            message = f"❌ Error setting autoscan: {e}"
+            print(message)
+            return message
+
+            
     else:
         print("Unknown command")
 
@@ -1035,6 +1317,27 @@ def lakeshore_temperature_sensor():
             modeMXC = excitationMXC = autorangeMXC = None
 
         try:
+            with heater_mutex:
+                resistance_50K_settings = ls.get_sensor_resistance_settings(channel=1, return_dict=True)
+                resistance_4K_settings  = ls.get_sensor_resistance_settings(channel=2, return_dict=True)
+                resistance_STILL_settings = ls.get_sensor_resistance_settings(channel=5, return_dict=True)
+
+            mode50K = resistance_50K_settings['excitation_mode']
+            excitation50K = resistance_50K_settings['excitation_range']
+
+            mode4K = resistance_4K_settings['excitation_mode']
+            excitation4K = resistance_4K_settings['excitation_range']
+
+            modeSTILL = resistance_STILL_settings['excitation_mode']
+            excitationSTILL = resistance_STILL_settings['excitation_range']
+
+        except Exception as e:
+            print(f"Error reading sensor resistance settings for 50K/4K/STILL\nReason: {e}")
+            mode50K = excitation50K = None
+            mode4K = excitation4K = None
+            modeSTILL = excitationSTILL = None
+
+        try:
             with heater_mutex: dwell_times = ls.get_channels_dwell_time(DEFAULT_CHANNELS)
         except Exception as e: 
             print(f"Error reading dwell times from LakeShore\nReason: {e}")
@@ -1077,6 +1380,12 @@ def lakeshore_temperature_sensor():
             'sensor_mode'      : modeMXC,
             'sensor_range'     : excitationMXC,
             'sensor_autorange' : autorangeMXC,
+            'sensor_mode_50K'   : mode50K,
+            'sensor_range_50K'  : excitation50K,
+            'sensor_mode_4K'    : mode4K,
+            'sensor_range_4K'   : excitation4K,
+            'sensor_mode_STILL' : modeSTILL,
+            'sensor_range_STILL': excitationSTILL,
             'dwell_times'      : dwell_times,
             'pause_times'      : pause_times,
             'autoscan'         : autoscan,
@@ -1188,7 +1497,13 @@ def broadcast_temperature(sensorValues, controlParams, sensorParams):
                     f"enabledMXC: {sensorParams['enabledMXC']}," +
                     f"enabled50K: {int(ls.get_channel_status(1))}," +
                     f"enabled4K: {int(ls.get_channel_status(2))}," +
-                    f"enabledSTILL: {int(ls.get_channel_status(5))}\n"
+                    f"enabledSTILL: {int(ls.get_channel_status(5))}," +
+                    f"mode50K: {sensorParams['sensor_mode_50K']}," +
+                    f"range50K: {sensorParams['sensor_range_50K']}," +
+                    f"mode4K: {sensorParams['sensor_mode_4K']}," +
+                    f"range4K: {sensorParams['sensor_range_4K']}," +
+                    f"modeSTILL: {sensorParams['sensor_mode_STILL']}," +
+                    f"rangeSTILL: {sensorParams['sensor_range_STILL']}\n"
                     ).encode('utf-8')
         
     except Exception as e:
