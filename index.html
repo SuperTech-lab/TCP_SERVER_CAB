@@ -2755,16 +2755,16 @@
           }
 
           const gMXC = document.getElementById("toggleMXCGlobal");
-          if (gMXC) gMXC.checked = !!currentParameters.enabledMXC;
+          if (gMXC && toggleMXC) gMXC.checked = toggleMXC.checked;
 
           const g50K = document.getElementById("toggle50KGlobal");
-          if (g50K) g50K.checked = !!currentParameters.enabled50K;
+          if (g50K && toggle50K) g50K.checked = toggle50K.checked;
 
           const g4K = document.getElementById("toggle4kGlobal");
-          if (g4K) g4K.checked = !!currentParameters.enabled4K;
+          if (g4K && toggle4k) g4K.checked = toggle4k.checked;
 
           const gSTILL = document.getElementById("toggleSTILLGlobal");
-          if (gSTILL) gSTILL.checked = !!currentParameters.enabledSTILL;
+          if (gSTILL && toggleSTILL) gSTILL.checked = toggleSTILL.checked;
 
           updateStageVisibility();
 
