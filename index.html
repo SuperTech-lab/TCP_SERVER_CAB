@@ -8,6 +8,7 @@
       .channel-dropdown {
         position: relative;
         display: inline-block;
+        width: auto;
       }
 
       .channel-dropdown summary {
@@ -37,7 +38,10 @@
       }
 
       .channel-dropdown-menu {
-        position: relative;
+        position: absolute;
+        z-index: 101;
+        top: 100%;
+        left: 0;
         margin-top: 4px;
         padding: 8px 10px;
         background-color: #fff;
@@ -57,19 +61,33 @@
       }
       .tab-menu {
         display: flex;
-        gap: 10px;
-        margin-bottom: 20px;
+        gap: 15px;
+        margin-bottom: 30px;
+        width: 100%;
+        max-width: 1600px;
       }
+
       .tab-button {
-        padding: 10px 20px;
-        background-color: #007bff;
+        flex-grow: 1;
+        padding: 15px 25px;
+        background-color: #6b7280;
         color: white;
         border: none;
-        border-radius: 5px;
+        border-radius: 8px;
         cursor: pointer;
+        font-weight: 600;
+        transition: background-color 0.2s, box-shadow 0.2s, transform 0.1s;
       }
+
       .tab-button.active {
-        background-color: #0056b3;
+        background-color: #3b82f6;
+        box-shadow: 0 2px 5px rgba(59, 130, 246, 0.4);
+      }
+
+      .tab-button:hover:not(.active) {
+        background-color: #4b5563;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
       }
       .tab-content {
         display: none;
@@ -151,7 +169,7 @@
         padding: 20px;
         border-radius: 8px;
         box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-        max-height: 200px;
+        /* max-height: 300px; */
       }
       .lakeshore-control-panel {
         flex: 1;
@@ -212,24 +230,32 @@
       }
       button {
         padding: 10px 20px;
-        font-size: 16px;
-        background-color: #007bff;
+        font-size: 15px; /* Aumentado ligeramente para mejor pulsación */
+        background-color: #3b82f6; /* Azul primario */
         color: white;
         border: none;
-        border-radius: 5px;
+        border-radius: 8px; /* Esquinas redondeadas */
         cursor: pointer;
-        margin-top: 10px;
+        margin-top: 15px;
         width: 100%;
+        font-weight: 600;
+        transition: background-color 0.2s, transform 0.1s; /* Transiciones suaves */
       }
 
       .inline-button {
         width: auto;
-        flex-shrink: 0;
-        white-space: nowrap;
+        padding: 8px 18px; /* Relleno más pequeño para botones en línea */
+        margin-top: 0;
       }
 
       button:hover {
-        background-color: #0056b3;
+        background-color: #2563eb; /* Azul más oscuro al pasar el ratón */
+        transform: translateY(-1px); /* Efecto de elevación */
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+
+      button:active {
+        transform: translateY(0); /* Vuelve a su lugar al hacer click */
       }
       .log-box {
         width: 94%;
@@ -370,14 +396,121 @@
         font-size: 0.9rem;
         margin-top: 4px;
       }
-      .lakeshore-control-panel,
+      .lakeshore-control-panel {
+        flex: 1;
+        background-color: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        min-width: 250px;
+        height: auto;
+        align-self: stretch;
+      }
       .lakeshore-control-panel .section-content {
         overflow: visible !important;
+      }
+      .particles-canvas {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: -1; /* Move the canvas to the background */
+      }
+      .global-settings-title {
+        display: flex;
+        align-items: center;
+        gap: 10px; /* Espacio entre el icono y el texto */
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: #361f37;
+        margin-bottom: 15px; /* Separación del título con los controles */
+      }
+
+      .global-settings-title .icon {
+        font-size: 1.5rem;
+        color: #3b82f6; /* Color azul */
+      }
+
+      .global-controls-row {
+        display: flex;
+        gap: 20px;
+        align-items: flex-start;
+        padding-bottom: 10px;
+      }
+
+      .autoscan-panel {
+        display: flex;
+        align-items: center;
+        min-width: 140px;
+        padding: 8px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        background-color: #f9fafb;
+        flex-shrink: 0; /* Evita que se encoja */
+      }
+
+      /* Ajuste del desplegable para que se parezca al panel anterior */
+      .channel-dropdown-summary {
+        /* Mantiene las propiedades existentes, pero asegura el mismo aspecto de panel */
+        padding: 8px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        background-color: #f9fafb;
+        font-weight: 500;
+      }
+      .log-section-title {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #1f2937;
+        margin: 15px 0 10px 0;
+        border-bottom: 1px solid #e5e7eb;
+        padding-bottom: 10px;
+        cursor: pointer;
+        justify-content: space-between;
+      }
+
+      .log-section-title .icon {
+        font-size: 1.2rem;
+        color: #ef4444;
+      }
+
+      .stage-mxc,
+      .stage-still,
+      .stage-4k,
+      .stage-50k {
+        background-color: white;
+        padding: 24px;
+        border-radius: 12px;
+        margin-top: 30px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease;
+      }
+
+      .stage-mxc {
+        border-left: 5px solid #3b82f6;
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+      }
+      .stage-still {
+        border-left: 5px solid #10b981;
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+      }
+      .stage-4k {
+        border-left: 5px solid #f59e0b;
+        box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2);
+      }
+      .stage-50k {
+        border-left: 5px solid #8b5cf6;
+        box-shadow: 0 4px 12px rgba(139, 92, 246, 0.2);
       }
     </style>
   </head>
 
   <body>
+    <canvas id="particles-canvas" class="particles-canvas"></canvas>
     <div class="container">
       <div class="tab-menu">
         <button class="tab-button active" data-target="lakeshore-tab">
@@ -394,18 +527,21 @@
         <!-- Global Settings Bar -->
         <div class="row-container">
           <div class="lakeshore-control-panel">
-            <div class="section-title">
-              <strong>GLOBAL SETTINGS</strong>
+            <div class="global-settings-title">
+              <span class="icon">⚙</span>
+              GLOBAL SETTINGS
             </div>
             <div class="section-content">
-              <div
-                class="control-row"
-                style="align-items: flex-start; gap: 25px"
-              >
-                <!-- Autoscan -->
-                <div style="display: flex; align-items: center; gap: 10px">
-                  <label for="autoscanToggle">Autoscan</label>
-                  <label class="switch">
+              <div class="global-controls-row">
+                <!-- Autoscan con estilo de panel -->
+                <div class="autoscan-panel">
+                  <label
+                    for="autoscanToggle"
+                    style="width: auto; font-weight: 700; margin-right: 10px"
+                  >
+                    Autoscan
+                  </label>
+                  <label class="switch" style="margin-left: 0">
                     <input
                       type="checkbox"
                       id="autoscanToggle"
@@ -414,7 +550,6 @@
                     <span class="slider round"></span>
                   </label>
                 </div>
-
                 <!-- Desplegable de canales -->
                 <details class="channel-dropdown" style="position: relative">
                   <summary class="channel-dropdown-summary">
@@ -486,8 +621,16 @@
 
         <!-- System Log for Fridge Tab -->
         <div class="row-container">
-          <div class="lakeshore-control-panel">
-            <div class="section-title">System Log</div>
+          <div
+            class="lakeshore-control-panel"
+            style="max-width: none; min-width: 100%"
+          >
+            <div class="log-section-title">
+              <div style="display: flex; align-items: center; gap: 10px">
+                <span class="icon">📜</span>
+                SYSTEM LOG
+              </div>
+            </div>
             <div class="section-content">
               <div class="log-box" id="logBoxLS"></div>
             </div>
@@ -613,6 +756,7 @@
             </div>
           </div>
           <div
+            class="lakeshore-plot-panel"
             style="
               flex: 3;
               min-width: 750px;
@@ -620,28 +764,44 @@
               flex-direction: column;
             "
           >
-            <div class="control-row" style="margin-bottom: 10px">
-              <!-- Toggle switch -->
-              <label for="toggleMXC" style="margin-right: 0px"
-                >Channel On/Off</label
+            <!-- Fila superior: Write Sensor, reset, time range, autorange, valor actual -->
+            <div
+              class="control-row"
+              style="
+                margin-bottom: 15px;
+                align-items: center;
+                padding-left: 0px;
+              "
+            >
+              <button
+                class="inline-button"
+                style="
+                  margin-left: 0;
+                  margin-right: 25px;
+                  padding: 8px 18px;
+                  min-width: 160px;
+                "
+                onclick="writeSensorSettingsMXC()"
               >
+                Write Sensor Settings
+              </button>
 
-              <label class="switch" style="margin-right: 50px">
-                <input
-                  type="checkbox"
-                  id="toggleMXC"
-                  onchange="toggleChannelMXC()"
-                />
-                <span class="slider round"></span>
-              </label>
               <label class="reset-toggle">
                 <input type="checkbox" id="reset-mxc" checked />
                 Reset when switching on
               </label>
-              <!-- Time range selector for MXC Stage -->
-              <label for="timeRangeMXC" style="margin-right: 0px"
-                >Time Range:</label
+
+              <label
+                for="timeRangeMXC"
+                style="
+                  margin: 0 10px 0 25px;
+                  align-self: center;
+                  display: flex;
+                  align-items: center;
+                "
               >
+                Time Range:
+              </label>
               <select
                 id="timeRangeMXC"
                 style="margin-right: 50px"
@@ -654,7 +814,7 @@
                 <option value="300">5 Minutes</option>
                 <option value="60" selected>1 Minute</option>
               </select>
-              <!-- Autorange checkbox -->
+
               <label class="circular-checkbox">
                 <input
                   type="checkbox"
@@ -665,7 +825,7 @@
                 <span></span>
                 Autorange
               </label>
-              <!-- Instant MXC value dropdown display -->
+
               <select
                 id="currentMXCValue"
                 class="currentmxc-value"
@@ -676,24 +836,19 @@
                 <option value="power">- W</option>
               </select>
             </div>
-            <!-- Temperature chart for MXC Stage -->
-            <div class="lakeshore-plot-panel">
-              <canvas
-                id="temperatureChartMXC"
-                width="800"
-                height="200"
-              ></canvas>
-            </div>
 
-            <!-- Thermometer parameters row -->
+            <!-- Gráfica -->
+            <canvas id="temperatureChartMXC" width="800" height="200"></canvas>
+
+            <!-- Fila inferior: Dwell, Pause, Excitation, Mode -->
             <div
               class="control-row"
               style="
                 margin-top: 10px;
                 display: flex;
-                gap: 15px;
+                justify-content: space-between;
                 align-items: center;
-                flex-wrap: wrap;
+                width: 100%;
               "
             >
               <label for="dwellMXC" style="width: 90px">Dwell Time:</label>
@@ -745,14 +900,6 @@
                 <option value="0">Voltage</option>
                 <option value="1">Current</option>
               </select>
-
-              <button
-                class="inline-button"
-                style="margin-left: auto; padding: 8px 18px; min-width: 160px"
-                onclick="writeSensorSettingsMXC()"
-              >
-                Write Sensor Settings
-              </button>
             </div>
           </div>
         </div>
@@ -835,17 +982,6 @@
           </div>
           <div class="lakeshore-plot-panel">
             <div class="control-row" style="align-items: center">
-              <label for="toggleSTILL" style="margin-right: 0px">
-                Channel On/Off
-              </label>
-              <label class="switch" style="margin-right: 50px">
-                <input
-                  type="checkbox"
-                  id="toggleSTILL"
-                  onchange="toggleChannelSTILL()"
-                />
-                <span class="slider round"></span>
-              </label>
               <label class="reset-toggle">
                 <input type="checkbox" id="reset-still" checked />
                 Reset when switching on
@@ -955,17 +1091,6 @@
           </div>
           <div class="lakeshore-plot-panel">
             <div class="control-row" style="align-items: center">
-              <label for="toggle4k" style="margin-right: 0px">
-                Channel On/Off
-              </label>
-              <label class="switch" style="margin-right: 50px">
-                <input
-                  type="checkbox"
-                  id="toggle4k"
-                  onchange="toggleChannel4k()"
-                />
-                <span class="slider round"></span>
-              </label>
               <label class="reset-toggle">
                 <input type="checkbox" id="reset-4k" checked />
                 Reset when switching on
@@ -1071,25 +1196,15 @@
           </div>
           <div class="lakeshore-plot-panel">
             <div class="control-row" style="margin-bottom: 10px">
-              <!-- Toggle switch -->
-              <label for="toggle50K" style="margin-right: 0px"
-                >Channel On/Off</label
-              >
-              <label class="switch" style="margin-right: 50px">
-                <input
-                  type="checkbox"
-                  id="toggle50K"
-                  onchange="toggleChannel50K()"
-                />
-                <span class="slider round"></span>
-              </label>
               <label class="reset-toggle">
                 <input type="checkbox" id="reset-50k" checked />
                 Reset when switching on
               </label>
 
               <!-- Time range for 50K-->
-              <label for="timeRange50K" style="margin-right: 0px"
+              <label
+                for="timeRange50K"
+                style="margin-left: 30px; margin-right: 0px"
                 >Time Range:</label
               >
               <select
@@ -2660,21 +2775,22 @@
             ); // Power in Watts
           }
 
-          const toggleMXC = document.getElementById("toggleMXC");
+          // MXC
+          const gMXC = document.getElementById("toggleMXCGlobal");
           const enabledMXC = !!currentParameters.enabledMXC;
 
-          if (pendingMXCToggle) {
-            if (toggleMXC.checked === enabledMXC) {
-              pendingMXCToggle = false;
-              console.log(
-                `✅ MXC backend synced with UI (${enabledMXC ? "ON" : "OFF"})`
-              );
-            } else {
-              console.log("⏳ Waiting for MXC backend to catch up...");
-            }
-          } else {
-            if (toggleMXC.checked !== enabledMXC) {
-              toggleMXC.checked = enabledMXC;
+          if (gMXC) {
+            if (pendingMXCToggle) {
+              if (gMXC.checked === enabledMXC) {
+                pendingMXCToggle = false;
+                console.log(
+                  `✅ MXC backend synced with UI (${enabledMXC ? "ON" : "OFF"})`
+                );
+              } else {
+                console.log("⏳ Waiting for MXC backend to catch up...");
+              }
+            } else if (gMXC.checked !== enabledMXC) {
+              gMXC.checked = enabledMXC;
               console.log(
                 `🔁 Sync MXC toggle -> ${
                   enabledMXC ? "ON" : "OFF"
@@ -2683,21 +2799,22 @@
             }
           }
 
-          const toggle50K = document.getElementById("toggle50K");
+          // 50K
+          const g50K = document.getElementById("toggle50KGlobal");
           const enabled50K = !!currentParameters.enabled50K;
 
-          if (pending50KToggle) {
-            if (toggle50K.checked === enabled50K) {
-              pending50KToggle = false;
-              console.log(
-                `✅ 50K backend synced with UI (${enabled50K ? "ON" : "OFF"})`
-              );
-            } else {
-              console.log("⏳ Waiting for 50K backend to catch up...");
-            }
-          } else {
-            if (toggle50K.checked !== enabled50K) {
-              toggle50K.checked = enabled50K;
+          if (g50K) {
+            if (pending50KToggle) {
+              if (g50K.checked === enabled50K) {
+                pending50KToggle = false;
+                console.log(
+                  `✅ 50K backend synced with UI (${enabled50K ? "ON" : "OFF"})`
+                );
+              } else {
+                console.log("⏳ Waiting for 50K backend to catch up...");
+              }
+            } else if (g50K.checked !== enabled50K) {
+              g50K.checked = enabled50K;
               console.log(
                 `🔁 Sync 50K toggle -> ${
                   enabled50K ? "ON" : "OFF"
@@ -2706,23 +2823,24 @@
             }
           }
 
-          const toggleSTILL = document.getElementById("toggleSTILL");
+          // STILL
+          const gSTILL = document.getElementById("toggleSTILLGlobal");
           const enabledSTILL = !!currentParameters.enabledSTILL;
 
-          if (pendingSTILLToggle) {
-            if (toggleSTILL.checked === enabledSTILL) {
-              pendingSTILLToggle = false;
-              console.log(
-                `✅ STILL backend synced with UI (${
-                  enabledSTILL ? "ON" : "OFF"
-                })`
-              );
-            } else {
-              console.log("⏳ Waiting for STILL backend to catch up...");
-            }
-          } else {
-            if (toggleSTILL.checked !== enabledSTILL) {
-              toggleSTILL.checked = enabledSTILL;
+          if (gSTILL) {
+            if (pendingSTILLToggle) {
+              if (gSTILL.checked === enabledSTILL) {
+                pendingSTILLToggle = false;
+                console.log(
+                  `✅ STILL backend synced with UI (${
+                    enabledSTILL ? "ON" : "OFF"
+                  })`
+                );
+              } else {
+                console.log("⏳ Waiting for STILL backend to catch up...");
+              }
+            } else if (gSTILL.checked !== enabledSTILL) {
+              gSTILL.checked = enabledSTILL;
               console.log(
                 `🔁 Sync STILL toggle -> ${
                   enabledSTILL ? "ON" : "OFF"
@@ -2731,41 +2849,29 @@
             }
           }
 
-          const toggle4k = document.getElementById("toggle4k");
-          const enabled4k = !!currentParameters.enabled4K;
+          // 4K
+          const g4K = document.getElementById("toggle4kGlobal");
+          const enabled4K = !!currentParameters.enabled4K;
 
-          if (pending4KToggle) {
-            if (toggle4k.checked === enabled4k) {
-              pending4KToggle = false;
-              console.log(
-                `✅ 4K backend synced with UI (${enabled4k ? "ON" : "OFF"})`
-              );
-            } else {
-              console.log("⏳ Waiting for 4K backend to catch up...");
-            }
-          } else {
-            if (toggle4k.checked !== enabled4k) {
-              toggle4k.checked = enabled4k;
+          if (g4K) {
+            if (pending4KToggle) {
+              if (g4K.checked === enabled4K) {
+                pending4KToggle = false;
+                console.log(
+                  `✅ 4K backend synced with UI (${enabled4K ? "ON" : "OFF"})`
+                );
+              } else {
+                console.log("⏳ Waiting for 4K backend to catch up...");
+              }
+            } else if (g4K.checked !== enabled4K) {
+              g4K.checked = enabled4K;
               console.log(
                 `🔁 Sync 4K toggle -> ${
-                  enabled4k ? "ON" : "OFF"
+                  enabled4K ? "ON" : "OFF"
                 } (from controller)`
               );
             }
           }
-
-          const gMXC = document.getElementById("toggleMXCGlobal");
-          if (gMXC && toggleMXC) gMXC.checked = toggleMXC.checked;
-
-          const g50K = document.getElementById("toggle50KGlobal");
-          if (g50K && toggle50K) g50K.checked = toggle50K.checked;
-
-          const g4K = document.getElementById("toggle4kGlobal");
-          if (g4K && toggle4k) g4K.checked = toggle4k.checked;
-
-          const gSTILL = document.getElementById("toggleSTILLGlobal");
-          if (gSTILL && toggleSTILL) gSTILL.checked = toggleSTILL.checked;
-
           updateStageVisibility();
 
           const autoscanToggle = document.getElementById("autoscanToggle");
@@ -2864,7 +2970,7 @@
       setInterval(fetchSensorData, 1000);
 
       async function toggleChannel50K() {
-        const checkbox = document.getElementById("toggle50K");
+        const checkbox = document.getElementById("toggle50KGlobal");
         const value = checkbox.checked ? 1 : 0;
         const resetFlag = document.getElementById("reset-50k").checked ? 1 : 0;
 
@@ -2898,7 +3004,7 @@
       }
 
       async function toggleChannelMXC() {
-        const checkbox = document.getElementById("toggleMXC");
+        const checkbox = document.getElementById("toggleMXCGlobal");
         const value = checkbox.checked ? 1 : 0;
         const resetFlag = document.getElementById("reset-mxc").checked ? 1 : 0;
 
@@ -2932,7 +3038,7 @@
       }
 
       async function toggleChannelSTILL() {
-        const checkbox = document.getElementById("toggleSTILL");
+        const checkbox = document.getElementById("toggleSTILLGlobal");
         const value = checkbox.checked ? 1 : 0;
         const resetFlag = document.getElementById("reset-still").checked
           ? 1
@@ -2960,7 +3066,7 @@
       }
 
       async function toggleChannel4k() {
-        const checkbox = document.getElementById("toggle4k");
+        const checkbox = document.getElementById("toggle4kGlobal");
         const value = checkbox.checked ? 1 : 0;
         const resetFlag = document.getElementById("reset-4k").checked ? 1 : 0;
 
@@ -3677,22 +3783,6 @@
       });
 
       function globalToggleChannel(channel) {
-        const map = {
-          MXC: { main: "toggleMXC", global: "toggleMXCGlobal" },
-          "50K": { main: "toggle50K", global: "toggle50KGlobal" },
-          "4K": { main: "toggle4k", global: "toggle4kGlobal" },
-          STILL: { main: "toggleSTILL", global: "toggleSTILLGlobal" },
-        };
-
-        const entry = map[channel];
-        if (!entry) return;
-
-        const mainCheckbox = document.getElementById(entry.main);
-        const globalCheckbox = document.getElementById(entry.global);
-        if (!mainCheckbox || !globalCheckbox) return;
-
-        mainCheckbox.checked = globalCheckbox.checked;
-
         switch (channel) {
           case "MXC":
             toggleChannelMXC();
@@ -3727,6 +3817,103 @@
         toggleStageElements("stage-4k", enabled4K);
         toggleStageElements("stage-still", enabledSTILL);
       }
+
+      function initParticles() {
+        const canvas = document.getElementById("particles-canvas");
+        const ctx = canvas.getContext("2d");
+        let particles = [];
+        let animationFrameId;
+
+        function resizeCanvas() {
+          canvas.width = window.innerWidth;
+          canvas.height = window.innerHeight;
+          // Re-initialize particles on resize to ensure distribution is correct
+          if (particles.length === 0) {
+            createParticles();
+          }
+        }
+
+        function createParticles() {
+          particles = [];
+          // Asegura un número de partículas razonable (máx. 100)
+          const numParticles = Math.min(
+            100,
+            Math.floor((canvas.width * canvas.height) / 15000)
+          );
+          for (let i = 0; i < numParticles; i++) {
+            particles.push({
+              x: Math.random() * canvas.width,
+              y: Math.random() * canvas.height,
+              radius: Math.random() * 1.5 + 0.5, // Radio entre 0.5 y 2.0
+              vx: Math.random() * 0.4 - 0.2, // Velocidad X
+              vy: Math.random() * 0.4 - 0.2, // Velocidad Y
+            });
+          }
+        }
+
+        function draw() {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+          // Color de los elementos (negro o gris muy oscuro)
+          const particleColor = "rgba(255, 0, 127, 0.8)"; // Gris oscuro
+          const lineColor = "rgba(255, 0, 127, 0.15)"; // Líneas muy tenues
+
+          for (let i = 0; i < particles.length; i++) {
+            const p1 = particles[i];
+
+            // 1. Dibujar líneas de conexión
+            for (let j = i + 1; j < particles.length; j++) {
+              const p2 = particles[j];
+              const dist = Math.sqrt(
+                Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2)
+              );
+
+              // Conectar si la distancia es menor a 100px
+              if (dist < 100) {
+                ctx.beginPath();
+                ctx.moveTo(p1.x, p1.y);
+                ctx.lineTo(p2.x, p2.y);
+
+                // Opacidad basada en la distancia (más cerca, más opaco)
+                const opacity = 1 - dist / 100;
+                ctx.strokeStyle = lineColor.replace(
+                  "0.1",
+                  (opacity * 0.2).toFixed(2)
+                );
+                ctx.lineWidth = 0.5;
+                ctx.stroke();
+              }
+            }
+
+            // 2. Mover la partícula
+            p1.x += p1.vx;
+            p1.y += p1.vy;
+
+            // Rebotar en los bordes
+            if (p1.x < 0 || p1.x > canvas.width) p1.vx *= -1;
+            if (p1.y < 0 || p1.y > canvas.height) p1.vy *= -1;
+
+            // 3. Dibujar la partícula (punto)
+            ctx.beginPath();
+            ctx.arc(p1.x, p1.y, p1.radius, 0, Math.PI * 2, false);
+            ctx.fillStyle = particleColor;
+            ctx.fill();
+          }
+
+          animationFrameId = requestAnimationFrame(draw);
+        }
+
+        // Initialization
+        window.addEventListener("resize", resizeCanvas);
+        resizeCanvas();
+
+        // Start animation
+        if (animationFrameId) cancelAnimationFrame(animationFrameId);
+        animationFrameId = requestAnimationFrame(draw);
+      }
+
+      // CALL THE FUNCTION WHEN THE PAGE LOADS
+      document.addEventListener("DOMContentLoaded", initParticles);
     </script>
   </body>
 </html>

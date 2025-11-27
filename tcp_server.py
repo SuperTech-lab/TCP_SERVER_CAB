@@ -18,9 +18,6 @@ PORT = 65432  # Port to listen on
 heater_mutex = threading.Lock() 
 
 
-
-from default_config import DEFAULT_SETTINGS, DEFAULT_SENSOR_RESISTANCE_SETTINGS
-
 def apply_default_channel_timing(channel: int) -> bool:
     """
     Aplica los tiempos por defecto (dwell y pause) de DEFAULT_SETTINGS
@@ -143,7 +140,7 @@ current_timeout = 300.0 # Current temperature setpoint for control (in s)
 current_proportional_gain = 0.0 # Current proportional gain
 current_integral_gain = 0.0 # Current integral gain
 current_derivative_gain = 0.0 # Current derivative gain
-current_mxc_temperature_setpoint = 0.0 # Current MXC temperature setpoint
+current_mxc_temperature_setpoint = DEFAULT_MXC_SETPOINT_MK # Current MXC temperature setpoint
 current_mxc_proportional_gain = DEFAULT_PID['P'] # Current MXC proportional gain
 current_mxc_integral_gain = DEFAULT_PID['I'] # Current MXC integral gain
 current_mxc_derivative_gain = DEFAULT_PID['D'] # Current MXC derivative gain
@@ -343,7 +340,9 @@ def handle_command(command):
         # Sintaxis to set the temperature setpoint for MXC: "set_temperature_setpoint_mxc:100"
         try:
             new_temperature_setpoint = float(command.split(":")[-1])
-            if 10.0 <= new_temperature_setpoint <= 500.0:
+            if 0.0 <= new_temperature_setpoint <= 500.0:
+                if (new_temperature_setpoint<10):
+                    print("⚠️ Temperature setpoint under 10mK might be useless")
                 with heater_mutex:
                     # Mutex protection ensures that only one thread acces the LakeShore device at a time
                     success = ls.set_channel_setpoint(new_temperature_setpoint, channel=6)  # Channel 6 is MXC

@@ -13,7 +13,7 @@ DEFAULT_PID = {
 
 DEFAULT_MXC_RESISTANCE_RANGE_SETTINGS = {
     "excitation_mode": 0,       # 0 for voltage, 1 for current
-    "excitation_range": 5,      # 5 for 200 uV and 100 pA
+    "excitation_range": 4,      #63 uV 
     "resistance_range": 14,     # 14 for 3.15 uA R = 6.32 kOhm
     "autorange": 1,             # 0 for NO, 1 for YES
     "excitation": 1,            # 0 for excitation on, 1 = exctiation off
@@ -59,7 +59,7 @@ SENSOR_RESISTANCE_RANGE_LIST = {
 
 DEFAULT_CHANNELS = [1, 2, 5, 6]
 DEFAULT_CHANNELS_ID = ["50K", "4K", "STILL", "MXC"]
-DEFAULT_MXC_SETPOINT_MK = 100.0
+DEFAULT_MXC_SETPOINT_MK = 0.0
 DEFAULT_MXC_HEATER_RANGE = "5"
 
 DEFAULT_SENSOR_RESISTANCE_SETTINGS = {

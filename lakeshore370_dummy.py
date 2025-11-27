@@ -59,7 +59,7 @@ RESISTANCE_RANGE_LIST = {
 
 DEFAULT_MXC_RESISTANCE_RANGE_SETTINGS = {
     "excitation_mode": 0,  # 0 voltage, 1 current
-    "excitation_range": 5, # 5 → 200 µV / 100 pA
+    "excitation_range": 4, # 5 → 200 µV / 100 pA
     "resistance_range": 14,
     "autorange": 1,        # 1 = YES
     "excitation": 1,       # 1 = excitation OFF
@@ -163,7 +163,7 @@ class LakeShore370:
             "50K": 50.0,
             "4K": 4.2,
             "STILL": 1.0,
-            "MXC": 0.100,   # 100 mK
+            "MXC": 0.0,   # 100 mK
         }
         self._resistances_ohm = {
             "50K": 100.0,
@@ -429,7 +429,7 @@ class LakeShore370:
             return False
 
         # Validación igual que el real
-        if value < 10 or value > 500:
+        if value < 0 or value > 500:
             print("Temperature setpoint must be between 10 mK and 500 mK.")
             return False
 
