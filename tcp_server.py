@@ -1,10 +1,15 @@
 import socket
 import random
 import time
+import json
 import threading
+import datetime
 from lakeshore370 import LakeShore370
+from psycopg2.pool import ThreadedConnectionPool
+import psycopg2
+from contextlib import contextmanager
 from default_config import (DEFAULT_PID, CURRENT_RANGE_LIST, DEFAULT_MXC_RESISTANCE_RANGE_SETTINGS, SENSOR_RESISTANCE_RANGE_LIST, DEFAULT_CHANNELS, 
-DEFAULT_CHANNELS_ID, DEFAULT_SETTINGS, DEFAULT_MXC_SETPOINT_MK, DEFAULT_MXC_HEATER_RANGE, DEFAULT_SENSOR_RESISTANCE_SETTINGS)
+DEFAULT_CHANNELS_ID, DEFAULT_SETTINGS, DEFAULT_MXC_SETPOINT_MK, DEFAULT_MXC_HEATER_RANGE, DEFAULT_SENSOR_RESISTANCE_SETTINGS, DB_INSERT_INTERVAL, DEFAULT_CURVES, CURVE_NAMES)
 
 ls = LakeShore370()
 
@@ -17,6 +22,109 @@ PORT = 65432  # Port to listen on
 # Mutex to protect the heater power level
 heater_mutex = threading.Lock() 
 
+#DB conection params
+db_delay = DB_INSERT_INTERVAL
+last_db_insert_ts = None
+DB_POOL = None
+CURRENT_RUN_ID = None
+
+last_sensorValues = None
+last_controlParams = None
+last_sensorParams = None
+
+
+def init_db_pool():
+    global DB_POOL
+    if DB_POOL is None:
+        DB_POOL = ThreadedConnectionPool(
+            minconn=1,
+            maxconn=10,   
+            host="localhost",
+            port=5432,
+            dbname="lakeshore_db",
+            user="lakeshore_app",  
+            password="Ricardo",
+        )
+        print("✅ DB connection pool inicializado")
+
+
+
+def close_db_pool():
+    global DB_POOL
+    if DB_POOL is not None:
+        DB_POOL.closeall()
+        DB_POOL = None
+        print("🔻 DB connection pool cerrado")
+
+
+@contextmanager
+def get_db_conn():
+    """
+    Maneja el pool de conexiones de la bd
+    """
+    if DB_POOL is None:
+        raise RuntimeError("DB_POOL no inicializado. Llama a init_db_pool() al arrancar.")
+
+    conn = DB_POOL.getconn()
+    try:
+        yield conn
+    finally:
+        DB_POOL.putconn(conn)
+
+def start_run(global_run_id: int):
+    
+    global CURRENT_RUN_ID, last_db_insert_ts
+
+    if CURRENT_RUN_ID is not None:
+        print(f"⚠ Ya hay un RUN en curso (RUN_ID = {CURRENT_RUN_ID}). Ciérralo antes con end_run.")
+        return
+    
+    try:
+        global_run_id = int(global_run_id)
+    except (ValueError, TypeError):
+        print("❌ RUN_ID must be an integer")
+        return
+
+    with get_db_conn() as conn:
+        with conn.cursor() as cur:
+            try:
+                cur.execute(
+                    """
+                    INSERT INTO runs (run_id, started_at)
+                    VALUES (%s, now())
+                    RETURNING run_id;
+                    """,
+                    (global_run_id,),
+                )
+                CURRENT_RUN_ID = cur.fetchone()[0]
+                conn.commit()
+                last_db_insert_ts = None
+                print(f"🏁 RUN {CURRENT_RUN_ID} iniciado")
+            except psycopg2.Error as e:
+                conn.rollback()
+                print(f"❌ Error iniciando RUN {global_run_id}: {e}")
+                CURRENT_RUN_ID = None
+
+
+
+def end_run():
+
+    global CURRENT_RUN_ID
+
+    if CURRENT_RUN_ID is None:
+        print("⚠ No hay RUN en curso")
+        return
+
+    with get_db_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE runs SET ended_at = now() WHERE run_id = %s;",
+                (CURRENT_RUN_ID,),
+            )
+        conn.commit()
+
+    print(f"🏁 RUN {CURRENT_RUN_ID} finalizado")
+    CURRENT_RUN_ID = None
 
 def apply_default_channel_timing(channel: int) -> bool:
     """
@@ -128,6 +236,27 @@ def apply_default_mxc_settings() -> None:
     except Exception as e:
         print(f"Error applying default MXC settings: {e}")
 
+
+def apply_default_curve_settings(channel: int) -> bool:
+    """
+    Aplica la curva por defecto (DEFAULT_CURVES) a un canal dado.
+    """
+    try:
+        default_curve = DEFAULT_CURVES[channel]
+    except KeyError:
+        print(f"(Info) No default curve defined for channel {channel}")
+        return False
+
+    try:
+        with heater_mutex:
+            ls.set_channel_curve(default_curve, channel=channel)
+        current_curves[channel] = default_curve
+        print(f"✅ Applied default curve {default_curve} to channel {channel}")
+        return True
+    except Exception as e:
+        print(f"Error applying default curve to channel {channel}: {e}")
+        return False
+
 # Global variables
 clients = [] # List to keep track of connected clients
 clients_lock = threading.Lock() # Mutex to protect the clients list
@@ -147,6 +276,12 @@ current_mxc_derivative_gain = DEFAULT_PID['D'] # Current MXC derivative gain
 current_mxc_resistance_mode = DEFAULT_MXC_RESISTANCE_RANGE_SETTINGS['excitation_mode'] # Current MXC resistance mode
 current_mxc_resistance_range = DEFAULT_MXC_RESISTANCE_RANGE_SETTINGS['excitation_range'] # Current MXC resistance range
 current_mxc_resistance_autorange = DEFAULT_MXC_RESISTANCE_RANGE_SETTINGS['autorange'] # Current MXC resistance autorange
+current_curves = {
+    1: DEFAULT_CURVES[1],  # 50K
+    2: DEFAULT_CURVES[2],  # 4K
+    5: DEFAULT_CURVES[5],  # STILL
+    6: DEFAULT_CURVES[6],  # MXC
+}
 
 def _is_connected(sock) -> bool:
     try:
@@ -194,8 +329,171 @@ def handle_command(command):
     global current_proportional_gain
     global current_integral_gain
     global current_derivative_gain
+
+    cmd = command.strip()
+
+    CONTROL_COMMAND_PREFIXES = (
+        "set_mxc_temperature_setpoint",
+        "set_temperature_setpoint",
+        "set_mxc_proportional_gain",
+        "set_mxc_integral_gain",
+        "set_mxc_derivative_gain",
+        "set_mxc_heater_range",
+        "set_proportional_gain",
+        "set_integral_gain",
+        "set_derivative_gain",
+        "set_heater_power",
+        "set_heater_range",
+        "set_temperature_limit",
+        "set_timeout",
+    )
+
+    if cmd.startswith(CONTROL_COMMAND_PREFIXES):
+        try:
+            with heater_mutex:
+                autoscan_state = ls.get_autoscan()
+        except Exception:
+            autoscan_state = None
+
+        # autoscan_state = (channel, enabled)
+        if autoscan_state and len(autoscan_state) >= 2:
+            enabled = int(autoscan_state[1])
+        else:
+            enabled = 0
+
+        if enabled == 1:
+            print("⚠️ Autoscan is ON — disabling automatically before applying control settings")
+            with heater_mutex:
+                ls.set_autoscan("off")
+            time.sleep(0.1)
+            print("✅ Autoscan disabled")
+
+    if cmd.startswith("start_run"):
+        parts = cmd.split(":")
+        if len(parts) != 2:
+            message = "❌ Syntax: start_run:<RUN_ID>"
+            print(message)
+            return message
+
+        try:
+            global_run_id = int(parts[1])
+        except (ValueError, TypeError):
+            message = "❌ RUN_ID must be an integer"
+            print(message)
+            return message
+
+        start_run(global_run_id)
+
+        if CURRENT_RUN_ID is not None:
+            message = f"✅ Run {CURRENT_RUN_ID} started"
+        else:
+            message = "❌ Failed to start run"
+
+        print(message)
+        return message
+
+    elif cmd == "end_run":
+        end_run()
+        return "✅ Run ended"
     
-    if command.startswith("set_temperature_setpoint"):
+    elif cmd == "get_last_run":
+        try:
+            with get_db_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT COALESCE(MAX(run_id), 0) FROM runs;")
+                    last_run = cur.fetchone()[0]
+
+            message = f"LAST_RUN:{last_run}"
+            print(f"📡 get_last_run -> {message}")
+            return message
+
+        except Exception as e:
+            message = f"ERROR:get_last_run:{e}"
+            print(message)
+            return message
+
+    elif cmd.startswith("get_run_data"):
+        parts = cmd.split(":")
+        if len(parts) != 2:
+            message = "RUN_DATA:ERROR:Syntax. Use get_run_data:<RUN_ID>"
+            print(message)
+            return message
+
+        try:
+            run_id = int(parts[1])
+        except ValueError:
+            message = "RUN_DATA:ERROR:RUN_ID must be an integer"
+            print(message)
+            return message
+
+        CHANNEL_IDS = {
+            "MXC":  6,
+            "STILL": 5,
+            "4K":   2,
+            "50K":  1,
+        }
+        ID_TO_NAME = {v: k for k, v in CHANNEL_IDS.items()}
+
+        try:
+            with get_db_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT
+                            channel_id,
+                            extract(epoch FROM ts) * 1000 AS ts_ms,
+                            temperature_k,
+                            resistance_ohm,
+                            power_w
+                        FROM channel_data
+                        WHERE run_id = %s
+                        ORDER BY ts ASC;
+                        """,
+                        (run_id,),
+                    )
+                    rows = cur.fetchall()
+
+            if not rows:
+                message = f"RUN_DATA:ERROR:No data found for RUN_ID {run_id}"
+                print(message)
+                return message
+
+            data_by_channel = {}
+            for channel_id, ts_ms, temp, res, power in rows:
+                ch_name = ID_TO_NAME.get(channel_id, str(channel_id))
+
+                if ch_name not in data_by_channel:
+                    data_by_channel[ch_name] = {
+                        "timestamps": [],
+                        "temperature_k": [],
+                        "resistance_ohm": [],
+                        "power_w": [],
+                    }
+
+                def to_float(x):
+                    return float(x) if x is not None else None
+
+                data_by_channel[ch_name]["timestamps"].append(float(ts_ms))
+                data_by_channel[ch_name]["temperature_k"].append(to_float(temp))
+                data_by_channel[ch_name]["resistance_ohm"].append(to_float(res))
+                data_by_channel[ch_name]["power_w"].append(to_float(power))
+
+            payload = {
+                "run_id": run_id,
+                "channels": data_by_channel,
+            }
+
+            json_str = json.dumps(payload)
+            message = f"RUN_DATA:OK:{json_str}"
+            print(f"📡 get_run_data -> {len(rows)} rows returned for RUN {run_id}")
+            return message
+
+        except Exception as e:
+            message = f"RUN_DATA:ERROR:{e}"
+            print(message)
+            return message
+    
+    elif command.startswith("set_temperature_setpoint"):
         # Sintaxis to set the heater power: "set_temperature_setpoint:10" in Kelvin
         try:
             new_temperature_setpoint = float(command.split(":")[-1])
@@ -760,7 +1058,6 @@ def handle_command(command):
         try:
             parts = command.split(":")
             channel_status = int(parts[1])    
-            reset_flag = int(parts[2]) if len(parts) > 2 else 1
 
             with heater_mutex:
                 current_status = int(ls.get_channel_status(channel = 6))
@@ -785,9 +1082,6 @@ def handle_command(command):
                 if success: break
 
             if success:
-                if bool(channel_status and reset_flag):
-                    apply_default_channel_timing(6)
-                    apply_default_mxc_settings()
                 message = f"✅ MXC sensor is now {'On' if bool(channel_status) else 'Off'}"
             else:
                 message = f"❌ Failed to set MXC sensor {'On' if bool(channel_status) else 'Off'}"
@@ -806,7 +1100,6 @@ def handle_command(command):
         try:
             parts = command.split(":")
             channel_status = int(parts[1])    
-            reset_flag = int(parts[2]) if len(parts) > 2 else 1
 
             with heater_mutex:
                 current_status = int(ls.get_channel_status(channel = 1))
@@ -831,8 +1124,6 @@ def handle_command(command):
                 if success: break
 
             if success:
-                if bool(channel_status and reset_flag):
-                    apply_default_channel_timing(1)
                 message = f"✅ 50k sensor is now {'On' if bool(channel_status) else 'Off'}"
             else:
                 message = f"❌ Failed to set 50k sensor {'On' if bool(channel_status) else 'Off'}"
@@ -852,7 +1143,6 @@ def handle_command(command):
         try:
             parts = command.split(":")
             channel_status = int(parts[1])    
-            reset_flag = int(parts[2]) if len(parts) > 2 else 1
 
             with heater_mutex:
                 current_status = int(ls.get_channel_status(channel=2))
@@ -877,8 +1167,6 @@ def handle_command(command):
                     break
 
             if success:
-                if bool(channel_status and reset_flag):
-                    apply_default_channel_timing(2)
                 message = f"✅ 4K sensor is now {'On' if bool(channel_status) else 'Off'}"
             else:
                 message = f"❌ Failed to set 4K sensor {'On' if bool(channel_status) else 'Off'}"
@@ -895,7 +1183,6 @@ def handle_command(command):
         try:
             parts = command.split(":")
             channel_status = int(parts[1])    
-            reset_flag = int(parts[2]) if len(parts) > 2 else 1
 
             with heater_mutex:
                 current_status = int(ls.get_channel_status(channel=5))
@@ -920,8 +1207,6 @@ def handle_command(command):
                     break
 
             if success:
-                if bool(channel_status and reset_flag):
-                    apply_default_channel_timing(5)
                 message = f"✅ STILL sensor is now {'On' if bool(channel_status) else 'Off'}"
             else:
                 message = f"❌ Failed to set STILL sensor {'On' if bool(channel_status) else 'Off'}"
@@ -931,6 +1216,67 @@ def handle_command(command):
 
         except Exception as e:
             message = f"❌ Error setting STILL sensor status: {e}"
+            print(message)
+            return message
+
+    elif command == "reset_defaults_mxc":
+        try:
+            ok_timing = apply_default_channel_timing(6)
+            apply_default_mxc_settings()
+            ok_curve = apply_default_curve_settings(6)
+            if ok_timing and ok_curve:
+                message = "✅ MXC channel reset to default settings"
+            else:
+                message = "⚠️ MXC defaults applied with some errors (check log)"
+            print(message)
+            return message
+        except Exception as e:
+            message = f"❌ Error resetting MXC defaults: {e}"
+            print(message)
+            return message
+
+    elif command == "reset_defaults_50k":
+        try:
+            ok_timing = apply_default_channel_timing(1)
+            ok_curve = apply_default_curve_settings(1)
+            if ok_timing and ok_curve:
+                message = "✅ 50K channel reset to default settings"
+            else:
+                message = "⚠️ 50K defaults applied with some errors (check log)"
+            print(message)
+            return message
+        except Exception as e:
+            message = f"❌ Error resetting 50K defaults: {e}"
+            print(message)
+            return message
+
+    elif command == "reset_defaults_4k":
+        try:
+            ok_timing = apply_default_channel_timing(2)
+            ok_curve = apply_default_curve_settings(2)
+            if ok_timing and ok_curve:
+                message = "✅ 4K channel reset to default settings"
+            else:
+                message = "⚠️ 4K defaults applied with some errors (check log)"
+            print(message)
+            return message
+        except Exception as e:
+            message = f"❌ Error resetting 4K defaults: {e}"
+            print(message)
+            return message
+
+    elif command == "reset_defaults_still":
+        try:
+            ok_timing = apply_default_channel_timing(5)
+            ok_curve = apply_default_curve_settings(5)
+            if ok_timing and ok_curve:
+                message = "✅ STILL channel reset to default settings"
+            else:
+                message = "⚠️ STILL defaults applied with some errors (check log)"
+            print(message)
+            return message
+        except Exception as e:
+            message = f"❌ Error resetting STILL defaults: {e}"
             print(message)
             return message
 
@@ -948,6 +1294,11 @@ def handle_command(command):
                 current_settings = ls.get_sensor_resistance_settings(channel=6, return_dict=True)
 
             time.sleep(0.1)
+
+            if not isinstance(current_settings, dict):
+                message = "❌ Could not read current sensor settings for MXC"
+                print(message)
+                return message
 
             current_settings['excitation_mode'] = new_mode
 
@@ -1175,9 +1526,114 @@ def handle_command(command):
             print(message)
             return message
 
-            
+    elif command.startswith("set_curve_mxc"):
+        try:
+            curve = int(command.split(":")[-1])
+
+            if curve not in CURVE_NAMES:
+                message = f"❌ Curve {curve} is not defined"
+                print(message)
+                return message
+
+            with heater_mutex:
+                ok = ls.set_channel_curve(curve, channel=6)
+
+            if ok:
+                current_curves[6] = curve
+                message = f"✅ MXC curve set to {curve} - {CURVE_NAMES[curve]}"
+            else:
+                message = f"❌ Failed to set MXC curve to {curve}"
+
+            print(message)
+            return message
+
+        except Exception as e:
+            message = f"❌ Error setting MXC curve: {e}"
+            print(message)
+            return message
+    
+    elif command.startswith("set_curve_50k"):
+        try:
+            curve = int(command.split(":")[-1])
+
+            if curve not in CURVE_NAMES:
+                message = f"❌ Curve {curve} is not defined"
+                print(message)
+                return message
+
+            with heater_mutex:
+                ok = ls.set_channel_curve(curve, channel=1)  
+
+            if ok:
+                current_curves[1] = curve
+                message = f"✅ 50K curve set to {curve} - {CURVE_NAMES[curve]}"
+            else:
+                message = f"❌ Failed to set 50K curve to {curve}"
+
+            print(message)
+            return message
+
+        except Exception as e:
+            message = f"❌ Error setting 50K curve: {e}"
+            print(message)
+            return message
+
+    elif command.startswith("set_curve_4k"):
+        try:
+            curve = int(command.split(":")[-1])
+
+            if curve not in CURVE_NAMES:
+                message = f"❌ Curve {curve} is not defined"
+                print(message)
+                return message
+
+            with heater_mutex:
+                ok = ls.set_channel_curve(curve, channel=2)  
+
+            if ok:
+                current_curves[2] = curve
+                message = f"✅ 4K curve set to {curve} - {CURVE_NAMES[curve]}"
+            else:
+                message = f"❌ Failed to set 4K curve to {curve}"
+
+            print(message)
+            return message
+
+        except Exception as e:
+            message = f"❌ Error setting 4K curve: {e}"
+            print(message)
+            return message
+
+    elif command.startswith("set_curve_still"):
+        try:
+            curve = int(command.split(":")[-1])
+
+            if curve not in CURVE_NAMES:
+                message = f"❌ Curve {curve} is not defined"
+                print(message)
+                return message
+
+            with heater_mutex:
+                ok = ls.set_channel_curve(curve, channel=5)  
+
+            if ok:
+                current_curves[5] = curve
+                message = f"✅ STILL curve set to {curve} - {CURVE_NAMES[curve]}"
+            else:
+                message = f"❌ Failed to set STILL curve to {curve}"
+
+            print(message)
+            return message
+
+        except Exception as e:
+            message = f"❌ Error setting STILL curve: {e}"
+            print(message)
+            return message  
+        
     else:
         print("Unknown command")
+
+
 
     
             
@@ -1287,7 +1743,8 @@ def lakeshore_temperature_sensor():
             channel_enabled_MXC = 0
         
         try:
-            with heater_mutex: tempSetPointMXC = ls.get_temperature_setpoint()  # Channel 6 is MXC
+            with heater_mutex: 
+                tempSetPointMXC = ls.get_temperature_setpoint()  # Channel 6 is MXC
         except Exception as e:
             print(f"Error reading temperature setpoint for MXC from LakeShore\nReason: {e}")
             tempSetPointMXC = None
@@ -1300,7 +1757,9 @@ def lakeshore_temperature_sensor():
 
             time.sleep(0.1) # Small delay to ensure communictation channel is ready
             
-            with heater_mutex: heaterRangeMXC = ls.get_control_range()
+            with heater_mutex: 
+                heaterRangeMXC = ls.get_control_range()
+                heaterOutputMXC = ls.get_heater_output_percent()
             
         except Exception as e:
             print(f"Error reading control parameters from LakeShore\nReason: {e}")
@@ -1373,6 +1832,7 @@ def lakeshore_temperature_sensor():
             'I': integralMXC,
             'D': derivativeMXC,
             'HR': heaterRangeMXC,
+            'heaterOutputMXC': heaterOutputMXC,
         }
 
         sensorParams = {
@@ -1388,7 +1848,11 @@ def lakeshore_temperature_sensor():
             'dwell_times'      : dwell_times,
             'pause_times'      : pause_times,
             'autoscan'         : autoscan,
-            'enabledMXC'       : channel_enabled_MXC
+            'enabledMXC'       : channel_enabled_MXC,
+            'curve_MXC'        : current_curves[6],
+            'curve_50K'        : current_curves[1],
+            'curve_4K'         : current_curves[2],
+            'curve_STILL'      : current_curves[5]
         }
 
         sensorValues = {
@@ -1397,12 +1861,20 @@ def lakeshore_temperature_sensor():
             'powers'       : powers,
         }
         
+        global last_sensorValues, last_controlParams, last_sensorParams
+        last_sensorValues = sensorValues
+        last_controlParams = controlParams
+        last_sensorParams = sensorParams
+
         try:
             broadcast_temperature(sensorValues, controlParams, sensorParams)
         except Exception as e:
             print(f"Error broadcasting temperature data: {e}")
+
+        maybe_insert_measurements()
         
         time.sleep(1)
+
 
 def broadcast_temperature(sensorValues, controlParams, sensorParams):
 
@@ -1502,7 +1974,13 @@ def broadcast_temperature(sensorValues, controlParams, sensorParams):
                     f"mode4K: {sensorParams['sensor_mode_4K']}," +
                     f"range4K: {sensorParams['sensor_range_4K']}," +
                     f"modeSTILL: {sensorParams['sensor_mode_STILL']}," +
-                    f"rangeSTILL: {sensorParams['sensor_range_STILL']}\n"
+                    f"rangeSTILL: {sensorParams['sensor_range_STILL']}," +
+                    f"curveMXC: {sensorParams['curve_MXC']}," +
+                    f"curve50K: {sensorParams['curve_50K']}," +
+                    f"curve4K: {sensorParams['curve_4K']}," +
+                    f"curveSTILL: {sensorParams['curve_STILL']}," +
+                    f"heaterOutputMXC: {controlParams['heaterOutputMXC']}," +
+                    f"RUNID: {CURRENT_RUN_ID}\n"
                     ).encode('utf-8')
         
     except Exception as e:
@@ -1535,5 +2013,188 @@ def broadcast_temperature(sensorValues, controlParams, sensorParams):
                     pass
 
 
+
+def maybe_insert_measurements():
+    global last_db_insert_ts
+    global last_sensorValues, last_controlParams, last_sensorParams
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    if last_db_insert_ts is not None:
+        if now - last_db_insert_ts < db_delay:
+            return  
+
+    last_db_insert_ts = now
+
+    run_id = CURRENT_RUN_ID
+    if run_id is None:
+        return
+
+    CHANNEL_IDS = {
+        "MXC":  6,
+        "STILL": 5,
+        "4K":   2,
+        "50K":  1,
+    }
+
+    CURVES_BY_NAME = {
+        "MXC":   current_curves[6],
+        "STILL": current_curves[5],
+        "4K":    current_curves[2],
+        "50K":   current_curves[1],
+    }
+
+    if (
+        last_sensorValues is None
+        or last_controlParams is None
+        or last_sensorParams is None
+    ):
+        print("Skipping DB insert: no sensor data available yet")
+        return
+
+    temperatures = last_sensorValues["temperatures"]
+    resistances  = last_sensorValues["resistances"]
+    powers       = last_sensorValues["powers"]
+
+    dwell_times  = last_sensorParams["dwell_times"]
+    pause_times  = last_sensorParams["pause_times"]
+
+    mxc_sp  = last_controlParams["MXCSP"]
+    mxc_p   = last_controlParams["P"]
+    mxc_i   = last_controlParams["I"]
+    mxc_d   = last_controlParams["D"]
+    mxc_hr  = last_controlParams["HR"]
+
+    per_channel = [
+        (
+            "MXC",
+            temperatures["MXC"],
+            resistances["MXC"],
+            powers["MXC"],
+            dwell_times["MXC"],
+            pause_times["MXC"],
+            last_sensorParams["sensor_mode"],       
+            last_sensorParams["sensor_range"],      
+            last_sensorParams["sensor_autorange"],
+            bool(last_sensorParams["enabledMXC"]),        
+
+            mxc_sp, mxc_p, mxc_i, mxc_d, mxc_hr,
+            CURVES_BY_NAME["MXC"],
+        ),
+        (
+            "STILL",
+            temperatures["STILL"],
+            resistances["STILL"],
+            powers["STILL"],
+            dwell_times["STILL"],
+            pause_times["STILL"],
+            last_sensorParams["sensor_mode_STILL"],
+            last_sensorParams["sensor_range_STILL"],
+            None,
+            bool(ls.get_channel_status(5)),          
+
+            None, None, None, None, None,
+            CURVES_BY_NAME["STILL"],          
+        ),
+        (
+            "4K",
+            temperatures["4K"],
+            resistances["4K"],
+            powers["4K"],
+            dwell_times["4K"],
+            pause_times["4K"],
+            last_sensorParams["sensor_mode_4K"],
+            last_sensorParams["sensor_range_4K"],
+            None,
+            bool(ls.get_channel_status(2)),         
+
+            None, None, None, None, None,
+            CURVES_BY_NAME["4K"],
+        ),
+        (
+            "50K",
+            temperatures["50K"],
+            resistances["50K"],
+            powers["50K"],
+            dwell_times["50K"],
+            pause_times["50K"],
+            last_sensorParams["sensor_mode_50K"],
+            last_sensorParams["sensor_range_50K"],
+            None,
+            bool(ls.get_channel_status(1)),         
+
+            None, None, None, None, None,
+            CURVES_BY_NAME["50K"],
+        ),
+    ]
+
+    with get_db_conn() as conn:
+        with conn.cursor() as cur:
+            for (
+                name, temp_k, res_ohm, power_w,
+                dwell_s, pause_s,
+                mode, range_, autorange,
+                enabled,
+                mxc_sp, mxc_p, mxc_i, mxc_d, mxc_hr,
+                curve_id
+            ) in per_channel:
+
+                channel_id = CHANNEL_IDS[name]
+
+                cur.execute(
+                    """
+                    INSERT INTO channel_data (
+                        run_id, channel_id, ts,
+                        temperature_k,
+                        resistance_ohm,
+                        power_w,
+                        dwell_s, pause_s,
+                        excitation_mode,
+                        excitation_range,
+                        autorange,
+                        enabled,
+                        mxc_setpoint_mk,
+                        mxc_p_gain,
+                        mxc_i_gain,
+                        mxc_d_gain,
+                        mxc_heater_range,
+                        curve
+                    ) VALUES (
+                        %s, %s, %s,
+                        %s, %s, %s,
+                        %s, %s,
+                        %s, %s, %s,
+                        %s,
+                        %s, %s, %s, %s, %s,
+                        %s
+                    )
+                    """,
+                    (
+                        run_id, channel_id, now,
+                        temp_k,
+                        res_ohm,
+                        power_w,
+                        dwell_s,
+                        pause_s,
+                        mode,
+                        range_,
+                        autorange,
+                        enabled,
+                        mxc_sp,
+                        mxc_p,
+                        mxc_i,
+                        mxc_d,
+                        mxc_hr,
+                        curve_id
+                    ),
+                )
+        conn.commit()
+
+
+
 if __name__ == "__main__":
-    start_server()
+    #try:
+        #init_db_pool()
+        start_server()
+    #finally:
+        end_run()
+        #close_db_pool()

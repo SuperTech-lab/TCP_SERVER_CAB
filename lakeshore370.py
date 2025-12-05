@@ -438,6 +438,36 @@ class LakeShore370:
             print(f"Getting sensor resistance settings for channel {channel} failed.\nReason: {e}")
             return None
 
+
+    def get_channel_curve(self, channel: int) -> int | None:
+        """
+        Devuelve el número de curva configurado en un canal (campo 4 de INSET?).
+        """
+        if channel not in DEFAULT_CHANNELS:
+            print(f"Channel {channel} is not valid. Valid channels are: {DEFAULT_CHANNELS}")
+            return None
+
+        try:
+            with _lakeshore_mutex:
+                parameters = self.device.query(f"INSET? {channel}").split(",")
+            curve = int(parameters[3])
+            return curve
+        except Exception as e:
+            print(f"Getting curve for channel {channel} failed.\nReason: {e}")
+            return None
+        
+    def get_heater_output_percent(self):
+        """
+        Get heater output as percentage of full scale (0–100 %).
+        """
+        try:
+            with _lakeshore_mutex:
+                response = self.device.query("HTR?")
+            return float(response.strip())
+        except Exception as e:
+            print(f"Getting heater output failed.\nReason: {e}")
+            return None
+        
     # ! -- Device set Methods -- #
 
     def set_temperature_setpoint(self, value: float, units: str = 'K', verbose=False):

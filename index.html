@@ -392,10 +392,43 @@
       .reset-toggle {
         display: flex;
         align-items: center;
+        justify-content: flex-start;
         gap: 6px;
         font-size: 0.9rem;
         margin-top: 4px;
+
+        background-color: #e6f9e6;
+        border: 1px solid #2ecc71;
+        color: #1e8f4b;
+        border-radius: 6px;
+        font-weight: 600;
+
+        width: 150px;
+        height: 48px;
+        padding: 4px 8px;
+        line-height: 1.1;
       }
+
+      .reset-toggle-2 {
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 6px;
+        font-size: 0.9rem;
+        margin-top: 4px;
+
+        background-color: #e6f9e6;
+        border: 1px solid #2ecc71;
+        color: #1e8f4b;
+        border-radius: 6px;
+        font-weight: 600;
+
+        width: 120px;
+        height: 40px;
+        padding: 4px 8px;
+        line-height: 1.1;
+      }
+
       .lakeshore-control-panel {
         flex: 1;
         background-color: white;
@@ -434,9 +467,10 @@
 
       .global-controls-row {
         display: flex;
-        gap: 20px;
-        align-items: flex-start;
+        justify-content: space-between;
+        align-items: center;
         padding-bottom: 10px;
+        padding-right: 10px;
       }
 
       .autoscan-panel {
@@ -467,10 +501,13 @@
         font-weight: 700;
         color: #1f2937;
         margin: 15px 0 10px 0;
-        border-bottom: 1px solid #e5e7eb;
-        padding-bottom: 10px;
+        padding: 15px 24px;
         cursor: pointer;
         justify-content: space-between;
+        background-color: white;
+        border-radius: 8px 8px 0 0;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        border-bottom: none;
       }
 
       .log-section-title .icon {
@@ -492,19 +529,65 @@
 
       .stage-mxc {
         border-left: 5px solid #3b82f6;
-        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+        box-shadow: 0 4px 12px rgba(34, 103, 214, 0.2);
       }
       .stage-still {
         border-left: 5px solid #10b981;
-        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+        box-shadow: 0 4px 12px rgba(13, 168, 116, 0.2);
       }
       .stage-4k {
-        border-left: 5px solid #f59e0b;
-        box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2);
+        border-left: 5px solid #dd8f08;
+        box-shadow: 0 4px 12px rgba(212, 138, 10, 0.2);
       }
       .stage-50k {
-        border-left: 5px solid #8b5cf6;
-        box-shadow: 0 4px 12px rgba(139, 92, 246, 0.2);
+        border-left: 5px solid #da2b2b;
+        box-shadow: 0 4px 12px rgba(233, 48, 48, 0.2);
+      }
+      .current-stage-value {
+        width: 120px;
+        margin-left: 30px;
+        margin-top: 10px;
+      }
+      .run-control {
+        display: flex;
+        align-items: center;
+        gap: 8px; /* Espacio entre los elementos de control */
+        padding: 8px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        background-color: #f9fafb;
+        flex-shrink: 0;
+      }
+
+      .run-control .run-label {
+        width: auto;
+        font-weight: 700;
+        margin-right: 0; /* Elimina el margen derecho si se usa gap */
+      }
+
+      .run-control .run-input {
+        width: 40px; /* Tamaño adecuado para el ID */
+        padding: 4px 6px;
+        font-size: 14px;
+      }
+
+      .run-control .inline-button {
+        padding: 6px 10px; /* Botones más pequeños para la barra de ajustes */
+        min-width: unset;
+      }
+      .run-control-floating {
+        margin-left: auto;
+        flex-shrink: 0;
+      }
+      .autoscan-panel {
+        margin-right: 26px;
+      }
+      .autoscan-panel,
+      .channel-dropdown-summary,
+      .run-control {
+        height: 40px;
+        display: flex;
+        align-items: center;
       }
     </style>
   </head>
@@ -607,6 +690,28 @@
                     </div>
                   </div>
                 </details>
+                <div class="run-control run-control-floating">
+                  <label for="runIdInput" class="run-label">RUN ID</label>
+                  <input
+                    type="number"
+                    id="runIdInput"
+                    class="run-input"
+                    value="1"
+                    min="1"
+                  />
+                  <button
+                    id="runPlayButton"
+                    class="inline-button run-play-button"
+                  >
+                    ▶
+                  </button>
+                  <button
+                    id="runStopButton"
+                    class="inline-button run-stop-button"
+                  >
+                    ⏹
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -620,17 +725,15 @@
             └── MXC Stage -->
 
         <!-- System Log for Fridge Tab -->
-        <div class="row-container">
+        <div class="section-title log-section-title">
+          <div style="display: flex; align-items: center; gap: 10px">
+            <span class="icon">📜</span>
+            SYSTEM LOG
+          </div>
+        </div>
+        <div class="section-content row-container log-section">
           <div class="lakeshore-control-panel">
-            <div class="log-section-title">
-              <div style="display: flex; align-items: center; gap: 10px">
-                <span class="icon">📜</span>
-                SYSTEM LOG
-              </div>
-            </div>
-            <div class="section-content">
-              <div class="log-box" id="logBoxLS"></div>
-            </div>
+            <div class="log-box" id="logBoxLS"></div>
           </div>
         </div>
         <!-- ------------------------- -->
@@ -643,6 +746,10 @@
               <div style="margin-top: 15px">
                 <!-- SOLO Controles del PID + Heater Range -->
                 <div id="control-settings-mxc">
+                  <div class="control-row" style="margin-bottom: 10px">
+                    <label style="width: 120px">Heater output:</label>
+                    <span id="heaterOutputMXC" class="current-value">- %</span>
+                  </div>
                   <div class="control-row" style="margin-bottom: 10px">
                     <label for="temperatureSetpointMXC" style="width: 120px"
                       >Setpoint (mK):</label
@@ -723,6 +830,21 @@
                       <option value="8">100 mA</option>
                     </select>
                   </div>
+                  <div class="control-row" style="margin-bottom: 10px">
+                    <label for="curveMXCSelect" style="width: 120px"
+                      >Curve:</label
+                    >
+                    <select
+                      id="curveMXCSelect"
+                      class="control-input"
+                      style="width: 120px"
+                    >
+                      <option value="1">PT-100-20K (PT1011)</option>
+                      <option value="2">CX-1050-CD-BF1 (X64005)</option>
+                      <option value="5">CX-1010-CD-BF0 (X63593)</option>
+                      <option value="6">RU-1000-BF0.007 (U03308)</option>
+                    </select>
+                  </div>
 
                   <div class="control-row" style="margin-top: 10px">
                     <button onclick="writeControlSettingsMXC()">
@@ -783,10 +905,13 @@
                 Write Sensor Settings
               </button>
 
-              <label class="reset-toggle">
-                <input type="checkbox" id="reset-mxc" checked />
-                Reset when switching on
-              </label>
+              <button
+                class="inline-button"
+                style="margin-right: 25px; padding: 8px 18px; min-width: 160px"
+                onclick="resetDefaultsMXC()"
+              >
+                Reset to default
+              </button>
 
               <label
                 for="timeRangeMXC"
@@ -823,11 +948,7 @@
                 Autorange
               </label>
 
-              <select
-                id="currentMXCValue"
-                class="currentmxc-value"
-                style="width: 120px; margin-left: 30px"
-              >
+              <select id="currentMXCValue" class="current-stage-value">
                 <option value="temperature">- mK</option>
                 <option value="resistance">- Ω</option>
                 <option value="power">- W</option>
@@ -955,6 +1076,21 @@
                   <option value="1">Current</option>
                 </select>
               </div>
+              <div class="control-row" style="margin-bottom: 10px">
+                <label for="curveSTILLSelect" style="width: 120px"
+                  >Curve:</label
+                >
+                <select
+                  id="curveSTILLSelect"
+                  class="control-input"
+                  style="width: 120px"
+                >
+                  <option value="1">PT-100-20K (PT1011)</option>
+                  <option value="2">CX-1050-CD-BF1 (X64005)</option>
+                  <option value="5">CX-1010-CD-BF0 (X63593)</option>
+                  <option value="6">RU-1000-BF0.007 (U03308)</option>
+                </select>
+              </div>
               <div class="control-row">
                 <button onclick="writeSettingsSTILL()">Write Settings</button>
               </div>
@@ -979,10 +1115,13 @@
           </div>
           <div class="lakeshore-plot-panel">
             <div class="control-row" style="align-items: center">
-              <label class="reset-toggle">
-                <input type="checkbox" id="reset-still" checked />
-                Reset when switching on
-              </label>
+              <button
+                class="inline-button"
+                style="margin-right: 25px; padding: 8px 18px; min-width: 160px"
+                onclick="resetDefaultsSTILL()"
+              >
+                Reset to default
+              </button>
               <label
                 for="timeRangeSTILL"
                 style="margin-left: 30px; margin-right: 0px"
@@ -1000,6 +1139,11 @@
                 <option value="1800">30 Minutes</option>
                 <option value="3600">1 Hour</option>
                 <option value="21600">6 Hours</option>
+              </select>
+              <select id="currentSTILLValue" class="current-stage-value">
+                <option value="temperature">- mK</option>
+                <option value="resistance">- Ω</option>
+                <option value="power">- W</option>
               </select>
             </div>
             <canvas
@@ -1064,6 +1208,19 @@
                   <option value="1">Current</option>
                 </select>
               </div>
+              <div class="control-row" style="margin-bottom: 10px">
+                <label for="curve4KSelect" style="width: 120px">Curve:</label>
+                <select
+                  id="curve4KSelect"
+                  class="control-input"
+                  style="width: 120px"
+                >
+                  <option value="1">PT-100-20K (PT1011)</option>
+                  <option value="2">CX-1050-CD-BF1 (X64005)</option>
+                  <option value="5">CX-1010-CD-BF0 (X63593)</option>
+                  <option value="6">RU-1000-BF0.007 (U03308)</option>
+                </select>
+              </div>
               <div class="control-row">
                 <button onclick="writeSettings4K()">Write Settings</button>
               </div>
@@ -1088,10 +1245,13 @@
           </div>
           <div class="lakeshore-plot-panel">
             <div class="control-row" style="align-items: center">
-              <label class="reset-toggle">
-                <input type="checkbox" id="reset-4k" checked />
-                Reset when switching on
-              </label>
+              <button
+                class="inline-button"
+                style="margin-right: 25px; padding: 8px 18px; min-width: 160px"
+                onclick="resetDefaults4K()"
+              >
+                Reset to default
+              </button>
               <label
                 for="timeRange4K"
                 style="margin-left: 30px; margin-right: 0px"
@@ -1109,6 +1269,11 @@
                 <option value="1800">30 Minutes</option>
                 <option value="3600">1 Hour</option>
                 <option value="21600">6 Hours</option>
+              </select>
+              <select id="current4KValue" class="current-stage-value">
+                <option value="temperature">- mK</option>
+                <option value="resistance">- Ω</option>
+                <option value="power">- W</option>
               </select>
             </div>
             <canvas id="temperatureChart4K" width="800" height="200"></canvas>
@@ -1169,6 +1334,19 @@
                   <option value="1">Current</option>
                 </select>
               </div>
+              <div class="control-row" style="margin-bottom: 10px">
+                <label for="curve50KSelect" style="width: 120px">Curve:</label>
+                <select
+                  id="curve50KSelect"
+                  class="control-input"
+                  style="width: 120px"
+                >
+                  <option value="1">PT-100-20K (PT1011)</option>
+                  <option value="2">CX-1050-CD-BF1 (X64005)</option>
+                  <option value="5">CX-1010-CD-BF0 (X63593)</option>
+                  <option value="6">RU-1000-BF0.007 (U03308)</option>
+                </select>
+              </div>
               <div class="control-row">
                 <button onclick="writeSettings50K()">Write Settings</button>
               </div>
@@ -1193,10 +1371,13 @@
           </div>
           <div class="lakeshore-plot-panel">
             <div class="control-row" style="margin-bottom: 10px">
-              <label class="reset-toggle">
-                <input type="checkbox" id="reset-50k" checked />
-                Reset when switching on
-              </label>
+              <button
+                class="inline-button"
+                style="margin-right: 25px; padding: 8px 18px; min-width: 160px"
+                onclick="resetDefaults50K()"
+              >
+                Reset to default
+              </button>
 
               <!-- Time range for 50K-->
               <label
@@ -1215,6 +1396,11 @@
                 <option value="1800">30 Minutes</option>
                 <option value="3600">1 Hour</option>
                 <option value="21600">6 Hours</option>
+              </select>
+              <select id="current50KValue" class="current-stage-value">
+                <option value="temperature">- mK</option>
+                <option value="resistance">- Ω</option>
+                <option value="power">- W</option>
               </select>
             </div>
             <canvas id="temperatureChart50K" width="800" height="200"></canvas>
@@ -1366,6 +1552,228 @@
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
+      let hasInitializedRunId = false;
+      let expectedNextRunId = null;
+
+      function loadHistoricalRun(runPayload) {
+        if (!runPayload || !runPayload.channels) {
+          addLogEntry("Error: RUN_DATA sin canales", "received");
+          return;
+        }
+
+        // Aseguramos que existen los stores
+        ["50K", "4K", "STILL", "MXC"].forEach((id) => {
+          if (!chartDataStore[id]) {
+            chartDataStore[id] = {
+              labels: [],
+              data: [],
+              setpoint: [],
+              startTime: null,
+            };
+          } else {
+            chartDataStore[id].labels = [];
+            chartDataStore[id].data = [];
+            chartDataStore[id].setpoint = [];
+            chartDataStore[id].startTime = null;
+          }
+        });
+
+        const channelMap = {
+          "50K": "50K",
+          "4K": "4K",
+          STILL: "STILL",
+          MXC: "MXC",
+        };
+
+        for (const [payloadKey, chartId] of Object.entries(channelMap)) {
+          const ch = runPayload.channels[payloadKey];
+          if (
+            !ch ||
+            !Array.isArray(ch.timestamps) ||
+            !Array.isArray(ch.temperature_k) ||
+            ch.timestamps.length === 0
+          ) {
+            continue;
+          }
+
+          const store = chartDataStore[chartId];
+
+          const timestampsMs = ch.timestamps.map((t) =>
+            typeof t === "string" ? Date.parse(t) : t
+          );
+          const t0 = timestampsMs[0];
+
+          for (let i = 0; i < ch.temperature_k.length; i++) {
+            const ti = timestampsMs[i];
+            const rel = (ti - t0) / 1000.0;
+            store.labels.push(rel);
+            store.data.push(ch.temperature_k[i]);
+          }
+
+          const durationSec =
+            store.labels[store.labels.length - 1] !== undefined
+              ? store.labels[store.labels.length - 1]
+              : 60;
+
+          store.startTime = Date.now() - durationSec * 1000;
+
+          const ranges = timeRangeOptions
+            .map((o) => o.value)
+            .sort((a, b) => a - b);
+          let chosen = ranges[0];
+          for (const r of ranges) {
+            if (durationSec >= r) chosen = r;
+          }
+
+          if (chartId === "MXC") currentTimeRangeMXC = chosen;
+          if (chartId === "50K") currentTimeRange50K = chosen;
+          if (chartId === "4K") currentTimeRange4K = chosen;
+          if (chartId === "STILL") currentTimeRangeSTILL = chosen;
+
+          redrawFromStore(chartId);
+        }
+
+        updateTimeRangeOptions();
+        updateTimeRangeOptions50K();
+        updateTimeRangeOptions4K();
+        updateTimeRangeOptionsSTILL();
+
+        addLogEntry(
+          `✅ Cargado RUN histórico ${runPayload.run_id} en las gráficas`,
+          "status"
+        );
+      }
+
+      async function initRunIdFromServer() {
+        if (hasInitializedRunId) {
+          return;
+        }
+        hasInitializedRunId = true;
+
+        const runIdInput = document.getElementById("runIdInput");
+        if (!runIdInput) return;
+
+        try {
+          addLogEntry("Requesting last run id...", "status");
+
+          const response = await sendCommandToServer("get_last_run");
+          const match = /LAST_RUN:(\d+)/.exec(response);
+
+          if (match) {
+            const lastRun = parseInt(match[1], 10);
+            const nextRun = lastRun + 1;
+            runIdInput.value = nextRun;
+            expectedNextRunId = nextRun;
+            addLogEntry(`Next run id set to ${nextRun}`, "status");
+          } else {
+            addLogEntry(
+              `Could not parse LAST_RUN from server response: "${response}". Using 1.`,
+              "status"
+            );
+            runIdInput.value = 1;
+            expectedNextRunId = 1;
+          }
+        } catch (error) {
+          addLogEntry(
+            `Error requesting last run id: ${error.message}. Using 1.`,
+            "received"
+          );
+          runIdInput.value = 1;
+          expectedNextRunId = 1;
+        }
+      }
+
+      function sleep(ms) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+      }
+      //RUN CONTROL:
+      document.addEventListener("DOMContentLoaded", function () {
+        const runIdInput = document.getElementById("runIdInput");
+        const runPlayButton = document.getElementById("runPlayButton");
+        const runStopButton = document.getElementById("runStopButton");
+
+        if (!runPlayButton || !runStopButton) {
+          console.warn("Run control elements not found in DOM");
+          return;
+        }
+
+        initRunIdFromServer();
+
+        // Play: start_run o get_run_data según runId
+        runPlayButton.addEventListener("click", async () => {
+          const runId = parseInt(runIdInput.value, 10);
+
+          if (isNaN(runId) || runId <= 0) {
+            addLogEntry("Error: RUN_ID must be a positive integer", "received");
+            return;
+          }
+
+          if (expectedNextRunId !== null && runId < expectedNextRunId) {
+            const command = `get_run_data:${runId}`;
+            addLogEntry(`Requesting historical data for run ${runId}`, "sent");
+
+            try {
+              const response = await sendCommandToServer(command);
+              addLogEntry(`Server response: ${response}`, "received");
+              const match = /RUN_DATA:OK:(\{.*\})/.exec(response);
+              if (!match) {
+                addLogEntry(
+                  "❌ No RUN_DATA JSON found in server response",
+                  "received"
+                );
+                return;
+              }
+
+              let payload;
+              try {
+                payload = JSON.parse(match[1]);
+              } catch (e) {
+                addLogEntry(
+                  `❌ Error parsing RUN_DATA JSON: ${e.message}`,
+                  "received"
+                );
+                return;
+              }
+
+              loadHistoricalRun(payload);
+            } catch (error) {
+              addLogEntry(
+                `Error sending get_run_data: ${error.message}`,
+                "received"
+              );
+            }
+
+            return;
+          }
+
+          const command = `start_run:${runId}`;
+          addLogEntry(`Sending command: ${command}`, "sent");
+
+          try {
+            const response = await sendCommandToServer(command);
+            addLogEntry(`Server response: ${response}`, "received");
+          } catch (error) {
+            addLogEntry(
+              `Error sending start_run: ${error.message}`,
+              "received"
+            );
+          }
+        });
+
+        // Stop: end_run
+        runStopButton.addEventListener("click", async () => {
+          const command = "end_run";
+          addLogEntry(`Sending command: ${command}`, "sent");
+
+          try {
+            const response = await sendCommandToServer(command);
+            addLogEntry(`Server response: ${response}`, "received");
+          } catch (error) {
+            addLogEntry(`Error sending end_run: ${error.message}`, "received");
+          }
+        });
+      });
+
       // Initialize the chart
       const ctx = document
         .getElementById("temperatureChartBB")
@@ -1398,11 +1806,11 @@
       let absoluteTimeLabels = [];
       let relativeTimeLabels = [];
       /*
-        absoluteTimeLabels stores timestamps in miliseconds
-        relativeTimeLabels stores time values in seconds relative to firstDataTime.
-        relativeTimeLabels is used for x-axis labels in charts, and it is calculated
-        as (Date.now() - firstDataTime) / 1000 
-        */
+              absoluteTimeLabels stores timestamps in miliseconds
+              relativeTimeLabels stores time values in seconds relative to firstDataTime.
+              relativeTimeLabels is used for x-axis labels in charts, and it is calculated
+              as (Date.now() - firstDataTime) / 1000
+              */
 
       // Track parameter values
       let currentParameters = {
@@ -1446,6 +1854,17 @@
         range4K: null,
         modeSTILL: null,
         rangeSTILL: null,
+        curveMXC: null,
+        curve50K: null,
+        curve4K: null,
+        curveSTILL: null,
+        R50K: null,
+        P50K: null,
+        R4K: null,
+        P4K: null,
+        RSTILL: null,
+        PSTILL: null,
+        heaterOutputMXC: null,
       };
 
       // Track last sent values
@@ -1847,6 +2266,23 @@
             document.getElementById("sensorModeSTILL").value =
               currentParameters.modeSTILL;
           }
+          if (currentParameters.curveMXC !== null) {
+            document.getElementById("curveMXCSelect").value =
+              currentParameters.curveMXC;
+          }
+
+          if (currentParameters.curve50K !== null) {
+            document.getElementById("curve50KSelect").value =
+              currentParameters.curve50K;
+          }
+          if (currentParameters.curve4K !== null) {
+            document.getElementById("curve4KSelect").value =
+              currentParameters.curve4K;
+          }
+          if (currentParameters.curveSTILL !== null) {
+            document.getElementById("curveSTILLSelect").value =
+              currentParameters.curveSTILL;
+          }
           initialParametersLoaded = true;
         }
 
@@ -1970,6 +2406,22 @@
         if (currentParameters.modeSTILL !== null) {
           document.getElementById("sensorModeSTILL").value =
             currentParameters.modeSTILL;
+        }
+        if (currentParameters.curveMXC !== null) {
+          document.getElementById("curveMXCSelect").value =
+            currentParameters.curveMXC;
+        }
+        if (currentParameters.curve50K !== null) {
+          document.getElementById("curve50KSelect").value =
+            currentParameters.curve50K;
+        }
+        if (currentParameters.curve4K !== null) {
+          document.getElementById("curve4KSelect").value =
+            currentParameters.curve4K;
+        }
+        if (currentParameters.curveSTILL !== null) {
+          document.getElementById("curveSTILLSelect").value =
+            currentParameters.curveSTILL;
         }
       }
 
@@ -2278,6 +2730,92 @@
         select.options[0].text = tempLabel;
         select.options[1].text = `${res_ohm.toFixed(3)} Ω`;
         select.options[2].text = `${power_watt.toExponential(2)} W`;
+      }
+
+      function updateMXCHeaterOutput(percent) {
+        const span = document.getElementById("heaterOutputMXC");
+        if (!span) return;
+
+        if (typeof percent === "number" && isFinite(percent)) {
+          span.textContent = `${percent.toFixed(1)} %`;
+        } else {
+          span.textContent = "- %";
+        }
+      }
+
+      function update50KValues(temp_K, res_ohm, power_watt) {
+        const select = document.getElementById("current50KValue");
+
+        let tempLabel =
+          typeof temp_K === "number" && isFinite(temp_K)
+            ? temp_K < 1.0
+              ? `${(temp_K * 1000).toFixed(3)} mK`
+              : `${temp_K.toFixed(3)} K`
+            : "-";
+
+        const resLabel =
+          typeof res_ohm === "number" && isFinite(res_ohm)
+            ? `${res_ohm.toFixed(3)} Ω`
+            : "- Ω";
+
+        const powerLabel =
+          typeof power_watt === "number" && isFinite(power_watt)
+            ? `${power_watt.toExponential(2)} W`
+            : "- W";
+
+        select.options[0].text = tempLabel;
+        select.options[1].text = resLabel;
+        select.options[2].text = powerLabel;
+      }
+
+      function update4KValues(temp_K, res_ohm, power_watt) {
+        const select = document.getElementById("current4KValue");
+
+        let tempLabel =
+          typeof temp_K === "number" && isFinite(temp_K)
+            ? temp_K < 1.0
+              ? `${(temp_K * 1000).toFixed(3)} mK`
+              : `${temp_K.toFixed(3)} K`
+            : "-";
+
+        const resLabel =
+          typeof res_ohm === "number" && isFinite(res_ohm)
+            ? `${res_ohm.toFixed(3)} Ω`
+            : "- Ω";
+
+        const powerLabel =
+          typeof power_watt === "number" && isFinite(power_watt)
+            ? `${power_watt.toExponential(2)} W`
+            : "- W";
+
+        select.options[0].text = tempLabel;
+        select.options[1].text = resLabel;
+        select.options[2].text = powerLabel;
+      }
+
+      function updateSTILLValues(temp_K, res_ohm, power_watt) {
+        const select = document.getElementById("currentSTILLValue");
+
+        let tempLabel =
+          typeof temp_K === "number" && isFinite(temp_K)
+            ? temp_K < 1.0
+              ? `${(temp_K * 1000).toFixed(3)} mK`
+              : `${temp_K.toFixed(3)} K`
+            : "-";
+
+        const resLabel =
+          typeof res_ohm === "number" && isFinite(res_ohm)
+            ? `${res_ohm.toFixed(3)} Ω`
+            : "- Ω";
+
+        const powerLabel =
+          typeof power_watt === "number" && isFinite(power_watt)
+            ? `${power_watt.toExponential(2)} W`
+            : "- W";
+
+        select.options[0].text = tempLabel;
+        select.options[1].text = resLabel;
+        select.options[2].text = powerLabel;
       }
 
       function redrawFromStore(chartId) {
@@ -2701,6 +3239,41 @@
           if (data.autoscan !== undefined) {
             currentParameters.autoscan = data.autoscan;
           }
+          if (data.curveMXC !== undefined) {
+            currentParameters.curveMXC = parseInt(data.curveMXC);
+          }
+          if (data.curve50K !== undefined) {
+            currentParameters.curve50K = parseInt(data.curve50K);
+          }
+          if (data.curve4K !== undefined) {
+            currentParameters.curve4K = parseInt(data.curve4K);
+          }
+          if (data.curveSTILL !== undefined) {
+            currentParameters.curveSTILL = parseInt(data.curveSTILL);
+          }
+          if (data.R50K !== undefined) {
+            currentParameters.R50K = parseFloat(data.R50K);
+          }
+          if (data.P50K !== undefined) {
+            currentParameters.P50K = parseFloat(data.P50K);
+          }
+          if (data.R4K !== undefined) {
+            currentParameters.R4K = parseFloat(data.R4K);
+          }
+          if (data.P4K !== undefined) {
+            currentParameters.P4K = parseFloat(data.P4K);
+          }
+          if (data.RSTILL !== undefined) {
+            currentParameters.RSTILL = parseFloat(data.RSTILL);
+          }
+          if (data.PSTILL !== undefined) {
+            currentParameters.PSTILL = parseFloat(data.PSTILL);
+          }
+          if (data.heaterOutputMXC !== undefined) {
+            currentParameters.heaterOutputMXC = parseFloat(
+              data.heaterOutputMXC
+            );
+          }
 
           // Update UI controls if parameters changed every minute
           // (or the time specified in parameterBoxUpdateInterval variable)
@@ -2735,11 +3308,21 @@
           // Update the 50k chart with the new temperature
           if (currentParameters["50K"] !== null) {
             updateTemperatureChart("50K", currentParameters["50K"]);
+            update50KValues(
+              currentParameters["50K"],
+              currentParameters.R50K,
+              currentParameters.P50K
+            );
           }
 
           //Update the 4k chart with the new temperature
           if (currentParameters["4K"] !== null) {
             updateTemperatureChart("4K", currentParameters["4K"]);
+            update4KValues(
+              currentParameters["4K"],
+              currentParameters.R4K,
+              currentParameters.P4K
+            );
           }
           // Update the STILL chart with the new temperature
           if (currentParameters.STILL !== null) {
@@ -2749,6 +3332,11 @@
             );
 
             updateTemperatureChart("STILL", currentParameters.STILL);
+            updateSTILLValues(
+              currentParameters.STILL,
+              currentParameters.RSTILL,
+              currentParameters.PSTILL
+            );
           }
 
           // Update the MXC chart with the new temperature
@@ -2770,6 +3358,8 @@
               currentParameters.RMXC, // Resistance in Ohms
               currentParameters.PMXC
             ); // Power in Watts
+
+            updateMXCHeaterOutput(currentParameters.heaterOutputMXC);
           }
 
           // MXC
@@ -2969,9 +3559,8 @@
       async function toggleChannel50K() {
         const checkbox = document.getElementById("toggle50KGlobal");
         const value = checkbox.checked ? 1 : 0;
-        const resetFlag = document.getElementById("reset-50k").checked ? 1 : 0;
 
-        const command = `set_channel_50k:${value}:${resetFlag}`;
+        const command = `set_channel_50k:${value}`;
 
         try {
           pending50KToggle = true;
@@ -2983,12 +3572,6 @@
             `Channel 50K is now ${checkbox.checked ? "enabled" : "disabled"}`
           );
           console.log(response);
-
-          if (value === 1 && resetFlag === 1) {
-            setTimeout(() => {
-              fetchSensorData(true);
-            }, 300);
-          }
         } catch (error) {
           checkbox.checked = !checkbox.checked;
           pending50KToggle = false;
@@ -3003,9 +3586,8 @@
       async function toggleChannelMXC() {
         const checkbox = document.getElementById("toggleMXCGlobal");
         const value = checkbox.checked ? 1 : 0;
-        const resetFlag = document.getElementById("reset-mxc").checked ? 1 : 0;
 
-        const command = `set_channel_mxc:${value}:${resetFlag}`;
+        const command = `set_channel_mxc:${value}`;
 
         try {
           pendingMXCToggle = true;
@@ -3018,11 +3600,6 @@
             `Channel MXC is now ${checkbox.checked ? "enabled" : "disabled"}`
           );
           console.log(response);
-          if (value === 1 && resetFlag === 1) {
-            setTimeout(() => {
-              fetchSensorData(true);
-            }, 300);
-          }
         } catch (error) {
           checkbox.checked = !checkbox.checked;
           pendingMXCToggle = false;
@@ -3037,21 +3614,20 @@
       async function toggleChannelSTILL() {
         const checkbox = document.getElementById("toggleSTILLGlobal");
         const value = checkbox.checked ? 1 : 0;
-        const resetFlag = document.getElementById("reset-still").checked
-          ? 1
-          : 0;
-        const command = `set_channel_still:${value}:${resetFlag}`;
+
+        const command = `set_channel_still:${value}`;
 
         try {
           pendingSTILLToggle = true;
+
           addLogEntry(`Sending STILL command: ${command}`, "sent");
           const response = await sendCommandToServer(command);
           addLogEntry(`Server response: ${response}`, "received");
-          if (value === 1 && resetFlag === 1) {
-            setTimeout(() => {
-              fetchSensorData(true);
-            }, 300);
-          }
+
+          console.log(
+            `Channel STILL is now ${checkbox.checked ? "enabled" : "disabled"}`
+          );
+          console.log(response);
         } catch (error) {
           checkbox.checked = !checkbox.checked;
           pendingSTILLToggle = false;
@@ -3059,24 +3635,27 @@
             `Error sending set_channel_still: ${error.message}`,
             "received"
           );
+          console.error(error);
         }
       }
 
       async function toggleChannel4k() {
         const checkbox = document.getElementById("toggle4kGlobal");
         const value = checkbox.checked ? 1 : 0;
-        const resetFlag = document.getElementById("reset-4k").checked ? 1 : 0;
 
-        const command = `set_channel_4k:${value}:${resetFlag}`;
+        const command = `set_channel_4k:${value}`;
 
         try {
           pending4KToggle = true;
-          addLogEntry(`Sending 4k command: ${command}`, "sent");
+
+          addLogEntry(`Sending 4K command: ${command}`, "sent");
           const response = await sendCommandToServer(command);
           addLogEntry(`Server response: ${response}`, "received");
-          if (value === 1 && resetFlag === 1) {
-            fetchSensorData(true);
-          }
+
+          console.log(
+            `Channel 4K is now ${checkbox.checked ? "enabled" : "disabled"}`
+          );
+          console.log(response);
         } catch (error) {
           checkbox.checked = !checkbox.checked;
           pending4KToggle = false;
@@ -3084,6 +3663,7 @@
             `Error sending set_channel_4k: ${error.message}`,
             "received"
           );
+          console.error(error);
         }
       }
 
@@ -3117,6 +3697,110 @@
             "received"
           );
           cb.checked = !cb.checked;
+          console.error(error);
+        }
+      }
+
+      async function resetDefaultsMXC() {
+        if (tcpConnectionStatus === false) {
+          addLogEntry(
+            "Cannot reset MXC to default: No connection to TCP server",
+            "status"
+          );
+          return;
+        }
+
+        const command = "reset_defaults_mxc";
+
+        try {
+          addLogEntry(`Sending MXC reset command: ${command}`, "sent");
+          const response = await sendCommandToServer(command);
+          addLogEntry(`Server response: ${response}`, "received");
+          await sleep(1000);
+          await fetchSensorData(true);
+        } catch (error) {
+          addLogEntry(
+            `Error sending MXC reset command: ${error.message}`,
+            "received"
+          );
+          console.error(error);
+        }
+      }
+
+      async function resetDefaults50K() {
+        if (tcpConnectionStatus === false) {
+          addLogEntry(
+            "Cannot reset 50K to default: No connection to TCP server",
+            "status"
+          );
+          return;
+        }
+
+        const command = "reset_defaults_50k";
+
+        try {
+          addLogEntry(`Sending 50K reset command: ${command}`, "sent");
+          const response = await sendCommandToServer(command);
+          addLogEntry(`Server response: ${response}`, "received");
+          await sleep(1000);
+          await fetchSensorData(true);
+        } catch (error) {
+          addLogEntry(
+            `Error sending 50K reset command: ${error.message}`,
+            "received"
+          );
+          console.error(error);
+        }
+      }
+
+      async function resetDefaults4K() {
+        if (tcpConnectionStatus === false) {
+          addLogEntry(
+            "Cannot reset 4K to default: No connection to TCP server",
+            "status"
+          );
+          return;
+        }
+
+        const command = "reset_defaults_4k";
+
+        try {
+          addLogEntry(`Sending 4K reset command: ${command}`, "sent");
+          const response = await sendCommandToServer(command);
+          addLogEntry(`Server response: ${response}`, "received");
+          await sleep(1000);
+          await fetchSensorData(true);
+        } catch (error) {
+          addLogEntry(
+            `Error sending 4K reset command: ${error.message}`,
+            "received"
+          );
+          console.error(error);
+        }
+      }
+
+      async function resetDefaultsSTILL() {
+        if (tcpConnectionStatus === false) {
+          addLogEntry(
+            "Cannot reset STILL to default: No connection to TCP server",
+            "status"
+          );
+          return;
+        }
+
+        const command = "reset_defaults_still";
+
+        try {
+          addLogEntry(`Sending STILL reset command: ${command}`, "sent");
+          const response = await sendCommandToServer(command);
+          addLogEntry(`Server response: ${response}`, "received");
+          await sleep(1000);
+          await fetchSensorData(true);
+        } catch (error) {
+          addLogEntry(
+            `Error sending STILL reset command: ${error.message}`,
+            "received"
+          );
           console.error(error);
         }
       }
@@ -3273,6 +3957,7 @@
           progressText.textContent = `Processing sensor settings... ${Math.round(
             progress
           )}%`;
+          await sleep(150);
         }
 
         setTimeout(() => {
@@ -3282,8 +3967,8 @@
 
       async function writeControlSettingsMXC() {
         /*  This function is called when the "Write Control Settings" button is clicked
-                It is async since it will send commands to the server, performing asynchronous operations
-            */
+                      It is async since it will send commands to the server, performing asynchronous operations
+                  */
 
         console.log("Writing control settings for MXC...");
 
@@ -3331,6 +4016,10 @@
           MXCI: parseFloat(document.getElementById("integralGainMXC").value),
           MXCD: parseFloat(document.getElementById("derivativeGainMXC").value),
           MXCHR: parseFloat(document.getElementById("heaterRangeMXC").value),
+          curveMXC: parseInt(
+            document.getElementById("curveMXCSelect").value,
+            10
+          ),
         };
 
         const commands = [];
@@ -3405,6 +4094,20 @@
           });
         }
 
+        if (!isNaN(values.curveMXC)) {
+          if (values.curveMXC < 0 || values.curveMXC > 20) {
+            addLogEntry(
+              "Error: Curve number must be between 0 and 20",
+              "received"
+            );
+            return;
+          }
+          commands.push({
+            type: "curveMXC",
+            command: `set_curve_mxc:${values.curveMXC}`,
+          });
+        }
+
         const progressContainer = document.getElementById(
           "progressContainerMXC"
         );
@@ -3433,6 +4136,7 @@
             ((commands.indexOf(cmd) + 1) / commands.length) * 100;
           progressBar.style.width = `${progress}%`;
           progressText.textContent = `Processing... ${Math.round(progress)}%`;
+          await sleep(150);
         }
 
         // Hide progress bar after completion
@@ -3458,6 +4162,10 @@
         );
         const mode = parseInt(
           document.getElementById("sensorModeSTILL").value,
+          10
+        );
+        const curve = parseInt(
+          document.getElementById("curveSTILLSelect").value,
           10
         );
         const commands = [];
@@ -3506,6 +4214,17 @@
           commands.push(`set_sensor_mode_still:${mode}`);
         }
 
+        if (!isNaN(curve)) {
+          if (curve < 0 || curve > 20) {
+            addLogEntry(
+              "Error: STILL Curve must be between 0 and 20",
+              "received"
+            );
+            return;
+          }
+          commands.push(`set_curve_still:${curve}`);
+        }
+
         if (commands.length === 0) {
           addLogEntry("No STILL sensor parameter changes detected", "status");
           return;
@@ -3539,6 +4258,7 @@
           progressText.textContent = `Processing STILL settings... ${Math.round(
             progress
           )}%`;
+          await sleep(150);
         }
 
         setTimeout(() => {
@@ -3563,6 +4283,10 @@
         );
         const mode = parseInt(
           document.getElementById("sensorMode50K").value,
+          10
+        );
+        const curve = parseInt(
+          document.getElementById("curve50KSelect").value,
           10
         );
         const commands = [];
@@ -3611,6 +4335,17 @@
           commands.push(`set_sensor_mode_50k:${mode}`);
         }
 
+        if (!isNaN(curve)) {
+          if (curve < 0 || curve > 20) {
+            addLogEntry(
+              "Error: 50K Curve must be between 0 and 20",
+              "received"
+            );
+            return;
+          }
+          commands.push(`set_curve_50k:${curve}`);
+        }
+
         if (commands.length === 0) {
           addLogEntry("No 50K sensor parameter changes detected", "status");
           return;
@@ -3644,6 +4379,7 @@
           progressText.textContent = `Processing 50K settings... ${Math.round(
             progress
           )}%`;
+          await sleep(150);
         }
 
         setTimeout(() => {
@@ -3668,6 +4404,10 @@
         );
         const mode = parseInt(
           document.getElementById("sensorMode4K").value,
+          10
+        );
+        const curve = parseInt(
+          document.getElementById("curve4KSelect").value,
           10
         );
         const commands = [];
@@ -3716,6 +4456,14 @@
           commands.push(`set_sensor_mode_4k:${mode}`);
         }
 
+        if (!isNaN(curve)) {
+          if (curve < 0 || curve > 20) {
+            addLogEntry("Error: 4K Curve must be between 0 and 20", "received");
+            return;
+          }
+          commands.push(`set_curve_4k:${curve}`);
+        }
+
         if (commands.length === 0) {
           addLogEntry("No 4K sensor parameter changes detected", "status");
           return;
@@ -3749,6 +4497,7 @@
           progressText.textContent = `Processing 4K settings... ${Math.round(
             progress
           )}%`;
+          await sleep(150);
         }
 
         setTimeout(() => {
@@ -3841,7 +4590,7 @@
             particles.push({
               x: Math.random() * canvas.width,
               y: Math.random() * canvas.height,
-              radius: Math.random() * 1.5 + 0.5, // Radio entre 0.5 y 2.0
+              radius: Math.random() * 2.5 + 1, // Radio entre 0.5 y 2.0
               vx: Math.random() * 0.4 - 0.2, // Velocidad X
               vy: Math.random() * 0.4 - 0.2, // Velocidad Y
             });

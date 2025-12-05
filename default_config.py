@@ -1,3 +1,5 @@
+import datetime
+
 DEFAULT_SETTINGS = {
     1: ['010, 003, 01, 2'],  # 50 K stage
     2: ['010, 003, 02, 2'],  # 4 K stage
@@ -16,7 +18,7 @@ DEFAULT_MXC_RESISTANCE_RANGE_SETTINGS = {
     "excitation_range": 4,      #63 uV 
     "resistance_range": 14,     # 14 for 3.15 uA R = 6.32 kOhm
     "autorange": 1,             # 0 for NO, 1 for YES
-    "excitation": 1,            # 0 for excitation on, 1 = exctiation off
+    "excitation": 0,            # 0 for excitation on, 1 = exctiation off
 }
 
 CURVE_NAMES = {
@@ -30,8 +32,8 @@ CURVE_NAMES = {
 DEFAULT_CURVES = {
     1 : 1,
     2 : 2,
-    5 : 3,
-    6 : 4,
+    5 : 5,
+    6 : 6,
 }
 
 CURRENT_RANGE_LIST = {
@@ -76,3 +78,5 @@ DEFAULT_SENSOR_RESISTANCE_SETTINGS = {
         "excitation_range": 5,
     },
 }
+
+DB_INSERT_INTERVAL = datetime.timedelta(seconds=1)

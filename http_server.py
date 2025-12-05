@@ -56,6 +56,12 @@ current_enabled_50K = None
 current_enabled_4K = None
 current_enabled_STILL = None
 current_autoscan = "off"
+current_curve_MXC = None
+current_curve_50K = None
+current_curve_4K = None
+current_curve_STILL = None
+current_heater_output_MXC = None
+current_RUNID = None
 
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
 
@@ -115,8 +121,15 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
                                    "mode4K": current_excitation_mode_4K,
                                    "range4K": current_excitation_range_4K,
                                    "modeSTILL": current_excitation_mode_STILL,
-                                   "rangeSTILL": current_excitation_range_STILL      })
+                                   "rangeSTILL": current_excitation_range_STILL,
+                                   "curveMXC": current_curve_MXC,
+                                   "curve50K": current_curve_50K,
+                                   "curve4K": current_curve_4K,
+                                   "curveSTILL": current_curve_STILL,      
+                                   "heaterOutputMXC": current_heater_output_MXC,    
+                                   "runID": current_RUNID,      })
                                    
+
             self.wfile.write(response.encode('utf-8'))
         else:
             self.send_error(404)
@@ -243,6 +256,12 @@ def receive_sensor_data(tcp_socket):
     global current_integral_gain
     global current_derivative_gain
     global current_autoscan
+    global current_curve_MXC
+    global current_curve_50K
+    global current_curve_4K 
+    global current_curve_STILL
+    global current_heater_output_MXC
+    global current_RUNID
 
     buf = b""
     while True:
@@ -372,6 +391,32 @@ def receive_sensor_data(tcp_socket):
 
                 except Exception as e:
                     print(f"Error parsing excitation/mode 50K/4K/STILL: {e}")
+
+                try:
+                    current_curve_MXC   = int(params[47].split(':')[-1].strip())
+                    current_curve_50K   = int(params[48].split(':')[-1].strip())
+                    current_curve_4K    = int(params[49].split(':')[-1].strip())
+                    current_curve_STILL = int(params[50].split(':')[-1].strip())
+
+                except Exception as e:
+                    print(f"Error parsing curve values (MXC/50K/4K/STILL): {e}")
+
+                try:
+                    current_heater_output_MXC = float(params[51].split(':')[-1].strip())
+                except Exception as e:
+                    print(f"Error parsing heaterOutputMXC: {e}")
+                    current_heater_output_MXC = None
+
+                try:
+                    raw_run = params[52].split(':')[-1].strip()
+                    if raw_run and raw_run.upper() != "NONE":
+                        current_RUNID = int(raw_run)
+                    else:
+                        current_RUNID = None
+                except Exception as e:
+                    print(f"⚠ Warning parsing run ID: {e} (raw value = {raw_run!r})")
+                    current_RUNID = None
+
 
         except Exception as e:
             print(f"Error receiving LakeShore370 data: {e}")

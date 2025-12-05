@@ -62,7 +62,7 @@ DEFAULT_MXC_RESISTANCE_RANGE_SETTINGS = {
     "excitation_range": 4, # 5 → 200 µV / 100 pA
     "resistance_range": 14,
     "autorange": 1,        # 1 = YES
-    "excitation": 1,       # 1 = excitation OFF
+    "excitation": 0,       # 1 = excitation OFF
 }
 
 CURVE_NAMES = {
@@ -75,8 +75,8 @@ CURVE_NAMES = {
 DEFAULT_CURVES = {
     1: 1,
     2: 2,
-    5: 3,
-    6: 4,
+    5: 5,
+    6: 6,
 }
 
 #Mapa canal → etiqueta
@@ -177,7 +177,13 @@ class LakeShore370:
             "STILL": 0.0,
             "MXC": 0.0,
         }
-
+        self._heater_output_percent = 0.0
+        self._curves = {
+            1: DEFAULT_CURVES[1],   # 50K
+            2: DEFAULT_CURVES[2],   # 4K
+            5: DEFAULT_CURVES[5],   # STILL
+            6: DEFAULT_CURVES[6],   # MXC
+        }
         # Canales ON por defecto
         self._channel_status = {ch: 1 for ch in DEFAULT_CHANNELS}
 
@@ -234,6 +240,17 @@ class LakeShore370:
             value = max(base + noise, 0.0)
             self._temps_K[label] = value
             return value
+        
+    def get_channel_curve(self, channel: int) -> int | None:
+        """
+        Devuelve la curva asignada al canal (para simular INSET? campo curva).
+        """
+        if channel not in DEFAULT_CHANNELS:
+            print(f"Dummy: Channel {channel} invalid. Valid: {DEFAULT_CHANNELS}")
+            return None
+
+        with _lakeshore_mutex:
+            return int(self._curves.get(channel, 0))
 
     def get_resistance(self, channel: int):
         """
@@ -393,6 +410,41 @@ class LakeShore370:
         if return_dict:
             return _translate_sensor_resistance_settings_to_dictionary(values)
         return values
+
+
+    def get_heater_output_percent(self):
+        
+        """
+        Devuelve un porcentaje de salida del heater (0–100 %) simulado
+        para la MXC, compatible con el método del LakeShore real.
+
+        Lo calculamos en función de la diferencia entre setpoint y
+        temperatura actual de la MXC: si la MXC está por debajo del
+        setpoint, sube el %; si está por encima, se acerca a 0.
+        """
+        with _lakeshore_mutex:
+            temp = float(self._temps_K.get("MXC", 0.0))
+            setp = float(self._mxc_setpoint_K)
+
+            # Error (K): cuánto falta para el setpoint
+            error = setp - temp
+
+            if error <= 0:
+                base = 0.0
+            else:
+                # Escala el error a 0–100% (ajustado "a ojo" para el dummy)
+                # Por ejemplo, 0.05 K por debajo de setpoint ⇒ ~100 %
+                base = min(error * 2000.0, 100.0)
+
+            # Un poquito de ruido para que no sea totalmente constante
+            noise = random.uniform(-2.0, 2.0)
+            value = max(0.0, min(100.0, base + noise))
+
+            # Guardamos algo coherente en la potencia también (opcional)
+            self._heater_output_percent = value
+            self._powers_W["MXC"] = 1e-3 * (value / 100.0)  # hasta 1 mW ficticio
+
+            return value
 
     # ---------------------- SET MÉTODOS ------------------------------
 
@@ -595,6 +647,27 @@ class LakeShore370:
             print(f"[DUMMY] Pause time for {label} (ch {channel}) set to {pause} s")
         return True
 
+    def set_channel_curve(self, curve_number: int, channel: int, verbose: bool = True) -> bool:
+        """
+        Dummy del comando para asignar una curva a un canal.
+        Simula el comportamiento del Lakeshore real.
+        """
+        if channel not in DEFAULT_CHANNELS:
+            print(f"Dummy: Channel {channel} is not valid. Valid: {DEFAULT_CHANNELS}")
+            return False
+
+        if not isinstance(curve_number, int):
+            print("Dummy: Curve number must be int.")
+            return False
+
+        with _lakeshore_mutex:
+            self._curves[channel] = int(curve_number)
+
+        if verbose:
+            print(f"[DUMMY] Curve for channel {channel} set to {curve_number}")
+
+        return True
+    
     def close(self):
         print("[DUMMY] Closing dummy LakeShore370 (no hardware).")
         return True
