@@ -830,21 +830,6 @@
                       <option value="8">100 mA</option>
                     </select>
                   </div>
-                  <div class="control-row" style="margin-bottom: 10px">
-                    <label for="curveMXCSelect" style="width: 120px"
-                      >Curve:</label
-                    >
-                    <select
-                      id="curveMXCSelect"
-                      class="control-input"
-                      style="width: 120px"
-                    >
-                      <option value="1">PT-100-20K (PT1011)</option>
-                      <option value="2">CX-1050-CD-BF1 (X64005)</option>
-                      <option value="5">CX-1010-CD-BF0 (X63593)</option>
-                      <option value="6">RU-1000-BF0.007 (U03308)</option>
-                    </select>
-                  </div>
 
                   <div class="control-row" style="margin-top: 10px">
                     <button onclick="writeControlSettingsMXC()">
@@ -964,60 +949,91 @@
               style="
                 margin-top: 10px;
                 display: flex;
-                justify-content: space-between;
+                flex-wrap: wrap;
+                gap: 20px 40px;
                 align-items: center;
-                width: 100%;
+                justify-content: flex-start;
               "
             >
-              <label for="dwellMXC" style="width: 90px">Dwell Time:</label>
-              <input
-                type="number"
-                class="control-input"
-                style="width: 50px; margin-left: 2px"
-                id="dwellMXC"
-                min="0"
-                max="10"
-                step="0.1"
-              />
+              <div style="display: flex; align-items: center; gap: 4px">
+                <label for="dwellMXC" style="width: auto; margin-right: 0"
+                  >Dwell Time:</label
+                >
+                <input
+                  type="number"
+                  class="control-input"
+                  style="width: 60px"
+                  id="dwellMXC"
+                  min="0"
+                  max="10"
+                  step="0.1"
+                />
+              </div>
 
-              <label for="pauseMXC" style="width: 100px">Pause Time:</label>
-              <input
-                type="number"
-                class="control-input"
-                style="width: 50px; margin-left: 2px"
-                id="pauseMXC"
-                min="0"
-                max="10"
-                step="0.1"
-              />
+              <div style="display: flex; align-items: center; gap: 6px">
+                <label for="pauseMXC" style="width: auto; margin-right: 0"
+                  >Pause Time:</label
+                >
+                <input
+                  type="number"
+                  class="control-input"
+                  style="width: 60px"
+                  id="pauseMXC"
+                  min="0"
+                  max="10"
+                  step="0.1"
+                />
+              </div>
 
-              <label for="sensorRangeMXC" style="width: 70px"
-                >Excitation:</label
-              >
-              <select
-                id="sensorRangeMXC"
-                class="control-input"
-                style="width: 160px"
-              >
-                <option value="1">2.00 uV and 1.00 pA</option>
-                <option value="2">6.32 uV and 3.16 pA</option>
-                <option value="3">20.0 uV and 10.0 pA</option>
-                <option value="4">63.2 uV and 31.6 pA</option>
-                <option value="5">200 uV and 100 pA</option>
-                <option value="6">632 uV and 316 pA</option>
-                <option value="7">2.00 mV and 1.00 nA</option>
-                <option value="8">6.32 mV and 3.16 nA</option>
-              </select>
+              <div style="display: flex; align-items: center; gap: 6px">
+                <label for="sensorRangeMXC" style="width: auto; margin-right: 0"
+                  >Excitation:</label
+                >
+                <select
+                  id="sensorRangeMXC"
+                  class="control-input"
+                  style="width: 200px; margin-left: 0"
+                >
+                  <option value="1">2.00 uV and 1.00 pA</option>
+                  <option value="2">6.32 uV and 3.16 pA</option>
+                  <option value="3">20.0 uV and 10.0 pA</option>
+                  <option value="4">63.2 uV and 31.6 pA</option>
+                  <option value="5">200 uV and 100 pA</option>
+                  <option value="6">632 uV and 316 pA</option>
+                  <option value="7">2.00 mV and 1.00 nA</option>
+                  <option value="8">6.32 mV and 3.16 nA</option>
+                </select>
+              </div>
 
-              <label for="sensorModeMXC" style="width: 40px">Mode:</label>
-              <select
-                id="sensorModeMXC"
-                class="control-input"
-                style="width: 90px"
-              >
-                <option value="0">Voltage</option>
-                <option value="1">Current</option>
-              </select>
+              <div style="display: flex; align-items: center; gap: 6px">
+                <label for="sensorModeMXC" style="width: auto; margin-right: 0"
+                  >Mode:</label
+                >
+                <select
+                  id="sensorModeMXC"
+                  class="control-input"
+                  style="width: 120px; margin-left: 0"
+                >
+                  <option value="0">Voltage</option>
+                  <option value="1">Current</option>
+                </select>
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 6px">
+                <label for="curveMXCSelect" style="width: auto; margin-right: 0"
+                  >Curve:</label
+                >
+                <select
+                  id="curveMXCSelect"
+                  class="control-input"
+                  style="width: 220px; margin-left: 0"
+                >
+                  <option value="1">PT-100-20K (PT1011)</option>
+                  <option value="2">CX-1050-CD-BF1 (X64005)</option>
+                  <option value="5">CX-1010-CD-BF0 (X63593)</option>
+                  <option value="6">RU-1000-BF0.007 (U03308)</option>
+                </select>
+              </div>
             </div>
           </div>
         </div>
@@ -1556,90 +1572,18 @@
       let expectedNextRunId = null;
 
       function loadHistoricalRun(runPayload) {
-        if (!runPayload || !runPayload.channels) {
-          addLogEntry("Error: RUN_DATA sin canales", "received");
+        if (!runPayload || !runPayload.run_id) {
+          addLogEntry("Error: RUN_DATA sin run_id", "received");
           return;
         }
 
-        // Aseguramos que existen los stores
-        ["50K", "4K", "STILL", "MXC"].forEach((id) => {
-          if (!chartDataStore[id]) {
-            chartDataStore[id] = {
-              labels: [],
-              data: [],
-              setpoint: [],
-              startTime: null,
-            };
-          } else {
-            chartDataStore[id].labels = [];
-            chartDataStore[id].data = [];
-            chartDataStore[id].setpoint = [];
-            chartDataStore[id].startTime = null;
-          }
-        });
+        const runId = runPayload.run_id;
 
-        const channelMap = {
-          "50K": "50K",
-          "4K": "4K",
-          STILL: "STILL",
-          MXC: "MXC",
-        };
-
-        for (const [payloadKey, chartId] of Object.entries(channelMap)) {
-          const ch = runPayload.channels[payloadKey];
-          if (
-            !ch ||
-            !Array.isArray(ch.timestamps) ||
-            !Array.isArray(ch.temperature_k) ||
-            ch.timestamps.length === 0
-          ) {
-            continue;
-          }
-
-          const store = chartDataStore[chartId];
-
-          const timestampsMs = ch.timestamps.map((t) =>
-            typeof t === "string" ? Date.parse(t) : t
-          );
-          const t0 = timestampsMs[0];
-
-          for (let i = 0; i < ch.temperature_k.length; i++) {
-            const ti = timestampsMs[i];
-            const rel = (ti - t0) / 1000.0;
-            store.labels.push(rel);
-            store.data.push(ch.temperature_k[i]);
-          }
-
-          const durationSec =
-            store.labels[store.labels.length - 1] !== undefined
-              ? store.labels[store.labels.length - 1]
-              : 60;
-
-          store.startTime = Date.now() - durationSec * 1000;
-
-          const ranges = timeRangeOptions
-            .map((o) => o.value)
-            .sort((a, b) => a - b);
-          let chosen = ranges[0];
-          for (const r of ranges) {
-            if (durationSec >= r) chosen = r;
-          }
-
-          if (chartId === "MXC") currentTimeRangeMXC = chosen;
-          if (chartId === "50K") currentTimeRange50K = chosen;
-          if (chartId === "4K") currentTimeRange4K = chosen;
-          if (chartId === "STILL") currentTimeRangeSTILL = chosen;
-
-          redrawFromStore(chartId);
-        }
-
-        updateTimeRangeOptions();
-        updateTimeRangeOptions50K();
-        updateTimeRangeOptions4K();
-        updateTimeRangeOptionsSTILL();
+        const url = `/plot_run?run_id=${encodeURIComponent(runId)}`;
+        window.open(url, "_blank", "width=1200,height=800");
 
         addLogEntry(
-          `✅ Cargado RUN histórico ${runPayload.run_id} en las gráficas`,
+          `✅ Abierta ventana con gráficas Python del RUN histórico ${runId}`,
           "status"
         );
       }
@@ -3861,6 +3805,10 @@
             10
           ),
           modeMXC: parseInt(document.getElementById("sensorModeMXC").value, 10),
+          curveMXC: parseInt(
+            document.getElementById("curveMXCSelect").value,
+            10
+          ),
         };
 
         const commands = [];
@@ -3918,6 +3866,20 @@
           commands.push({
             type: "modeMXC",
             command: `set_sensor_mode_mxc:${values.modeMXC}`,
+          });
+        }
+
+        if (!isNaN(values.curveMXC)) {
+          if (values.curveMXC < 0 || values.curveMXC > 20) {
+            addLogEntry(
+              "Error: Curve number must be between 0 and 20",
+              "received"
+            );
+            return;
+          }
+          commands.push({
+            type: "curveMXC",
+            command: `set_curve_mxc:${values.curveMXC}`,
           });
         }
 
@@ -4016,10 +3978,6 @@
           MXCI: parseFloat(document.getElementById("integralGainMXC").value),
           MXCD: parseFloat(document.getElementById("derivativeGainMXC").value),
           MXCHR: parseFloat(document.getElementById("heaterRangeMXC").value),
-          curveMXC: parseInt(
-            document.getElementById("curveMXCSelect").value,
-            10
-          ),
         };
 
         const commands = [];
@@ -4091,20 +4049,6 @@
           commands.push({
             type: "MXCHR",
             command: `set_mxc_heater_range:${values.MXCHR}`,
-          });
-        }
-
-        if (!isNaN(values.curveMXC)) {
-          if (values.curveMXC < 0 || values.curveMXC > 20) {
-            addLogEntry(
-              "Error: Curve number must be between 0 and 20",
-              "received"
-            );
-            return;
-          }
-          commands.push({
-            type: "curveMXC",
-            command: `set_curve_mxc:${values.curveMXC}`,
           });
         }
 

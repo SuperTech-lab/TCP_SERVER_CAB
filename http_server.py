@@ -3,6 +3,12 @@ import json
 import socket
 import threading
 import time
+import io
+import base64
+from datetime import datetime
+from urllib.parse import urlparse, parse_qs
+import matplotlib.pyplot as plt
+
 
 # Configuration for the TCP socket server
 TCP_HOST = '192.168.38.3'      #Replace with the Raspberry Pi's IP address: 192.168.38.3
@@ -66,15 +72,18 @@ current_RUNID = None
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
+        parsed = urlparse(self.path)
+        path = parsed.path
+        query = parse_qs(parsed.query)
 
-        if self.path == '/':
+        if path == '/':
             self.send_response(200)
             self.send_header('Content-type', 'text/html')
             self.end_headers()
             with open('/home/SuperTech/TCP_SERVER_CAB/index.html', 'rb') as file:       #C:\CuartoInformatica\Practicas_CAB\TCP_SERVER\index.html
                 self.wfile.write(file.read())
 
-        elif self.path == '/get-data':
+        elif path == '/get-data':
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.end_headers()
@@ -131,6 +140,31 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
                                    
 
             self.wfile.write(response.encode('utf-8'))
+
+        elif path == '/plot_run':
+            run_vals = query.get("run_id")
+            if not run_vals:
+                self.send_error(400, "Missing run_id")
+                return
+
+            try:
+                run_id = int(run_vals[0])
+            except ValueError:
+                self.send_error(400, "Invalid run_id")
+                return
+
+            run_payload = self.get_run_payload(run_id)
+            if run_payload is None:
+                self.send_error(500, "Could not retrieve RUN_DATA")
+                return
+
+            html = self.render_run_plot_html(run_payload)
+
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/html; charset=utf-8')
+            self.end_headers()
+            self.wfile.write(html.encode('utf-8'))
+
         else:
             self.send_error(404)
 
@@ -179,6 +213,111 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         except Exception as e:
             print(f"Error sending command to TCP server: {e}")
             return f"Error: {str(e)}"
+        
+    def get_run_payload(self, run_id: int):
+        """
+        Envía 'get_run_data:RUN_ID' al servidor TCP y extrae el JSON
+        después de 'RUN_DATA:OK:'.
+        """
+        cmd = f"get_run_data:{run_id}"
+        raw = self.send_command_to_tcp_server(cmd)
+        print("RAW RUN_DATA response:", repr(raw))
+
+        prefix = "RUN_DATA:"
+        idx = raw.find(prefix)
+        if idx == -1:
+            print("RUN_DATA JSON not found in response")
+            return None
+
+        part = raw[idx + len(prefix):].strip()
+
+        if part.startswith("ERROR:"):
+            print("RUN_DATA error from TCP:", part)
+            return None
+
+        ok_prefix = "OK:"
+        if part.startswith(ok_prefix):
+            json_str = part[len(ok_prefix):].strip()
+        else:
+            json_str = part
+
+        end = json_str.rfind("}")
+        if end != -1:
+            json_str = json_str[:end + 1]
+
+        try:
+            payload = json.loads(json_str)
+            return payload
+        except Exception as e:
+            print("Error decoding RUN_DATA JSON:", e)
+            print("JSON candidate was:", json_str)
+            return None
+        
+    def _parse_ts(self, ts):
+        if isinstance(ts, (int, float)):
+            return datetime.fromtimestamp(ts / 1000.0)
+        if isinstance(ts, str):
+            try:
+                return datetime.fromisoformat(ts.replace("Z", "+00:00"))
+            except Exception:
+                try:
+                    return datetime.fromtimestamp(float(ts))
+                except Exception:
+                    raise ValueError(f"Unsupported timestamp format: {ts!r}")
+        raise ValueError(f"Unsupported timestamp type: {type(ts)}")
+
+    def render_run_plot_html(self, run_payload: dict) -> str:
+        channels = ["50K", "4K", "STILL", "MXC"]
+
+        fig, axes = plt.subplots(2, 2, figsize=(10, 6))
+        axes = axes.flatten()
+
+        for idx, ch_name in enumerate(channels):
+            ax = axes[idx]
+            ch = run_payload.get("channels", {}).get(ch_name)
+
+            if (not ch or
+                not isinstance(ch.get("timestamps"), list) or
+                not isinstance(ch.get("temperature_k"), list) or
+                len(ch["timestamps"]) == 0):
+                ax.set_title(f"{ch_name} (sin datos)")
+                ax.axis("off")
+                continue
+
+            ts_list = ch["timestamps"]
+            temps = ch["temperature_k"]
+
+            t0 = self._parse_ts(ts_list[0])
+            t_rel = [(self._parse_ts(t) - t0).total_seconds() for t in ts_list]
+
+            ax.plot(t_rel, temps)
+            ax.set_title(ch_name)
+            ax.set_xlabel("Tiempo (s)")
+            ax.set_ylabel("Temperatura (K)")
+
+        fig.suptitle(f"RUN {run_payload.get('run_id')}")
+        fig.tight_layout()
+
+        buf = io.BytesIO()
+        fig.savefig(buf, format="png", bbox_inches="tight")
+        plt.close(fig)
+        buf.seek(0)
+        img_b64 = base64.b64encode(buf.read()).decode("ascii")
+
+        html = f"""<!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <title>RUN {run_payload.get('run_id')} – gráficas</title>
+    </head>
+    <body style="background:#111;color:#fff;font-family:system-ui;text-align:center;">
+        <h1>RUN {run_payload.get('run_id')}</h1>
+        <p>Gráficas Python (matplotlib) para 50K, 4K, STILL y MXC</p>
+        <img src="data:image/png;base64,{img_b64}"
+            style="max-width:100%;height:auto;border:1px solid #444;" />
+    </body>
+    </html>"""
+        return html
 
 def connect_to_tcp_server():
     # Connect to the TCP server
@@ -676,6 +815,7 @@ def _organize_50k_params(params):
         print("Invalid 50K pause time value received:", params[1])
 
     return dwell_50K, pause_50K
+
 
 if __name__ == "__main__":
     # Connect to the TCP server
