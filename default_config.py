@@ -24,16 +24,16 @@ DEFAULT_MXC_RESISTANCE_RANGE_SETTINGS = {
 CURVE_NAMES = {
     1  :    "PT-100-20K (PT1011)",
     2  :    "CX-1050-CD-BF1 (X64005)",
-    5  :    "CX-1010-CD-BF0 (X63593)",
-    6  :    "RU-1000-BF0.007 (U03308)"
+    3  :    "CX-1010-CD-BF0 (X63593)",
+    4  :    "RU-1000-BF0.007 (U03308)"
     
 }
 
 DEFAULT_CURVES = {
     1 : 1,
     2 : 2,
-    5 : 5,
-    6 : 6,
+    5 : 3,
+    6 : 4,
 }
 
 CURRENT_RANGE_LIST = {
