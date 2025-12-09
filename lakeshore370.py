@@ -670,7 +670,7 @@ class LakeShore370:
             current_dwell_time = self.get_dwell_time(channel)
             if dwell_time == current_dwell_time:
                 print(f"Dwell time for channel {channel} is already set to {dwell_time} seconds.")
-                return False
+                return True
 
             if channel not in DEFAULT_CHANNELS:
                 print(f"Channel {channel} is not valid. Valid channels are: {DEFAULT_CHANNELS}")
@@ -757,7 +757,7 @@ class LakeShore370:
             current_curve = parameters[3]
             if int(current_curve) == int(curve_number):
                 print(f"Curve number {int(curve_number)} is already set to channel {int(channel)}")
-                return False
+                return True
             dwell = parameters[1]
             pause = parameters[2]
             temp_coeff = parameters[4]

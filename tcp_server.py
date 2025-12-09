@@ -820,7 +820,7 @@ def handle_command(command):
                 if success:
                     message = f"✅ Dwell time succesfully set for MXC to {new_dwell_time} s"
                 else:
-                    message = f"❌ Failed to set dwell time for MXC"
+                    message = f"❌ Failed to set dwell time for MXC:"
                 print(message)                
             else:
                 message += f"Dwell time must be non-negative"
