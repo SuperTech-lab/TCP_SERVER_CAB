@@ -1,37 +1,37 @@
-OVERVIEW
+# Overview
 
 This application has been developed to control the Lakeshore 370 device, one of the main components in the refrigeration system of the superconducting group. The main reason to develop such system was to enable the group members to control all the Lakeshore functionalities in a remote and easy way. Rather than having to use commands in the terminal, the superconducting group users are now able to change the device's parameters and configurations entirely through the website.
 
 This website (index.html file) has three different tabs for different functionalities:
 
-- Fridge Control: in this tab (selected by default), the information about the temperature of each Lakeshore channel (MXC, STILL, 4K and 50K) is shown, together with all the other functionalities. These functionalities include, among others: P, I and D gain configuration, heater range configuration, curve selection, etc.
+### - Fridge Control: in this tab (selected by default), the information about the temperature of each Lakeshore channel (MXC, STILL, 4K and 50K) is shown, together with all the other functionalities. These functionalities include, among others: P, I and D gain configuration, heater range configuration, curve selection, etc.
 
-- BlackBody Control: this tab is yet to be developed. It was created to manage the Black Body parameters and temperature.
+### - BlackBody Control: this tab is yet to be developed. It was created to manage the Black Body parameters and temperature.
 
-- MXC comparison: this tab was implemented as a future feature. Here, a comparative chart between a possible future channel's resistance and the MXC temperature is shown. This will be useful, for example, when comparing it with a channel measuring a superconductor, as it will show how the resistance decays alongside the temperature.
+### - MXC comparison: this tab was implemented as a future feature. Here, a comparative chart between a possible future channel's resistance and the MXC temperature is shown. This will be useful, for example, when comparing it with a channel measuring a superconductor, as it will show how the resistance decays alongside the temperature.
 
 Even though there is a considerable amount of code, the main data stream repeats itself in almost every part of the system. The following approach is taken to communicate backend and frontend:
 
 ## Data flow (high-level overview)
 
-1. Device / Simulator
+### 1. Device / Simulator
 
-   - The source of data is the Lakeshore 370 device. For development and testing without influencing production, the simulator `lakeshore370_dummy.py` has been developed.
+- The source of data is the Lakeshore 370 device. For development and testing without influencing production, the simulator `lakeshore370_dummy.py` has been developed.
 
-2. Hardware abstraction
+### 2. Hardware abstraction
 
-   - The module `lakeshore370.py` implements communication with the hardware (or with the dummy). It provides functions to read temperatures, configure PID gains, heater ranges, curve selection, etc. This is archieved through the PyVisa communication protocol.
+- The module `lakeshore370.py` implements communication with the hardware (or with the dummy). It provides functions to read temperatures, configure PID gains, heater ranges, curve selection, etc. This is archieved through the PyVisa communication protocol.
 
-3. Backend (servers)
+### 3. Backend (servers)
 
-   - `tcp_server.py` exposes a TCP interface for clients that want to send commands or receive readings. Here, we initialise the Lakeshore connection, as well as the database one. It also handles all possible commands to send to the Lakeshore device.
-   - `http_server.py` serves the web UI and any HTTP endpoints used by the UI. It gets the data from the TCP server and delivers it to the `index.html` afterwards. Moreover, it also has an endpoint to retrieve the data from previous RUNS.
+- `tcp_server.py` exposes a TCP interface for clients that want to send commands or receive readings. Here, we initialise the Lakeshore connection, as well as the database one. It also handles all possible commands to send to the Lakeshore device.
+- `http_server.py` serves the web UI and any HTTP endpoints used by the UI. It gets the data from the TCP server and delivers it to the `index.html` afterwards. Moreover, it also has an endpoint to retrieve the data from previous RUNS.
 
-4. Frontend
+### 4. Frontend
 
-   - The user interface is in `index.html` with logic in `index.js`. The frontend obtains data from the `http_server.py` JSON via the /get-data endpoint. Afterwards, it parses all the JSON components to the variables, being able to show how they change in live. The configuration of all parameters is also developed in a way that everytime the user confirms the changes made, `index.html` sends the commands to the TCP server, who then applies it to the Lakeshore device.
+- The user interface is in `index.html` with logic in `index.js`. The frontend obtains data from the `http_server.py` JSON via the /get-data endpoint. Afterwards, it parses all the JSON components to the variables, being able to show how they change in live. The configuration of all parameters is also developed in a way that everytime the user confirms the changes made, `index.html` sends the commands to the TCP server, who then applies it to the Lakeshore device.
 
-5. Runtime flow (overview)
+### 5. Runtime flow (overview)
 
 - Device readout and broadcasting (TCP server)
 
