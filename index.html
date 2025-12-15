@@ -589,6 +589,35 @@
         display: flex;
         align-items: center;
       }
+      .relation-container {
+        display: flex;
+        max-width: 1400px;
+        margin: 0 auto;
+        gap: 20px;
+        align-items: flex-start;
+      }
+
+      .relation-control-panel {
+        flex: 1;
+        background-color: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        min-width: 250px;
+      }
+
+      .relation-plot-panel {
+        flex: 3;
+        background-color: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        min-width: 750px;
+      }
+
+      #relationChart {
+        height: 420px;
+      }
     </style>
   </head>
 
@@ -601,6 +630,9 @@
         </button>
         <button class="tab-button" data-target="blackbody-tab">
           Black Body Control
+        </button>
+        <button class="tab-button" data-target="relation-tab">
+          MXC comparison
         </button>
       </div>
     </div>
@@ -1566,10 +1598,60 @@
       </div>
     </div>
 
+    <div id="relation-tab" class="tab-content">
+      <div class="container relation-container">
+        <div class="relation-control-panel">
+          <h1>MXC comparison</h1>
+
+          <div class="section-title">Relation plot</div>
+          <div class="section-content">
+            <div class="control-group">
+              <div class="control-row">
+                <label for="relationChannelSelect">Channel (R):</label>
+                <select
+                  id="relationChannelSelect"
+                  class="control-input"
+                  style="width: 180px; margin-left: 0"
+                  onchange="onRelationChannelChange()"
+                >
+                  <option value="STILL">STILL</option>
+                  <option value="4K">4K</option>
+                  <option value="50K">50K</option>
+                  <option value="CH7">CH7</option>
+                </select>
+              </div>
+              <div class="control-row" style="margin-top: 10px">
+                <label style="width: 120px">MXC (x):</label>
+                <span id="relationCurrentMXC" class="current-value">-</span>
+              </div>
+              <div class="control-row">
+                <label style="width: 120px">R channel (y):</label>
+                <span id="relationCurrentR" class="current-value">-</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="relation-plot-panel">
+          <canvas id="relationChart"></canvas>
+        </div>
+      </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
       let hasInitializedRunId = false;
       let expectedNextRunId = null;
+      let relationChart = null;
+      let currentRelationChannel = "STILL";
+      const RELATION_LIVE_POINTS = 400;
+
+      const relationDataStore = {
+        STILL: [],
+        "4K": [],
+        "50K": [],
+        CH7: [],
+      };
 
       function loadHistoricalRun(runPayload) {
         if (!runPayload || !runPayload.run_id) {
@@ -1809,6 +1891,7 @@
         RSTILL: null,
         PSTILL: null,
         heaterOutputMXC: null,
+        //RCH7: null,
       };
 
       // Track last sent values
@@ -3218,6 +3301,9 @@
               data.heaterOutputMXC
             );
           }
+          /* if (data.RCH7 !== undefined) {
+            currentParameters.RCH7 = parseFloat(data.RCH7);
+          } */
 
           // Update UI controls if parameters changed every minute
           // (or the time specified in parameterBoxUpdateInterval variable)
@@ -3431,6 +3517,9 @@
               }
             }
           }
+
+          //updateRelationStore();
+          //redrawRelationChart();
 
           if (tcpConnectionStatus === false) {
             await updateConnectionStatus();
@@ -4601,6 +4690,142 @@
         if (animationFrameId) cancelAnimationFrame(animationFrameId);
         animationFrameId = requestAnimationFrame(draw);
       }
+
+      function getResistanceForChannel(channel) {
+        switch (channel) {
+          case "STILL":
+            return currentParameters.RSTILL;
+          case "4K":
+            return currentParameters.R4K;
+          case "50K":
+            return currentParameters.R50K;
+          case "CH7":
+            return currentParameters.RCH7;
+          default:
+            return null;
+        }
+      }
+
+      function createRelationChart() {
+        const canvas = document.getElementById("relationChart");
+        if (!canvas) return null;
+
+        const ctx = canvas.getContext("2d");
+        return new Chart(ctx, {
+          type: "scatter",
+          data: {
+            datasets: [
+              {
+                label: "R(STILL) vs T(MXC)",
+                data: [],
+                showLine: false,
+                pointRadius: 2,
+              },
+            ],
+          },
+          options: {
+            animation: false,
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              x: {
+                type: "linear",
+                title: { display: true, text: "MXC Temperature (K)" },
+              },
+              y: {
+                title: { display: true, text: "Resistance (Ω)" },
+              },
+            },
+            plugins: {
+              legend: { display: true },
+              tooltip: {
+                callbacks: {
+                  label: function (ctx) {
+                    const x = ctx.parsed.x;
+                    const y = ctx.parsed.y;
+                    return `T=${x.toFixed(6)} K, R=${y.toFixed(3)} Ω`;
+                  },
+                },
+              },
+            },
+          },
+        });
+      }
+
+      function updateRelationCurrentLabels() {
+        const mxcSpan = document.getElementById("relationCurrentMXC");
+        const rSpan = document.getElementById("relationCurrentR");
+        if (!mxcSpan || !rSpan) return;
+
+        const t = currentParameters.MXC;
+        const r = getResistanceForChannel(currentRelationChannel);
+
+        if (typeof t === "number" && isFinite(t)) {
+          mxcSpan.textContent =
+            t < 1.0 ? `${(t * 1000).toFixed(3)} mK` : `${t.toFixed(6)} K`;
+        } else {
+          mxcSpan.textContent = "-";
+        }
+
+        if (typeof r === "number" && isFinite(r)) {
+          rSpan.textContent = `${r.toFixed(3)} Ω`;
+        } else {
+          rSpan.textContent = "-";
+        }
+      }
+
+      function pushRelationPointFor(channel) {
+        const t = currentParameters.MXC;
+        const r = getResistanceForChannel(channel);
+
+        if (!(typeof t === "number" && isFinite(t))) return;
+        if (!(typeof r === "number" && isFinite(r))) return;
+
+        relationDataStore[channel].push({ x: t, y: r });
+
+        const HARD_CAP = 20000;
+        if (relationDataStore[channel].length > HARD_CAP) {
+          relationDataStore[channel].splice(
+            0,
+            relationDataStore[channel].length - HARD_CAP
+          );
+        }
+      }
+
+      function updateRelationStore() {
+        pushRelationPointFor("STILL");
+        pushRelationPointFor("4K");
+        pushRelationPointFor("50K");
+        pushRelationPointFor("CH7");
+      }
+
+      function redrawRelationChart() {
+        if (!relationChart) return;
+
+        const pts = relationDataStore[currentRelationChannel] || [];
+        const windowPts = pts.slice(-RELATION_LIVE_POINTS);
+
+        relationChart.data.datasets[0].data = windowPts;
+        relationChart.data.datasets[0].label = `R(${currentRelationChannel}) vs T(MXC)`;
+        relationChart.update("none");
+
+        updateRelationCurrentLabels();
+      }
+
+      function onRelationChannelChange() {
+        const sel = document.getElementById("relationChannelSelect");
+        if (!sel) return;
+        currentRelationChannel = sel.value;
+        redrawRelationChart();
+      }
+
+      document.addEventListener("DOMContentLoaded", () => {
+        const sel = document.getElementById("relationChannelSelect");
+        if (sel) currentRelationChannel = sel.value;
+
+        relationChart = createRelationChart();
+        redrawRelationChart();
+      });
 
       // CALL THE FUNCTION WHEN THE PAGE LOADS
       document.addEventListener("DOMContentLoaded", initParticles);

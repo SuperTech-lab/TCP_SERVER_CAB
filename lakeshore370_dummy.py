@@ -5,8 +5,8 @@ import random
 _lakeshore_mutex = threading.Lock()
 
 
-DEFAULT_CHANNELS = [1, 2, 5, 6]
-DEFAULT_CHANNELS_ID = ["50K", "4K", "STILL", "MXC"]
+DEFAULT_CHANNELS = [1, 2, 5, 6]#, 7]
+DEFAULT_CHANNELS_ID = ["50K", "4K", "STILL", "MXC"]#, "CH7"]
 ALL_CHANNELS = range(1, 17)
 
 # [dwell time, pause time, curve number, temperature coefficient]
@@ -184,6 +184,8 @@ class LakeShore370:
             5: DEFAULT_CURVES[5],   # STILL
             6: DEFAULT_CURVES[6],   # MXC
         }
+        """ self._temps_K["CH7"] = self._temps_K["MXC"]
+        self._resistances_ohm["CH7"] = 800.0 """
         # Canales ON por defecto
         self._channel_status = {ch: 1 for ch in DEFAULT_CHANNELS}
 
@@ -221,6 +223,8 @@ class LakeShore370:
         # status 0 = off, 1 = on
         self._autoscan = ["6", "0"]
 
+        #self._channel_status[7] = 1
+
         print("Dummy LakeShore370 inicializado (sin hardware real).")
 
     # ---------------------- GET MÉTODOS ------------------------------
@@ -255,9 +259,31 @@ class LakeShore370:
     def get_resistance(self, channel: int):
         """
         Devuelve resistencia en Ohmios del canal indicado.
+        El canal 7 está artificialmente correlacionado con la temperatura MXC.
         """
         label = self._label_from_channel(channel)
+
         with _lakeshore_mutex:
+
+            # ----------- CANAL 7 FICTICIO -----------
+            if channel == 7:
+                T_mxc = self._temps_K.get("MXC", 0.05)
+
+                # Relación artificial pero realista:
+                # R ↓ cuando T ↓ (tipo sensor resistivo)
+                # R = R0 * (T / T0)^alpha
+                T0 = 0.05        # 50 mK referencia
+                R0 = 1000.0      # 1 kΩ a 50 mK
+                alpha = 1.2      # pendiente suave
+
+                R = R0 * (max(T_mxc, 1e-4) / T0) ** alpha
+                noise = random.uniform(-5.0, 5.0)
+
+                value = max(R + noise, 1.0)
+                self._resistances_ohm["CH7"] = value
+                return value
+
+            # ----------- RESTO DE CANALES -----------
             base = self._resistances_ohm.get(label, 0.0)
             noise = random.uniform(-0.5, 0.5)
             value = max(base + noise, 0.0)

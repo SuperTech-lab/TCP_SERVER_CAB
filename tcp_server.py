@@ -1980,7 +1980,8 @@ def broadcast_temperature(sensorValues, controlParams, sensorParams):
                     f"curve4K: {sensorParams['curve_4K']}," +
                     f"curveSTILL: {sensorParams['curve_STILL']}," +
                     f"heaterOutputMXC: {controlParams['heaterOutputMXC']}," +
-                    f"RUNID: {CURRENT_RUN_ID}\n"
+                    f"RUNID: {CURRENT_RUN_ID}\n" 
+                    #f"RCH7: {resistances['CH7']}\n"
                     ).encode('utf-8')
         
     except Exception as e:
@@ -2192,9 +2193,9 @@ def maybe_insert_measurements():
 
 
 if __name__ == "__main__":
-    #try:
-        #init_db_pool()
+    try:
+        init_db_pool()
         start_server()
-    #finally:
+    finally:
         end_run()
-        #close_db_pool()
+        close_db_pool()

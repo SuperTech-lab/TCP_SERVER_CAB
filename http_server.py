@@ -68,6 +68,7 @@ current_curve_4K = None
 current_curve_STILL = None
 current_heater_output_MXC = None
 current_RUNID = None
+#current_RCH7 = None
 
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
 
@@ -136,7 +137,9 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
                                    "curve4K": current_curve_4K,
                                    "curveSTILL": current_curve_STILL,      
                                    "heaterOutputMXC": current_heater_output_MXC,    
-                                   "runID": current_RUNID,      })
+                                   "runID": current_RUNID,      
+                                   #"RCH7": current_RCH7,
+                                   })
                                    
 
             self.wfile.write(response.encode('utf-8'))
@@ -401,6 +404,7 @@ def receive_sensor_data(tcp_socket):
     global current_curve_STILL
     global current_heater_output_MXC
     global current_RUNID
+    #global current_RCH7
 
     buf = b""
     while True:
@@ -556,6 +560,11 @@ def receive_sensor_data(tcp_socket):
                     print(f"⚠ Warning parsing run ID: {e} (raw value = {raw_run!r})")
                     current_RUNID = None
 
+                """ try:
+                    current_RCH7 = float(params[53].split(':')[-1].strip())
+                except Exception as e:
+                    print(f"Error parsing RCH7: {e}")
+                    current_RCH7 = None """
 
         except Exception as e:
             print(f"Error receiving LakeShore370 data: {e}")
