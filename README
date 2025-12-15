@@ -1,71 +1,101 @@
-# Overview
+# 📚 Overview
 
-This application has been developed to control the Lakeshore 370 device, one of the main components in the refrigeration system of the superconducting group. The main reason to develop such system was to enable the group members to control all the Lakeshore functionalities in a remote and easy way. Rather than having to use commands in the terminal, the superconducting group users are now able to change the device's parameters and configurations entirely through the website.
+[cite_start]Este proyecto desarrolla una aplicación para controlar el dispositivo **Lakeshore 370** [cite: 1][cite_start], un componente clave en el sistema de refrigeración del grupo de superconductores[cite: 1].
 
-This website (index.html file) has three different tabs for different functionalities:
+[cite_start]El objetivo principal es permitir a los miembros del grupo controlar todas las funcionalidades del Lakeshore de forma remota y sencilla[cite: 2]. [cite_start]En lugar de utilizar comandos en la terminal, los usuarios pueden modificar los parámetros y configuraciones del dispositivo completamente a través de un sitio web[cite: 3].
 
-## Fridge Control
-
-In this tab (selected by default), the information about the temperature of each Lakeshore channel (MXC, STILL, 4K and 50K) is shown, together with all the other functionalities. These functionalities include, among others: P, I and D gain configuration, heater range configuration, curve selection, etc.
-
-## BlackBody Control
-
-This tab is yet to be developed. It was created to manage the Black Body parameters and temperature.
-
-## MXC Comparison
-
-This tab was implemented as a future feature. Here, a comparative chart between a possible future channel's resistance and the MXC temperature is shown. This will be useful, for example, when comparing it with a channel measuring a superconductor, as it will show how the resistance decays alongside the temperature.
-
-Even though there is a considerable amount of code, the main data stream repeats itself in almost every part of the system. The following approach is taken to communicate backend and frontend:
+[cite_start]El sitio web (`index.html`) se organiza en tres pestañas principales para diferentes funcionalidades[cite: 4]:
 
 ---
 
-# Data Flow (High-Level Overview)
+## ❄️ Funcionalidades del Sitio Web
 
-## 1. Device / Simulator
+### 1. Fridge Control (Control de Refrigerador)
 
-- The source of data is the Lakeshore 370 device. For development and testing without influencing production, the simulator `lakeshore370_dummy.py` has been developed.
+- [cite_start]Esta es la pestaña seleccionada por defecto[cite: 4].
+- [cite_start]Muestra la información de temperatura de cada canal del Lakeshore (MXC, STILL, 4K y 50K)[cite: 4].
+- [cite_start]Incluye funcionalidades para la configuración de parámetros como[cite: 5]:
+  - Ganancias P, I y D.
+  - Configuración del rango del calentador (heater range).
+  - Selección de curva.
 
-## 2. Hardware Abstraction
+### 2. BlackBody Control (Control de Cuerpo Negro)
 
-- The module `lakeshore370.py` implements communication with the hardware (or with the dummy). It provides functions to read temperatures, configure PID gains, heater ranges, curve selection, etc. This is archieved through the PyVisa communication protocol.
+- [cite_start]Esta pestaña está aún **pendiente de desarrollo**[cite: 5].
+- [cite_start]Fue creada para gestionar la temperatura y los parámetros del Cuerpo Negro[cite: 6].
 
-## 3. Backend (Servers)
+### 3. MXC Comparison (Comparación de MXC)
 
-- `tcp_server.py` exposes a TCP interface for clients that want to send commands or receive readings. Here, we initialise the Lakeshore connection, as well as the database one. It also handles all possible commands to send to the Lakeshore device.
-- `http_server.py` serves the web UI and any HTTP endpoints used by the UI. It gets the data from the TCP server and delivers it to the `index.html` afterwards. Moreover, it also has an endpoint to retrieve the data from previous RUNS.
-
-## 4. Frontend
-
-- The user interface is in `index.html` with logic in `index.js`. The frontend obtains data from the `http_server.py` JSON via the /get-data endpoint. Afterwards, it parses all the JSON components to the variables, being able to show how they change in live. The configuration of all parameters is also developed in a way that everytime the user confirms the changes made, `index.html` sends the commands to the TCP server, who then applies it to the Lakeshore device.
-
-## 5. Runtime Flow (Overview)
-
-### Device Readout and Broadcasting (TCP Server)
-
-- The driver in `lakeshore370.py` is used by `tcp_server.py`'s `lakeshore_temperature_sensor()` loop to read temperatures, resistances and power, together with control and sensor parameters.
-- `tcp_server.py` composes a single text message per sample containing many `key:value` pairs (for example, `50K: 0.05,4K: 0.3,STILL: OFF,MXC: 0.01,MXCSP:...`).
-- The TCP server accepts two client modes: subscriber mode and command mode. Subscribers connect, send `SUB\n` and remain connected to receive the continuous broadcasts; command-mode connections send a single command and receive a one-line reply.
-
-### HTTP Server as a TCP Subscriber
-
-- `http_server.py` connects to the TCP server as a subscriber (it opens a persistent TCP socket, sends `SUB\n` and runs `receive_sensor_data()` in a background thread).
-- `receive_sensor_data()` reads the content from the TCP socket, parses the `key:value` pairs and updates the global variables that represent the latest snapshot for each channel and parameter.
-- `http_server.py` exposes an endpoint `/get-data` that returns the current snapshot as a JSON from those global variables. This is how the frontend obtains the latest values.
-
-### Frontend Interactions
-
-- Reading data: the frontend requests `/get-data` (periodically) to obtain a snapshot JSON used to update the UI widgets and charts.
-- Commands/configuration: when the user changes a parameter, the frontend POSTs to `/send-command`. The HTTP server opens a TCP connection, sends the command text, reads the single-line response and returns it to the frontend.
+- [cite_start]Implementada como una **funcionalidad futura**[cite: 7].
+- [cite_start]Mostrará un gráfico comparativo entre la resistencia de un posible canal futuro y la temperatura del MXC[cite: 8].
+- [cite_start]Esto será útil para comparar la resistencia de un superconductor con la temperatura, mostrando cómo decae la resistencia[cite: 9].
 
 ---
 
-# Relevant Files
+# ⚙️ Data Flow (Flujo de Datos - Descripción de Alto Nivel)
 
-- `lakeshore370.py`: device driver and low-level API.
-- `lakeshore370_dummy.py`: simulator for development and tests.
-- `tcp_server.py`: TCP server managing client connections and commands.
-- `http_server.py`: HTTP server for the UI and related endpoints.
-- `index.html`, `index.js`: web interface and client-side logic.
-- `default_config.py`: default values and configuration.
-- `dbconfig.sql`: postgresql configuration file for the database.
+[cite_start]A pesar de la considerable cantidad de código, el flujo principal de datos se repite en casi todas las partes del sistema[cite: 10]. [cite_start]La comunicación entre el _backend_ y el _frontend_ sigue el siguiente enfoque[cite: 11]:
+
+## Componentes del Flujo de Datos
+
+### 1. Device / Simulator (Dispositivo / Simulador)
+
+- [cite_start]La fuente principal de datos es el dispositivo **Lakeshore 370**[cite: 12].
+- [cite_start]Para el desarrollo y las pruebas, se utiliza un simulador: `lakeshore370_dummy.py`[cite: 12].
+
+### 2. Hardware Abstraction (Abstracción de Hardware)
+
+- [cite_start]El módulo `lakeshore370.py` se encarga de implementar la comunicación con el hardware real o con el simulador (`lakeshore370_dummy.py`)[cite: 13].
+- [cite_start]Proporciona funciones para leer temperaturas, configurar ganancias PID, rangos de calentador, selección de curva, etc.[cite: 14].
+- [cite_start]Esto se logra a través del protocolo de comunicación **PyVisa**[cite: 14].
+
+### 3. Backend (Servidores)
+
+| Archivo          | Función Principal               | Descripción                                                                                                                                                                                                                                                                                    |
+| :--------------- | :------------------------------ | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tcp_server.py`  | Servidor de Comandos y Lecturas | [cite_start]Expone una interfaz TCP para clientes que deseen enviar comandos o recibir lecturas[cite: 15]. [cite_start]Inicializa la conexión con el Lakeshore y con la base de datos[cite: 16]. [cite_start]Maneja todos los posibles comandos a enviar al dispositivo Lakeshore[cite: 17].   |
+| `http_server.py` | Servidor Web y UI               | [cite_start]Sirve la interfaz web (`index.html`) y los _endpoints_ HTTP utilizados por la UI[cite: 18]. [cite_start]Obtiene los datos del servidor TCP y los entrega al `index.html`[cite: 19]. [cite_start]También tiene un _endpoint_ para recuperar datos de **RUNS** anteriores[cite: 20]. |
+
+### 4. Frontend (Interfaz de Usuario)
+
+- [cite_start]La interfaz de usuario se encuentra en `index.html` y la lógica asociada está en `index.js`[cite: 21].
+- [cite_start]El _frontend_ obtiene datos del servidor HTTP (`http_server.py`) a través del _endpoint_ `/get-data` que devuelve un JSON[cite: 22].
+- [cite_start]El JSON se parsea para actualizar las variables y mostrar los cambios en tiempo real[cite: 23].
+- [cite_start]Cuando el usuario confirma los cambios de configuración, `index.html` envía los comandos al servidor TCP, que luego los aplica al dispositivo Lakeshore[cite: 24].
+
+---
+
+## ➡️ Runtime Flow (Flujo en Tiempo de Ejecución)
+
+### A. Device Readout and Broadcasting (Lectura y Difusión del Dispositivo - TCP Server)
+
+1.  [cite_start]El _driver_ (`lakeshore370.py`) es utilizado por el _loop_ `lakeshore_temperature_sensor()` en `tcp_server.py` para leer continuamente temperaturas, resistencias, potencia y parámetros de control/sensor[cite: 25].
+2.  [cite_start]`tcp_server.py` compone un único mensaje de texto por muestra que contiene varios pares `key:value` (ejemplo: `50K: 0.05,4K: 0.3,STILL: OFF,MXC: 0.01,MXCSP:...`)[cite: 26].
+3.  [cite_start]El servidor TCP acepta dos modos de cliente[cite: 27]:
+    - [cite_start]**Subscriber Mode**: Los clientes se conectan, envían `SUB\n` y permanecen conectados para recibir las difusiones continuas de datos[cite: 28].
+    - [cite_start]**Command Mode**: Las conexiones envían un único comando y reciben una respuesta de una sola línea[cite: 29].
+
+### B. HTTP Server as a TCP Subscriber (HTTP Server como Suscriptor TCP)
+
+1.  [cite_start]`http_server.py` se conecta al servidor TCP como un suscriptor (abre un _socket_ TCP persistente, envía `SUB\n` y ejecuta `receive_sensor_data()` en un _thread_ de fondo)[cite: 30].
+2.  [cite_start]La función `receive_sensor_data()` lee el contenido del _socket_ TCP, parsea los pares `key:value` y actualiza las variables globales que representan la instantánea más reciente para cada canal y parámetro[cite: 31, 32].
+3.  [cite_start]`http_server.py` expone el _endpoint_ `/get-data` que devuelve esta instantánea actual como un JSON a partir de dichas variables globales[cite: 33]. [cite_start]**Así es como el _frontend_ obtiene los valores más recientes**[cite: 33].
+
+### C. Frontend Interactions (Interacciones del Frontend)
+
+| Interacción                | Proceso                                                                                                                                                                                                                                                                  |
+| :------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Lectura de Datos**       | [cite_start]El _frontend_ solicita `/get-data` **periódicamente** para obtener la instantánea JSON utilizada para actualizar los _widgets_ y gráficos de la UI[cite: 34].                                                                                                |
+| **Comandos/Configuración** | [cite_start]Cuando el usuario cambia un parámetro, el _frontend_ hace un **POST** a `/send-command`[cite: 35]. [cite_start]El servidor HTTP abre una conexión TCP, envía el texto del comando, lee la respuesta de una sola línea y la devuelve al _frontend_[cite: 36]. |
+
+---
+
+# 📂 Archivos Relevantes
+
+- [cite_start]`lakeshore370.py`: Controlador del dispositivo y API de bajo nivel[cite: 37].
+- [cite_start]`lakeshore370_dummy.py`: Simulador para desarrollo y pruebas[cite: 37].
+- [cite_start]`tcp_server.py`: Servidor TCP que gestiona las conexiones y comandos de los clientes[cite: 38].
+- [cite_start]`http_server.py`: Servidor HTTP para la interfaz de usuario y los _endpoints_ relacionados[cite: 38].
+- [cite_start]`index.html`, `index.js`: Interfaz web y lógica del lado del cliente[cite: 38].
+- [cite_start]`default_config.py`: Valores por defecto y configuración[cite: 39].
+- [cite_start]`dbconfig.sql`: Archivo de configuración de **PostgreSQL** para la base de datos[cite: 39].
