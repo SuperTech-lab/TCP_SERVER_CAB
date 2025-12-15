@@ -1,4 +1,12 @@
-# Overview
+# LakeShore 370 – Control & Monitoring System (CAB)
+
+<p align="center">
+  <img src="logoCAB.png"
+       alt="Centro de Astrobiología (CAB - CSIC/INTA)"
+       width="500"/>
+</p>
+
+## Overview
 
 This application has been developed to control the Lakeshore 370 device, one of the main components in the refrigeration system of the superconducting group. The main reason to develop such system was to enable the group members to control all the Lakeshore functionalities in a remote and easy way. Rather than having to use commands in the terminal, the superconducting group users are now able to change the device's parameters and configurations entirely through the website.
 
