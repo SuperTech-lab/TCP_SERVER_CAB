@@ -39,7 +39,7 @@ def init_db_pool():
         DB_POOL = ThreadedConnectionPool(
             minconn=1,
             maxconn=10,   
-            host="localhost",
+            host="192.168.38.4",
             port=5432,
             dbname="lakeshore_db",
             user="lakeshore_app",  
