@@ -2194,8 +2194,8 @@ def maybe_insert_measurements():
 
 if __name__ == "__main__":
     try:
-        #init_db_pool()
+        init_db_pool()
         start_server()
     finally:
         end_run()
-        #close_db_pool()
+        close_db_pool()
