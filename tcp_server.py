@@ -2139,6 +2139,9 @@ def maybe_insert_measurements():
                 curve_id
             ) in per_channel:
 
+                if not enabled:
+                    continue
+
                 channel_id = CHANNEL_IDS[name]
 
                 cur.execute(
