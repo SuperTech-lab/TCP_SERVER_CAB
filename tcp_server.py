@@ -10,6 +10,7 @@ import psycopg2
 from contextlib import contextmanager
 from default_config import (DEFAULT_PID, CURRENT_RANGE_LIST, DEFAULT_MXC_RESISTANCE_RANGE_SETTINGS, SENSOR_RESISTANCE_RANGE_LIST, DEFAULT_CHANNELS, 
 DEFAULT_CHANNELS_ID, DEFAULT_SETTINGS, DEFAULT_MXC_SETPOINT_MK, DEFAULT_MXC_HEATER_RANGE, DEFAULT_SENSOR_RESISTANCE_SETTINGS, DB_INSERT_INTERVAL, DEFAULT_CURVES, CURVE_NAMES)
+import urllib.parse
 
 ls = LakeShore370()
 
@@ -71,30 +72,34 @@ def get_db_conn():
     finally:
         DB_POOL.putconn(conn)
 
-def start_run(global_run_id: int):
-    
+def start_run(global_run_id: int, description: str | None = None):
     global CURRENT_RUN_ID, last_db_insert_ts
 
     if CURRENT_RUN_ID is not None:
         print(f"⚠ Ya hay un RUN en curso (RUN_ID = {CURRENT_RUN_ID}). Ciérralo antes con end_run.")
         return
-    
+
     try:
         global_run_id = int(global_run_id)
     except (ValueError, TypeError):
         print("❌ RUN_ID must be an integer")
         return
 
+    if description is not None:
+        description = description.strip()
+        if description == "":
+            description = None
+
     with get_db_conn() as conn:
         with conn.cursor() as cur:
             try:
                 cur.execute(
                     """
-                    INSERT INTO runs (run_id, started_at)
-                    VALUES (%s, now())
+                    INSERT INTO runs (run_id, started_at, description)
+                    VALUES (%s, now(), %s)
                     RETURNING run_id;
                     """,
-                    (global_run_id,),
+                    (global_run_id, description),
                 )
                 CURRENT_RUN_ID = cur.fetchone()[0]
                 conn.commit()
@@ -369,9 +374,9 @@ def handle_command(command):
             print("✅ Autoscan disabled")
 
     if cmd.startswith("start_run"):
-        parts = cmd.split(":")
-        if len(parts) != 2:
-            message = "❌ Syntax: start_run:<RUN_ID>"
+        parts = cmd.split(":", 2)
+        if len(parts) < 2:
+            message = "❌ Syntax: start_run:<RUN_ID>[:<DESCRIPTION>]"
             print(message)
             return message
 
@@ -382,7 +387,11 @@ def handle_command(command):
             print(message)
             return message
 
-        start_run(global_run_id)
+        desc = None
+        if len(parts) == 3:
+            desc = urllib.parse.unquote(parts[2])   #the description
+
+        start_run(global_run_id, desc)
 
         if CURRENT_RUN_ID is not None:
             message = f"✅ Run {CURRENT_RUN_ID} started"
@@ -392,6 +401,23 @@ def handle_command(command):
         print(message)
         return message
 
+    elif cmd == "get_recent_runs":
+        try:
+            with get_db_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT run_id, COALESCE(description, '')
+                        FROM runs
+                        ORDER BY started_at DESC
+                        LIMIT 5;
+                    """)
+                    rows = cur.fetchall()
+
+            payload = [{"run_id": int(r[0]), "description": r[1]} for r in rows]
+            return "RECENT_RUNS:OK:" + json.dumps(payload)
+        except Exception as e:
+            return f"ERROR:get_recent_runs:{e}"
+
     elif cmd == "end_run":
         end_run()
         return "✅ Run ended"
@@ -400,6 +426,21 @@ def handle_command(command):
         try:
             with get_db_conn() as conn:
                 with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT run_id
+                        FROM runs
+                        WHERE ended_at IS NULL
+                        ORDER BY started_at DESC
+                        LIMIT 1;
+                    """)
+                    row = cur.fetchone()
+
+                    if row:
+                        active = row[0]
+                        message = f"ACTIVE_RUN:{active}"
+                        print(f"📡 get_last_run -> {message}")
+                        return message
+
                     cur.execute("SELECT COALESCE(MAX(run_id), 0) FROM runs;")
                     last_run = cur.fetchone()[0]
 
@@ -411,6 +452,7 @@ def handle_command(command):
             message = f"ERROR:get_last_run:{e}"
             print(message)
             return message
+
 
     elif cmd.startswith("get_run_data"):
         parts = cmd.split(":")
@@ -444,7 +486,8 @@ def handle_command(command):
                             extract(epoch FROM ts) * 1000 AS ts_ms,
                             temperature_k,
                             resistance_ohm,
-                            power_w
+                            power_w,
+                            mxc_setpoint_mk
                         FROM channel_data
                         WHERE run_id = %s
                         ORDER BY ts ASC;
@@ -459,7 +502,7 @@ def handle_command(command):
                 return message
 
             data_by_channel = {}
-            for channel_id, ts_ms, temp, res, power in rows:
+            for channel_id, ts_ms, temp, res, power, mxc_sp_mk  in rows:
                 ch_name = ID_TO_NAME.get(channel_id, str(channel_id))
 
                 if ch_name not in data_by_channel:
@@ -468,6 +511,7 @@ def handle_command(command):
                         "temperature_k": [],
                         "resistance_ohm": [],
                         "power_w": [],
+                        "mxc_setpoint_mk": [],
                     }
 
                 def to_float(x):
@@ -477,6 +521,7 @@ def handle_command(command):
                 data_by_channel[ch_name]["temperature_k"].append(to_float(temp))
                 data_by_channel[ch_name]["resistance_ohm"].append(to_float(res))
                 data_by_channel[ch_name]["power_w"].append(to_float(power))
+                data_by_channel[ch_name]["mxc_setpoint_mk"].append(to_float(mxc_sp_mk))
 
             payload = {
                 "run_id": run_id,
@@ -2200,5 +2245,4 @@ if __name__ == "__main__":
         init_db_pool()
         start_server()
     finally:
-        end_run()
         close_db_pool()

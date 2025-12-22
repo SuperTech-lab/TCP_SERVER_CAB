@@ -618,6 +618,81 @@
       #relationChart {
         height: 420px;
       }
+
+      .run-play-button {
+        background-color: #22c55e;
+        color: white;
+      }
+
+      .run-play-button:hover:not(:disabled) {
+        background-color: #16a34a;
+      }
+
+      .run-play-button:disabled {
+        background-color: #9ca3af;
+        color: #f3f4f6;
+        cursor: not-allowed;
+        opacity: 0.7;
+        box-shadow: none;
+        transform: none;
+      }
+      .run-stop-button {
+        background-color: #ef4444;
+        color: white;
+      }
+
+      .run-stop-button:hover:not(:disabled) {
+        background-color: #dc2626;
+      }
+
+      .run-stop-button:disabled {
+        background-color: #fca5a5;
+        cursor: not-allowed;
+        opacity: 0.7;
+      }
+      .run-control-floating {
+        display: flex;
+        align-items: flex-end;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .recent-runs {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        min-width: 260px;
+      }
+
+      .run-select {
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid #2a2a2a;
+        background: #111;
+        color: #fff;
+        outline: none;
+      }
+
+      .run-select:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+      }
+      .recent-runs {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 4px;
+        margin: 0 auto;
+        min-width: 280px;
+        text-align: center;
+      }
+
+      .recent-runs label {
+        text-align: center;
+        font-size: 13px;
+        font-weight: 600;
+        color: #374151;
+      }
     </style>
   </head>
 
@@ -722,6 +797,14 @@
                     </div>
                   </div>
                 </details>
+                <div class="recent-runs">
+                  <label class="run-label" for="recentRunsSelect"
+                    >Últimos RUNs</label
+                  >
+                  <select id="recentRunsSelect" class="run-select">
+                    <option value="">(cargando...)</option>
+                  </select>
+                </div>
                 <div class="run-control run-control-floating">
                   <label for="runIdInput" class="run-label">RUN ID</label>
                   <input
@@ -730,6 +813,19 @@
                     class="run-input"
                     value="1"
                     min="1"
+                  />
+                  <label
+                    for="runDescInput"
+                    class="run-label"
+                    style="margin-left: 10px"
+                    >Desc</label
+                  >
+                  <input
+                    type="text"
+                    id="runDescInput"
+                    class="run-input"
+                    placeholder="Descripción del RUN..."
+                    style="min-width: 240px"
                   />
                   <button
                     id="runPlayButton"
@@ -1645,6 +1741,7 @@
       let relationChart = null;
       let currentRelationChannel = "STILL";
       const RELATION_LIVE_POINTS = 400;
+      let currentActiveRunId = null;
 
       const relationDataStore = {
         STILL: [],
@@ -1652,6 +1749,26 @@
         "50K": [],
         CH7: [],
       };
+
+      function updateRunUI() {
+        const playBtn = document.getElementById("runPlayButton");
+        const stopBtn = document.getElementById("runStopButton");
+        const runIdInput = document.getElementById("runIdInput");
+        const runDescInput = document.getElementById("runDescInput");
+
+        if (!playBtn || !stopBtn) return;
+
+        const hasActiveRun = currentActiveRunId !== null;
+
+        playBtn.disabled = hasActiveRun;
+
+        stopBtn.disabled = !hasActiveRun;
+
+        if (runIdInput) {
+          runIdInput.disabled = hasActiveRun;
+        }
+        if (runDescInput) runDescInput.disabled = hasActiveRun;
+      }
 
       function loadHistoricalRun(runPayload) {
         if (!runPayload || !runPayload.run_id) {
@@ -1670,38 +1787,129 @@
         );
       }
 
-      async function initRunIdFromServer() {
-        if (hasInitializedRunId) {
-          return;
+      const recentRunsSelect = document.getElementById("recentRunsSelect");
+      if (recentRunsSelect) {
+        recentRunsSelect.addEventListener("change", async () => {
+          const runId = parseInt(recentRunsSelect.value, 10);
+          if (!runId) return;
+
+          addLogEntry(`📂 Cargando RUN histórico ${runId}`, "status");
+
+          try {
+            const response = await sendCommandToServer(`get_run_data:${runId}`);
+            const match = /RUN_DATA:OK:(\{.*\})/.exec(response);
+
+            if (!match) {
+              addLogEntry("❌ No RUN_DATA encontrado", "received");
+              return;
+            }
+
+            const payload = JSON.parse(match[1]);
+            loadHistoricalRun(payload);
+          } catch (e) {
+            addLogEntry(
+              `❌ Error cargando RUN ${runId}: ${e.message}`,
+              "received"
+            );
+          }
+        });
+      }
+
+      async function refreshRecentRuns() {
+        if (!recentRunsSelect) return;
+
+        recentRunsSelect.innerHTML = `<option value="">(cargando...)</option>`;
+
+        try {
+          const response = await sendCommandToServer("get_recent_runs");
+
+          const marker = "RECENT_RUNS:OK:";
+          const i = response.indexOf(marker);
+          if (i === -1) {
+            recentRunsSelect.innerHTML = `<option value="">(error cargando)</option>`;
+            addLogEntry(`❌ get_recent_runs: ${response}`, "received");
+            return;
+          }
+
+          const jsonStr = response.slice(i + marker.length).trim();
+          const runs = JSON.parse(jsonStr);
+
+          if (!Array.isArray(runs) || runs.length === 0) {
+            recentRunsSelect.innerHTML = `<option value="">(sin runs)</option>`;
+            return;
+          }
+
+          recentRunsSelect.innerHTML =
+            `<option value="">Selecciona un RUN...</option>` +
+            runs
+              .map((r) => {
+                const label = r.description
+                  ? `RUN ${r.run_id} — ${r.description}`
+                  : `RUN ${r.run_id}`;
+                return `<option value="${
+                  r.run_id
+                }" data-desc="${encodeURIComponent(r.description || "")}">
+                    ${label}
+                  </option>`;
+              })
+              .join("");
+        } catch (e) {
+          recentRunsSelect.innerHTML = `<option value="">(error cargando)</option>`;
+          addLogEntry(`❌ Error get_recent_runs: ${e.message}`, "received");
         }
+      }
+
+      async function initRunIdFromServer() {
+        if (hasInitializedRunId) return;
         hasInitializedRunId = true;
 
         const runIdInput = document.getElementById("runIdInput");
         if (!runIdInput) return;
 
         try {
-          addLogEntry("Requesting last run id...", "status");
+          addLogEntry("Requesting last/active run id...", "status");
 
           const response = await sendCommandToServer("get_last_run");
-          const match = /LAST_RUN:(\d+)/.exec(response);
 
-          if (match) {
-            const lastRun = parseInt(match[1], 10);
+          let m;
+
+          // Caso 1: hay RUN abierto
+          m = /ACTIVE_RUN:(\d+)/.exec(response);
+          if (m) {
+            const activeRun = parseInt(m[1], 10);
+            currentActiveRunId = activeRun;
+
+            runIdInput.value = activeRun;
+            expectedNextRunId = activeRun;
+            addLogEntry(`Active run detected: ${activeRun}`, "status");
+            updateRunUI();
+            return;
+          }
+
+          // Caso 2: no hay abierto
+          m = /LAST_RUN:(\d+)/.exec(response);
+          if (m) {
+            const lastRun = parseInt(m[1], 10);
             const nextRun = lastRun + 1;
+
+            currentActiveRunId = null;
             runIdInput.value = nextRun;
             expectedNextRunId = nextRun;
+
             addLogEntry(`Next run id set to ${nextRun}`, "status");
-          } else {
-            addLogEntry(
-              `Could not parse LAST_RUN from server response: "${response}". Using 1.`,
-              "status"
-            );
-            runIdInput.value = 1;
-            expectedNextRunId = 1;
+            updateRunUI();
+            return;
           }
+
+          addLogEntry(
+            `Could not parse run id from: "${response}". Using 1.`,
+            "status"
+          );
+          runIdInput.value = 1;
+          expectedNextRunId = 1;
         } catch (error) {
           addLogEntry(
-            `Error requesting last run id: ${error.message}. Using 1.`,
+            `Error requesting run id: ${error.message}. Using 1.`,
             "received"
           );
           runIdInput.value = 1;
@@ -1717,6 +1925,7 @@
         const runIdInput = document.getElementById("runIdInput");
         const runPlayButton = document.getElementById("runPlayButton");
         const runStopButton = document.getElementById("runStopButton");
+        const runDescInput = document.getElementById("runDescInput");
 
         if (!runPlayButton || !runStopButton) {
           console.warn("Run control elements not found in DOM");
@@ -1724,23 +1933,34 @@
         }
 
         initRunIdFromServer();
+        updateRunUI();
 
         // Play: start_run o get_run_data según runId
         runPlayButton.addEventListener("click", async () => {
           const runId = parseInt(runIdInput.value, 10);
+
+          if (currentActiveRunId !== null) {
+            addLogEntry("⚠️ A run is already active", "status");
+            return;
+          }
+
+          const isHistorical =
+            currentActiveRunId === null &&
+            expectedNextRunId !== null &&
+            runId < expectedNextRunId;
 
           if (isNaN(runId) || runId <= 0) {
             addLogEntry("Error: RUN_ID must be a positive integer", "received");
             return;
           }
 
-          if (expectedNextRunId !== null && runId < expectedNextRunId) {
+          if (isHistorical) {
             const command = `get_run_data:${runId}`;
             addLogEntry(`Requesting historical data for run ${runId}`, "sent");
 
             try {
               const response = await sendCommandToServer(command);
-              addLogEntry(`Server response: ${response}`, "received");
+              //addLogEntry(`Server response: ${response}`, "received");
               const match = /RUN_DATA:OK:(\{.*\})/.exec(response);
               if (!match) {
                 addLogEntry(
@@ -1772,12 +1992,18 @@
             return;
           }
 
-          const command = `start_run:${runId}`;
+          const desc = runDescInput ? runDescInput.value.trim() : "";
+          const command =
+            desc.length > 0
+              ? `start_run:${runId}:${encodeURIComponent(desc)}`
+              : `start_run:${runId}`;
           addLogEntry(`Sending command: ${command}`, "sent");
 
           try {
             const response = await sendCommandToServer(command);
             addLogEntry(`Server response: ${response}`, "received");
+            currentActiveRunId = runId;
+            updateRunUI();
           } catch (error) {
             addLogEntry(
               `Error sending start_run: ${error.message}`,
@@ -1794,6 +2020,12 @@
           try {
             const response = await sendCommandToServer(command);
             addLogEntry(`Server response: ${response}`, "received");
+
+            const ended = parseInt(runIdInput.value, 10);
+            currentActiveRunId = null;
+            expectedNextRunId = ended + 1;
+            runIdInput.value = expectedNextRunId;
+            updateRunUI();
           } catch (error) {
             addLogEntry(`Error sending end_run: ${error.message}`, "received");
           }
@@ -3584,6 +3816,7 @@
 
         // Initial data fetch
         await fetchSensorData();
+        await refreshRecentRuns();
       });
 
       // Fetch data every 1 seconds

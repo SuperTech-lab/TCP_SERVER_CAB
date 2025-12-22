@@ -270,57 +270,222 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         raise ValueError(f"Unsupported timestamp type: {type(ts)}")
 
     def render_run_plot_html(self, run_payload: dict) -> str:
+        import io, base64
+        import matplotlib.pyplot as plt
+
         channels = ["50K", "4K", "STILL", "MXC"]
+        images = {}  
 
-        fig, axes = plt.subplots(2, 2, figsize=(10, 6))
-        axes = axes.flatten()
-
-        for idx, ch_name in enumerate(channels):
-            ax = axes[idx]
+        for ch_name in channels:
             ch = run_payload.get("channels", {}).get(ch_name)
+
+            fig = plt.figure(figsize=(6, 3.2))
+            ax = fig.add_subplot(111)   
 
             if (not ch or
                 not isinstance(ch.get("timestamps"), list) or
                 not isinstance(ch.get("temperature_k"), list) or
                 len(ch["timestamps"]) == 0):
-                ax.set_title(f"{ch_name} (sin datos)")
-                ax.axis("off")
-                continue
 
-            ts_list = ch["timestamps"]
-            temps = ch["temperature_k"]
+                ax.set_title(ch_name)
+                ax.set_xlabel("Tiempo (s)")
+                ax.set_ylabel("Temperatura (K)")
+                ax.set_xlim(0, 1)
+                ax.set_ylim(0, 1)
+                ax.grid(True, alpha=0.3)
 
-            t0 = self._parse_ts(ts_list[0])
-            t_rel = [(self._parse_ts(t) - t0).total_seconds() for t in ts_list]
+            else:
+                ts_list = ch["timestamps"]
+                temps = ch["temperature_k"]
 
-            ax.plot(t_rel, temps)
-            ax.set_title(ch_name)
-            ax.set_xlabel("Tiempo (s)")
-            ax.set_ylabel("Temperatura (K)")
+                t0 = self._parse_ts(ts_list[0])
+                t_rel = [(self._parse_ts(t) - t0).total_seconds() for t in ts_list]
 
-        fig.suptitle(f"RUN {run_payload.get('run_id')}")
-        fig.tight_layout()
+                ax.plot(t_rel, temps, label="T")
 
-        buf = io.BytesIO()
-        fig.savefig(buf, format="png", bbox_inches="tight")
-        plt.close(fig)
-        buf.seek(0)
-        img_b64 = base64.b64encode(buf.read()).decode("ascii")
+                if ch_name == "MXC":
+                    sp_vals = ch.get("mxc_setpoint_mk")
+                    if isinstance(sp_vals, list) and len(sp_vals) == len(t_rel):
+                        sp_k = [float(v) if v is not None else None for v in sp_vals]
+                        ax.plot(t_rel, sp_k, linestyle="--", color="red", linewidth=1.5, label="Setpoint")
+
+                ax.set_title(ch_name)
+                ax.set_xlabel("Tiempo (s)")
+                ax.set_ylabel("Temperatura (K)")
+                ax.legend(loc="best")
+
+            buf = io.BytesIO()
+            fig.tight_layout()
+            fig.savefig(buf, format="png", bbox_inches="tight")
+            plt.close(fig)
+            buf.seek(0)
+            images[ch_name] = base64.b64encode(buf.read()).decode("ascii")
+
+        run_id = run_payload.get("run_id")
 
         html = f"""<!DOCTYPE html>
     <html>
     <head>
-        <meta charset="utf-8">
-        <title>RUN {run_payload.get('run_id')} – gráficas</title>
+    <meta charset="utf-8">
+    <title>RUN {run_id} – gráficas</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <style>
+        body {{
+        margin: 0;
+        background: #111;
+        color: #fff;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        }}
+        .wrap {{
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 18px;
+        text-align: center;
+        }}
+        .grid {{
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+        margin-top: 14px;
+        }}
+        .card {{
+        background: #161616;
+        border: 1px solid #2a2a2a;
+        border-radius: 12px;
+        padding: 10px;
+        }}
+        .card h3 {{
+        margin: 8px 0 10px 0;
+        font-size: 16px;
+        font-weight: 700;
+        color: #e5e7eb;
+        }}
+        .plot {{
+        width: 100%;
+        height: auto;
+        border-radius: 8px;
+        border: 1px solid #2a2a2a;
+        cursor: zoom-in;
+        user-select: none;
+        }}
+        /* Modal fullscreen */
+        .modal {{
+        position: fixed;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0,0,0,0.92);
+        z-index: 9999;
+        padding: 18px;
+        }}
+        .modal.open {{
+        display: flex;
+        }}
+        .modal-inner {{
+        width: min(98vw, 1600px);
+        height: min(92vh, 1000px);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        }}
+        .modal-header {{
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        }}
+        .modal-title {{
+        font-weight: 800;
+        text-align: left;
+        color: #f3f4f6;
+        }}
+        .close-btn {{
+        background: #ef4444;
+        border: none;
+        color: white;
+        padding: 10px 14px;
+        border-radius: 10px;
+        cursor: pointer;
+        font-weight: 800;
+        }}
+        .close-btn:hover {{ filter: brightness(0.95); }}
+        .modal-img {{
+        flex: 1;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        border-radius: 12px;
+        border: 1px solid #2a2a2a;
+        background: #0b0b0b;
+        cursor: zoom-out;
+        }}
+        @media (max-width: 900px) {{
+        .grid {{ grid-template-columns: 1fr; }}
+        }}
+    </style>
     </head>
-    <body style="background:#111;color:#fff;font-family:system-ui;text-align:center;">
-        <h1>RUN {run_payload.get('run_id')}</h1>
-        <p>Gráficas Python (matplotlib) para 50K, 4K, STILL y MXC</p>
-        <img src="data:image/png;base64,{img_b64}"
-            style="max-width:100%;height:auto;border:1px solid #444;" />
+    <body>
+    <div class="wrap">
+        <h1 style="margin:0;">RUN {run_id}</h1>
+        <p style="margin:8px 0 0 0; color:#cbd5e1;">
+        Gráficas de los canales MXC, 50K, 4K y STILL para el RUN {run_id}.
+        </p>
+
+        <div class="grid">
+        {"".join([f'''
+        <div class="card">
+            <h3>{ch}</h3>
+            <img class="plot"
+                src="data:image/png;base64,{images[ch]}"
+                alt="Plot {ch}"
+                data-title="{ch}"
+                onclick="openModal(this)" />
+        </div>
+        ''' for ch in channels])}
+        </div>
+    </div>
+
+    <div id="modal" class="modal" onclick="closeModal(event)">
+        <div class="modal-inner" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <div id="modalTitle" class="modal-title"></div>
+            <button class="close-btn" onclick="closeModal()">Cerrar</button>
+        </div>
+        <img id="modalImg" class="modal-img" src="" alt="Full plot" onclick="closeModal()" />
+        </div>
+    </div>
+
+    <script>
+        function openModal(imgEl) {{
+        const modal = document.getElementById("modal");
+        const modalImg = document.getElementById("modalImg");
+        const modalTitle = document.getElementById("modalTitle");
+
+        modalImg.src = imgEl.src;
+        modalTitle.textContent = "RUN {run_id} — " + (imgEl.dataset.title || "");
+        modal.classList.add("open");
+        }}
+
+        function closeModal(ev) {{
+        const modal = document.getElementById("modal");
+        modal.classList.remove("open");
+        const modalImg = document.getElementById("modalImg");
+        modalImg.src = "";
+        }}
+
+        document.addEventListener("keydown", (e) => {{
+        if (e.key === "Escape") {{
+            const modal = document.getElementById("modal");
+            if (modal.classList.contains("open")) closeModal();
+        }}
+        }});
+    </script>
     </body>
     </html>"""
         return html
+
+
 
 def connect_to_tcp_server():
     # Connect to the TCP server
