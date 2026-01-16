@@ -493,7 +493,6 @@ def connect_to_tcp_server():
     try:
         tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         tcp_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1) 
-        tcp_socket.settimeout(20)
         print(f"Connecting to TCP server at {TCP_HOST}:{TCP_PORT}...")
         tcp_socket.connect((TCP_HOST, TCP_PORT))
         # Identify as sensor data subscriber
@@ -731,8 +730,16 @@ def receive_sensor_data(tcp_socket):
                     print(f"Error parsing RCH7: {e}")
                     current_RCH7 = None """
 
+        except socket.timeout:
+            continue
+
         except Exception as e:
             print(f"Error receiving LakeShore370 data: {e}")
+            try:
+                tcp_socket.close()
+            except Exception:
+                pass
+
             try:
                 tcp_socket = connect_to_tcp_server()
                 buf = b""  # reset buffer on reconnect
