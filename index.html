@@ -466,11 +466,11 @@
       }
 
       .global-controls-row {
-        display: flex;
-        justify-content: space-between;
+        display: grid;
+        grid-template-columns: auto auto auto 1fr auto;
         align-items: center;
-        padding-bottom: 10px;
-        padding-right: 10px;
+        column-gap: 18px; /* antes 24px */
+        width: 100%;
       }
 
       .autoscan-panel {
@@ -651,26 +651,21 @@
         opacity: 0.7;
       }
       .run-control-floating {
+        justify-self: end; /* ← CLAVE EN GRID */
         display: flex;
-        align-items: flex-end;
-        gap: 12px;
-        flex-wrap: wrap;
-      }
-
-      .recent-runs {
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-        min-width: 260px;
+        align-items: center;
+        gap: 10px;
       }
 
       .run-select {
-        padding: 10px 12px;
-        border-radius: 10px;
+        width: 100%;
+        max-width: 420px; /* ← MISMO ANCHO QUE EL CONTENEDOR */
+        padding: 8px 10px;
+
+        border-radius: 8px;
         border: 1px solid #2a2a2a;
         background: #111;
         color: #fff;
-        outline: none;
       }
 
       .run-select:disabled {
@@ -680,11 +675,15 @@
       .recent-runs {
         display: flex;
         flex-direction: column;
-        justify-content: center;
-        gap: 4px;
-        margin: 0 auto;
-        min-width: 280px;
-        text-align: center;
+        gap: 6px;
+
+        max-width: 420px; /* ← ANCHO CONTROLADO */
+        width: 100%;
+
+        margin: 0;
+        text-align: left;
+        margin-left: -6px;
+        margin-right: 6px;
       }
 
       .recent-runs label {
@@ -797,6 +796,17 @@
                     </div>
                   </div>
                 </details>
+                <label class="circular-checkbox">
+                  <input
+                    type="checkbox"
+                    id="autorangeMXC"
+                    checked
+                    onchange="toggleAutorangeMXC()"
+                  />
+                  <span></span>
+                  Autorange
+                </label>
+
                 <div class="recent-runs">
                   <label class="run-label" for="recentRunsSelect"
                     >Últimos RUNs</label
@@ -1049,17 +1059,6 @@
                 <option value="300">5 Minutes</option>
                 <option value="60" selected>1 Minute</option>
               </select>
-
-              <label class="circular-checkbox">
-                <input
-                  type="checkbox"
-                  id="autorangeMXC"
-                  checked
-                  onchange="toggleAutorangeMXC()"
-                />
-                <span></span>
-                Autorange
-              </label>
 
               <select id="currentMXCValue" class="current-stage-value">
                 <option value="temperature">- mK</option>
