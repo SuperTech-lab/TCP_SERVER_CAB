@@ -68,7 +68,11 @@ current_curve_4K = None
 current_curve_STILL = None
 current_heater_output_MXC = None
 current_RUNID = None
-#current_RCH7 = None
+current_RCH9  = None
+current_RCH10 = None
+current_RCH12 = None
+current_RCH13 = None
+current_RCH14 = None
 
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
 
@@ -138,7 +142,11 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
                                    "curveSTILL": current_curve_STILL,      
                                    "heaterOutputMXC": current_heater_output_MXC,    
                                    "runID": current_RUNID,      
-                                   #"RCH7": current_RCH7,
+                                   "RCH9":  current_RCH9,
+                                    "RCH10": current_RCH10,
+                                    "RCH12": current_RCH12,
+                                    "RCH13": current_RCH13,
+                                    "RCH14": current_RCH14,
                                    })
                                    
 
@@ -568,7 +576,8 @@ def receive_sensor_data(tcp_socket):
     global current_curve_STILL
     global current_heater_output_MXC
     global current_RUNID
-    #global current_RCH7
+    global current_RCH9, current_RCH10, current_RCH12, current_RCH13, current_RCH14
+
 
     buf = b""
     while True:
@@ -724,11 +733,22 @@ def receive_sensor_data(tcp_socket):
                     print(f"⚠ Warning parsing run ID: {e} (raw value = {raw_run!r})")
                     current_RUNID = None
 
-                """ try:
-                    current_RCH7 = float(params[53].split(':')[-1].strip())
+                try:
+                    def _parse_rch(i):
+                        v = params[i].split(':')[-1].strip()
+                        if not v or v.upper() == "NONE":
+                            return None
+                        return float(v)
+
+                    current_RCH9  = _parse_rch(53)
+                    current_RCH10 = _parse_rch(54)
+                    current_RCH12 = _parse_rch(55)
+                    current_RCH13 = _parse_rch(56)
+                    current_RCH14 = _parse_rch(57)
+
                 except Exception as e:
-                    print(f"Error parsing RCH7: {e}")
-                    current_RCH7 = None """
+                    print(f"Error parsing extra resistances RCH9/10/12/13/14: {e}")
+                    current_RCH9 = current_RCH10 = current_RCH12 = current_RCH13 = current_RCH14 = None
 
         except socket.timeout:
             continue

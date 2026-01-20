@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -76,7 +76,10 @@
         border-radius: 8px;
         cursor: pointer;
         font-weight: 600;
-        transition: background-color 0.2s, box-shadow 0.2s, transform 0.1s;
+        transition:
+          background-color 0.2s,
+          box-shadow 0.2s,
+          transform 0.1s;
       }
 
       .tab-button.active {
@@ -239,7 +242,9 @@
         margin-top: 15px;
         width: 100%;
         font-weight: 600;
-        transition: background-color 0.2s, transform 0.1s; /* Transiciones suaves */
+        transition:
+          background-color 0.2s,
+          transform 0.1s; /* Transiciones suaves */
       }
 
       .inline-button {
@@ -691,6 +696,13 @@
         font-size: 13px;
         font-weight: 600;
         color: #374151;
+      }
+
+      .relation-control-panel .current-value {
+        width: auto;
+        white-space: nowrap;
+        text-align: left;
+        margin-left: 8px;
       }
     </style>
   </head>
@@ -1709,10 +1721,11 @@
                   style="width: 180px; margin-left: 0"
                   onchange="onRelationChannelChange()"
                 >
-                  <option value="STILL">STILL</option>
-                  <option value="4K">4K</option>
-                  <option value="50K">50K</option>
-                  <option value="CH7">CH7</option>
+                  <option value="CH9">CH9: Ti #1</option>
+                  <option value="CH10">CH10: TiAu #1</option>
+                  <option value="CH12">CH12: TiAlAu #1</option>
+                  <option value="CH13">CH13: Ti #2</option>
+                  <option value="CH14">CH14: Ti #3</option>
                 </select>
               </div>
               <div class="control-row" style="margin-top: 10px">
@@ -1738,15 +1751,16 @@
       let hasInitializedRunId = false;
       let expectedNextRunId = null;
       let relationChart = null;
-      let currentRelationChannel = "STILL";
+      let currentRelationChannel = "CH9";
       const RELATION_LIVE_POINTS = 400;
       let currentActiveRunId = null;
 
       const relationDataStore = {
-        STILL: [],
-        "4K": [],
-        "50K": [],
-        CH7: [],
+        CH9: [],
+        CH10: [],
+        CH12: [],
+        CH13: [],
+        CH14: [],
       };
 
       function updateRunUI() {
@@ -1782,7 +1796,7 @@
 
         addLogEntry(
           `✅ Abierta ventana con gráficas Python del RUN histórico ${runId}`,
-          "status"
+          "status",
         );
       }
 
@@ -1808,7 +1822,7 @@
           } catch (e) {
             addLogEntry(
               `❌ Error cargando RUN ${runId}: ${e.message}`,
-              "received"
+              "received",
             );
           }
         });
@@ -1902,14 +1916,14 @@
 
           addLogEntry(
             `Could not parse run id from: "${response}". Using 1.`,
-            "status"
+            "status",
           );
           runIdInput.value = 1;
           expectedNextRunId = 1;
         } catch (error) {
           addLogEntry(
             `Error requesting run id: ${error.message}. Using 1.`,
-            "received"
+            "received",
           );
           runIdInput.value = 1;
           expectedNextRunId = 1;
@@ -1964,7 +1978,7 @@
               if (!match) {
                 addLogEntry(
                   "❌ No RUN_DATA JSON found in server response",
-                  "received"
+                  "received",
                 );
                 return;
               }
@@ -1975,7 +1989,7 @@
               } catch (e) {
                 addLogEntry(
                   `❌ Error parsing RUN_DATA JSON: ${e.message}`,
-                  "received"
+                  "received",
                 );
                 return;
               }
@@ -1984,7 +1998,7 @@
             } catch (error) {
               addLogEntry(
                 `Error sending get_run_data: ${error.message}`,
-                "received"
+                "received",
               );
             }
 
@@ -2006,7 +2020,7 @@
           } catch (error) {
             addLogEntry(
               `Error sending start_run: ${error.message}`,
-              "received"
+              "received",
             );
           }
         });
@@ -2122,7 +2136,11 @@
         RSTILL: null,
         PSTILL: null,
         heaterOutputMXC: null,
-        //RCH7: null,
+        RCH9: null,
+        RCH10: null,
+        RCH12: null,
+        RCH13: null,
+        RCH14: null,
       };
 
       // Track last sent values
@@ -2236,7 +2254,7 @@
 
         const totalElapsedSec = Math.max(
           0,
-          (Date.now() - store.startTime) / 1000
+          (Date.now() - store.startTime) / 1000,
         );
 
         // timeRangeOptions is ascending: [1m, 5m, 15m, 30m, 1h, 6h]
@@ -2280,7 +2298,7 @@
 
         const totalElapsedSec = Math.max(
           0,
-          (Date.now() - store.startTime) / 1000
+          (Date.now() - store.startTime) / 1000,
         );
 
         select.innerHTML = "";
@@ -2319,7 +2337,7 @@
 
         const totalElapsedSec = Math.max(
           0,
-          (Date.now() - store.startTime) / 1000
+          (Date.now() - store.startTime) / 1000,
         );
 
         select.innerHTML = "";
@@ -2362,7 +2380,7 @@
 
         const totalElapsedSec = Math.max(
           0,
-          (Date.now() - store.startTime) / 1000
+          (Date.now() - store.startTime) / 1000,
         );
 
         select.innerHTML = "";
@@ -2725,7 +2743,7 @@
       function createTemperatureChart(
         canvasId,
         includesetpoint = false,
-        label = "Temperature (K)"
+        label = "Temperature (K)",
       ) {
         // Create a new chart instance
         const ctx = document.getElementById(canvasId).getContext("2d");
@@ -2822,13 +2840,13 @@
 
             const newMin = prompt(
               `Enter new Y-axis MIN (current: ${currentMin}):`,
-              currentMin
+              currentMin,
             );
             if (newMin === null || isNaN(parseFloat(newMin))) return;
 
             const newMax = prompt(
               `Enter new Y-axis MAX (current: ${currentMax}):`,
-              currentMax
+              currentMax,
             );
             if (newMax === null || isNaN(parseFloat(newMax))) return;
 
@@ -2850,7 +2868,7 @@
         }
         if (!chartDataStore[chartId]) {
           console.warn(
-            `⚠️ Data store for ${chartId} not found. Initializing...`
+            `⚠️ Data store for ${chartId} not found. Initializing...`,
           );
           chartDataStore[chartId] = {
             labels: [],
@@ -2889,8 +2907,8 @@
 
         console.log(
           `➡ Pushed to ${chartId}: T=${temperature}, S=${setpoint}, t=${relTime.toFixed(
-            2
-          )}`
+            2,
+          )}`,
         );
         console.log(`✅ Store after push (${chartId}):`, store);
 
@@ -3169,7 +3187,7 @@
         if (tcpConnectionStatus === false) {
           addLogEntry(
             "Cannot send command: No connection to TCP server",
-            "status"
+            "status",
           );
           return;
         }
@@ -3177,22 +3195,22 @@
         // Get current values from UI
         const currentValues = {
           temperatureSetpoint: parseFloat(
-            document.getElementById("temperatureSetpoint").value
+            document.getElementById("temperatureSetpoint").value,
           ),
           heaterPower: parseFloat(document.getElementById("heaterPower").value),
           heaterRange: document.getElementById("heaterRange").value,
           temperatureLimit: parseFloat(
-            document.getElementById("temperatureLimit").value
+            document.getElementById("temperatureLimit").value,
           ),
           timeout: parseFloat(document.getElementById("timeout").value),
           proportionalGain: parseFloat(
-            document.getElementById("proportionalGain").value
+            document.getElementById("proportionalGain").value,
           ),
           integralGain: parseFloat(
-            document.getElementById("integralGain").value
+            document.getElementById("integralGain").value,
           ),
           derivativeGain: parseFloat(
-            document.getElementById("derivativeGain").value
+            document.getElementById("derivativeGain").value,
           ),
         };
 
@@ -3219,7 +3237,7 @@
           if (currentValues.heaterPower < 0 || currentValues.heaterPower > 1) {
             addLogEntry(
               "Error: Heater power must be between 0.0 and 1.0",
-              "received"
+              "received",
             );
             return;
           }
@@ -3245,7 +3263,7 @@
           if (currentValues.temperatureLimit < 0) {
             addLogEntry(
               "Error: Temperature limit must be non-negative",
-              "received"
+              "received",
             );
             return;
           }
@@ -3278,7 +3296,7 @@
           if (currentValues.proportionalGain < 0) {
             addLogEntry(
               "Error: Proportional gain must be non-negative",
-              "received"
+              "received",
             );
             return;
           }
@@ -3296,7 +3314,7 @@
           if (currentValues.integralGain < 0) {
             addLogEntry(
               "Error: Integral gain must be non-negative",
-              "received"
+              "received",
             );
             return;
           }
@@ -3314,7 +3332,7 @@
           if (currentValues.derivativeGain < 0) {
             addLogEntry(
               "Error: Derivative gain must be non-negative",
-              "received"
+              "received",
             );
             return;
           }
@@ -3342,7 +3360,7 @@
           } catch (error) {
             addLogEntry(
               `Error sending ${cmd.type}: ${error.message}`,
-              "received"
+              "received",
             );
           }
         }
@@ -3407,7 +3425,7 @@
           }
           if (data.temperature_limit !== undefined) {
             currentParameters.temperatureLimit = parseFloat(
-              data.temperature_limit
+              data.temperature_limit,
             );
           }
           if (data.timeout !== undefined) {
@@ -3415,7 +3433,7 @@
           }
           if (data.proportional_gain !== undefined) {
             currentParameters.proportionalGain = parseFloat(
-              data.proportional_gain
+              data.proportional_gain,
             );
           }
           if (data.integral_gain !== undefined) {
@@ -3529,12 +3547,19 @@
           }
           if (data.heaterOutputMXC !== undefined) {
             currentParameters.heaterOutputMXC = parseFloat(
-              data.heaterOutputMXC
+              data.heaterOutputMXC,
             );
           }
-          /* if (data.RCH7 !== undefined) {
-            currentParameters.RCH7 = parseFloat(data.RCH7);
-          } */
+          if (data.RCH9 !== undefined)
+            currentParameters.RCH9 = parseFloat(data.RCH9);
+          if (data.RCH10 !== undefined)
+            currentParameters.RCH10 = parseFloat(data.RCH10);
+          if (data.RCH12 !== undefined)
+            currentParameters.RCH12 = parseFloat(data.RCH12);
+          if (data.RCH13 !== undefined)
+            currentParameters.RCH13 = parseFloat(data.RCH13);
+          if (data.RCH14 !== undefined)
+            currentParameters.RCH14 = parseFloat(data.RCH14);
 
           // Update UI controls if parameters changed every minute
           // (or the time specified in parameterBoxUpdateInterval variable)
@@ -3572,7 +3597,7 @@
             update50KValues(
               currentParameters["50K"],
               currentParameters.R50K,
-              currentParameters.P50K
+              currentParameters.P50K,
             );
           }
 
@@ -3582,21 +3607,21 @@
             update4KValues(
               currentParameters["4K"],
               currentParameters.R4K,
-              currentParameters.P4K
+              currentParameters.P4K,
             );
           }
           // Update the STILL chart with the new temperature
           if (currentParameters.STILL !== null) {
             console.log(
               "📈 Updating STILL chart with:",
-              currentParameters.STILL
+              currentParameters.STILL,
             );
 
             updateTemperatureChart("STILL", currentParameters.STILL);
             updateSTILLValues(
               currentParameters.STILL,
               currentParameters.RSTILL,
-              currentParameters.PSTILL
+              currentParameters.PSTILL,
             );
           }
 
@@ -3605,19 +3630,19 @@
             console.log(
               "📈 Updating MXC chart with:",
               currentParameters.MXC,
-              currentParameters.temperatureSetpoint
+              currentParameters.temperatureSetpoint,
             );
 
             updateTemperatureChart(
               "MXC",
               currentParameters.MXC,
-              currentParameters.temperatureSetpoint
+              currentParameters.temperatureSetpoint,
             );
 
             updateMXCValues(
               currentParameters.MXC, // Temperature in mK
               currentParameters.RMXC, // Resistance in Ohms
-              currentParameters.PMXC
+              currentParameters.PMXC,
             ); // Power in Watts
 
             updateMXCHeaterOutput(currentParameters.heaterOutputMXC);
@@ -3632,7 +3657,7 @@
               if (gMXC.checked === enabledMXC) {
                 pendingMXCToggle = false;
                 console.log(
-                  `✅ MXC backend synced with UI (${enabledMXC ? "ON" : "OFF"})`
+                  `✅ MXC backend synced with UI (${enabledMXC ? "ON" : "OFF"})`,
                 );
               } else {
                 console.log("⏳ Waiting for MXC backend to catch up...");
@@ -3642,7 +3667,7 @@
               console.log(
                 `🔁 Sync MXC toggle -> ${
                   enabledMXC ? "ON" : "OFF"
-                } (from controller)`
+                } (from controller)`,
               );
             }
           }
@@ -3656,7 +3681,7 @@
               if (g50K.checked === enabled50K) {
                 pending50KToggle = false;
                 console.log(
-                  `✅ 50K backend synced with UI (${enabled50K ? "ON" : "OFF"})`
+                  `✅ 50K backend synced with UI (${enabled50K ? "ON" : "OFF"})`,
                 );
               } else {
                 console.log("⏳ Waiting for 50K backend to catch up...");
@@ -3666,7 +3691,7 @@
               console.log(
                 `🔁 Sync 50K toggle -> ${
                   enabled50K ? "ON" : "OFF"
-                } (from controller)`
+                } (from controller)`,
               );
             }
           }
@@ -3682,7 +3707,7 @@
                 console.log(
                   `✅ STILL backend synced with UI (${
                     enabledSTILL ? "ON" : "OFF"
-                  })`
+                  })`,
                 );
               } else {
                 console.log("⏳ Waiting for STILL backend to catch up...");
@@ -3692,7 +3717,7 @@
               console.log(
                 `🔁 Sync STILL toggle -> ${
                   enabledSTILL ? "ON" : "OFF"
-                } (from controller)`
+                } (from controller)`,
               );
             }
           }
@@ -3706,7 +3731,7 @@
               if (g4K.checked === enabled4K) {
                 pending4KToggle = false;
                 console.log(
-                  `✅ 4K backend synced with UI (${enabled4K ? "ON" : "OFF"})`
+                  `✅ 4K backend synced with UI (${enabled4K ? "ON" : "OFF"})`,
                 );
               } else {
                 console.log("⏳ Waiting for 4K backend to catch up...");
@@ -3716,7 +3741,7 @@
               console.log(
                 `🔁 Sync 4K toggle -> ${
                   enabled4K ? "ON" : "OFF"
-                } (from controller)`
+                } (from controller)`,
               );
             }
           }
@@ -3732,7 +3757,7 @@
                 console.log(
                   `✅ Autoscan backend synced with UI (${
                     backendAutoscanOn ? "ON" : "OFF"
-                  })`
+                  })`,
                 );
               } else {
                 console.log("⏳ Waiting for Autoscan backend to catch up...");
@@ -3743,14 +3768,14 @@
                 console.log(
                   `🔁 Sync Autoscan toggle -> ${
                     backendAutoscanOn ? "ON" : "OFF"
-                  } (from controller)`
+                  } (from controller)`,
                 );
               }
             }
           }
 
-          //updateRelationStore();
-          //redrawRelationChart();
+          updateRelationStore();
+          redrawRelationChart();
 
           if (tcpConnectionStatus === false) {
             await updateConnectionStatus();
@@ -3771,28 +3796,28 @@
         charts["BB"] = createTemperatureChart(
           "temperatureChartBB",
           true,
-          "Black Body Temperature (K)"
+          "Black Body Temperature (K)",
         );
         charts["50K"] = createTemperatureChart(
           "temperatureChart50K",
           false,
-          "Temperature 50K"
+          "Temperature 50K",
         );
 
         charts["4K"] = createTemperatureChart(
           "temperatureChart4K",
           false,
-          "Temperature 4K"
+          "Temperature 4K",
         );
         charts["STILL"] = createTemperatureChart(
           "temperatureChartSTILL",
           false,
-          "Temperature STILL"
+          "Temperature STILL",
         );
         charts["MXC"] = createTemperatureChart(
           "temperatureChartMXC",
           false,
-          "Temperature MXC"
+          "Temperature MXC",
         );
 
         enableYAxisLimitEditing(charts["MXC"], "temperatureChartMXC");
@@ -3834,7 +3859,7 @@
           addLogEntry(`Server response: ${response}`, "received");
 
           console.log(
-            `Channel 50K is now ${checkbox.checked ? "enabled" : "disabled"}`
+            `Channel 50K is now ${checkbox.checked ? "enabled" : "disabled"}`,
           );
           console.log(response);
         } catch (error) {
@@ -3842,7 +3867,7 @@
           pending50KToggle = false;
           addLogEntry(
             `Error sending set_channel_50k: ${error.message}`,
-            "received"
+            "received",
           );
           console.error(error);
         }
@@ -3862,7 +3887,7 @@
           addLogEntry(`Server response: ${response}`, "received");
 
           console.log(
-            `Channel MXC is now ${checkbox.checked ? "enabled" : "disabled"}`
+            `Channel MXC is now ${checkbox.checked ? "enabled" : "disabled"}`,
           );
           console.log(response);
         } catch (error) {
@@ -3870,7 +3895,7 @@
           pendingMXCToggle = false;
           addLogEntry(
             `Error sending set_channel_mxc: ${error.message}`,
-            "received"
+            "received",
           );
           console.error(error);
         }
@@ -3890,7 +3915,7 @@
           addLogEntry(`Server response: ${response}`, "received");
 
           console.log(
-            `Channel STILL is now ${checkbox.checked ? "enabled" : "disabled"}`
+            `Channel STILL is now ${checkbox.checked ? "enabled" : "disabled"}`,
           );
           console.log(response);
         } catch (error) {
@@ -3898,7 +3923,7 @@
           pendingSTILLToggle = false;
           addLogEntry(
             `Error sending set_channel_still: ${error.message}`,
-            "received"
+            "received",
           );
           console.error(error);
         }
@@ -3918,7 +3943,7 @@
           addLogEntry(`Server response: ${response}`, "received");
 
           console.log(
-            `Channel 4K is now ${checkbox.checked ? "enabled" : "disabled"}`
+            `Channel 4K is now ${checkbox.checked ? "enabled" : "disabled"}`,
           );
           console.log(response);
         } catch (error) {
@@ -3926,7 +3951,7 @@
           pending4KToggle = false;
           addLogEntry(
             `Error sending set_channel_4k: ${error.message}`,
-            "received"
+            "received",
           );
           console.error(error);
         }
@@ -3939,7 +3964,7 @@
         if (tcpConnectionStatus === false) {
           addLogEntry(
             "Cannot send MXC command: No connection to TCP server",
-            "status"
+            "status",
           );
           const cb = document.getElementById("autorangeMXC");
           cb.checked = !cb.checked;
@@ -3959,7 +3984,7 @@
         } catch (error) {
           addLogEntry(
             `Error sending autorange MXC: ${error.message}`,
-            "received"
+            "received",
           );
           cb.checked = !cb.checked;
           console.error(error);
@@ -3970,7 +3995,7 @@
         if (tcpConnectionStatus === false) {
           addLogEntry(
             "Cannot reset MXC to default: No connection to TCP server",
-            "status"
+            "status",
           );
           return;
         }
@@ -3986,7 +4011,7 @@
         } catch (error) {
           addLogEntry(
             `Error sending MXC reset command: ${error.message}`,
-            "received"
+            "received",
           );
           console.error(error);
         }
@@ -3996,7 +4021,7 @@
         if (tcpConnectionStatus === false) {
           addLogEntry(
             "Cannot reset 50K to default: No connection to TCP server",
-            "status"
+            "status",
           );
           return;
         }
@@ -4012,7 +4037,7 @@
         } catch (error) {
           addLogEntry(
             `Error sending 50K reset command: ${error.message}`,
-            "received"
+            "received",
           );
           console.error(error);
         }
@@ -4022,7 +4047,7 @@
         if (tcpConnectionStatus === false) {
           addLogEntry(
             "Cannot reset 4K to default: No connection to TCP server",
-            "status"
+            "status",
           );
           return;
         }
@@ -4038,7 +4063,7 @@
         } catch (error) {
           addLogEntry(
             `Error sending 4K reset command: ${error.message}`,
-            "received"
+            "received",
           );
           console.error(error);
         }
@@ -4048,7 +4073,7 @@
         if (tcpConnectionStatus === false) {
           addLogEntry(
             "Cannot reset STILL to default: No connection to TCP server",
-            "status"
+            "status",
           );
           return;
         }
@@ -4064,7 +4089,7 @@
         } catch (error) {
           addLogEntry(
             `Error sending STILL reset command: ${error.message}`,
-            "received"
+            "received",
           );
           console.error(error);
         }
@@ -4079,7 +4104,7 @@
         if (tcpConnectionStatus === false) {
           addLogEntry(
             "Cannot send Autoscan command: No connection to TCP server",
-            "status"
+            "status",
           );
           cb.checked = !desiredState;
           return;
@@ -4098,7 +4123,7 @@
         } catch (error) {
           addLogEntry(
             `Error sending Autoscan command: ${error.message}`,
-            "received"
+            "received",
           );
           cb.checked = !desiredState;
           pendingAutoscanToggle = false;
@@ -4113,7 +4138,7 @@
         if (tcpConnectionStatus === false) {
           addLogEntry(
             "Cannot send MXC command: No connection to TCP server",
-            "status"
+            "status",
           );
           return;
         }
@@ -4123,12 +4148,12 @@
           pauseMXC: parseFloat(document.getElementById("pauseMXC").value),
           rangeMXC: parseInt(
             document.getElementById("sensorRangeMXC").value,
-            10
+            10,
           ),
           modeMXC: parseInt(document.getElementById("sensorModeMXC").value, 10),
           curveMXC: parseInt(
             document.getElementById("curveMXCSelect").value,
-            10
+            10,
           ),
         };
 
@@ -4138,7 +4163,7 @@
           if (values.dwellMXC < 0 || values.dwellMXC > 10) {
             addLogEntry(
               "Error: Dwell time must be between 0.0 and 10.0",
-              "received"
+              "received",
             );
             return;
           }
@@ -4152,7 +4177,7 @@
           if (values.pauseMXC < 0 || values.pauseMXC > 10) {
             addLogEntry(
               "Error: Pause time must be between 0.0 and 10.0",
-              "received"
+              "received",
             );
             return;
           }
@@ -4166,7 +4191,7 @@
           if (values.rangeMXC < 1 || values.rangeMXC > 8) {
             addLogEntry(
               "Error: Sensor Range (Excitation) must be between 1 and 8",
-              "received"
+              "received",
             );
             return;
           }
@@ -4180,7 +4205,7 @@
           if (values.modeMXC !== 0 && values.modeMXC !== 1) {
             addLogEntry(
               "Error: Sensor Mode must be 0 (Voltage) or 1 (Current)",
-              "received"
+              "received",
             );
             return;
           }
@@ -4194,7 +4219,7 @@
           if (values.curveMXC < 0 || values.curveMXC > 20) {
             addLogEntry(
               "Error: Curve number must be between 0 and 20",
-              "received"
+              "received",
             );
             return;
           }
@@ -4207,13 +4232,13 @@
         if (commands.length === 0) {
           addLogEntry(
             "No sensor parameter changes detected or valid",
-            "status"
+            "status",
           );
           return;
         }
 
         const progressContainer = document.getElementById(
-          "progressContainerMXC"
+          "progressContainerMXC",
         );
         const progressBar = document.getElementById("progressBarMXC");
         const progressText = document.getElementById("progressTextMXC");
@@ -4231,14 +4256,14 @@
           } catch (error) {
             addLogEntry(
               `Error sending ${cmd.type}: ${error.message}`,
-              "received"
+              "received",
             );
           }
           const progress =
             ((commands.indexOf(cmd) + 1) / commands.length) * 100;
           progressBar.style.width = `${progress}%`;
           progressText.textContent = `Processing sensor settings... ${Math.round(
-            progress
+            progress,
           )}%`;
           await sleep(150);
         }
@@ -4260,7 +4285,7 @@
         if (tcpConnectionStatus === false) {
           addLogEntry(
             "Cannot send MXC command: No connection to TCP server",
-            "status"
+            "status",
           );
           return;
         }
@@ -4271,7 +4296,7 @@
           if (tcpConnectionStatus === false) {
             addLogEntry(
               "Cannot send MXC command: No connection to TCP server",
-              "status"
+              "status",
             );
             return;
           }
@@ -4282,7 +4307,7 @@
             if (value < 1 || value > 8) {
               addLogEntry(
                 "Error: Sensor range must be between 1 and 8",
-                "received"
+                "received",
               );
               return;
             }
@@ -4291,10 +4316,10 @@
         // Get current values from UI
         const values = {
           MXCSP: parseFloat(
-            document.getElementById("temperatureSetpointMXC").value
+            document.getElementById("temperatureSetpointMXC").value,
           ),
           MXCP: parseFloat(
-            document.getElementById("proportionalGainMXC").value
+            document.getElementById("proportionalGainMXC").value,
           ),
           MXCI: parseFloat(document.getElementById("integralGainMXC").value),
           MXCD: parseFloat(document.getElementById("derivativeGainMXC").value),
@@ -4307,7 +4332,7 @@
           if (values.MXCSP < 0 || values.MXCSP > 500) {
             addLogEntry(
               "Error: MXC Setpoint must be between 0.0 and 500.0 K",
-              "received"
+              "received",
             );
             return;
           }
@@ -4321,7 +4346,7 @@
           if (values.MXCP < 0 || values.MXCP > 10) {
             addLogEntry(
               "Error: MXC Proportional Gain must be between 0.0 and 10.0",
-              "received"
+              "received",
             );
             return;
           }
@@ -4335,7 +4360,7 @@
           if (values.MXCI < 0 || values.MXCI > 10) {
             addLogEntry(
               "Error: MXC Integral Gain must be between 0.0 and 10.0",
-              "received"
+              "received",
             );
             return;
           }
@@ -4349,7 +4374,7 @@
           if (values.MXCD < 0 || values.MXCD > 100) {
             addLogEntry(
               "Error: MXC Derivative Gain must be between 0.0 and 100.0",
-              "received"
+              "received",
             );
             return;
           }
@@ -4363,7 +4388,7 @@
           if (values.MXCHR < 0 || values.MXCHR > 8) {
             addLogEntry(
               "Error: There are only eight heater ranges (0-8) available (being 0 OFF)",
-              "received"
+              "received",
             );
             return;
           }
@@ -4374,7 +4399,7 @@
         }
 
         const progressContainer = document.getElementById(
-          "progressContainerMXC"
+          "progressContainerMXC",
         );
         const progressBar = document.getElementById("progressBarMXC");
         const progressText = document.getElementById("progressTextMXC");
@@ -4393,7 +4418,7 @@
           } catch (error) {
             addLogEntry(
               `Error sending ${cmd.type}: ${error.message}`,
-              "received"
+              "received",
             );
           }
           // Update progress bar
@@ -4414,7 +4439,7 @@
         if (tcpConnectionStatus === false) {
           addLogEntry(
             "Cannot send STILL command: No connection to TCP server",
-            "status"
+            "status",
           );
           return;
         }
@@ -4423,15 +4448,15 @@
         const pause = parseFloat(document.getElementById("pauseSTILL").value);
         const range = parseInt(
           document.getElementById("sensorRangeSTILL").value,
-          10
+          10,
         );
         const mode = parseInt(
           document.getElementById("sensorModeSTILL").value,
-          10
+          10,
         );
         const curve = parseInt(
           document.getElementById("curveSTILLSelect").value,
-          10
+          10,
         );
         const commands = [];
 
@@ -4439,7 +4464,7 @@
           if (dwell < 0 || dwell > 10) {
             addLogEntry(
               "Error: STILL dwell time must be between 0.0 and 10.0",
-              "received"
+              "received",
             );
             return;
           }
@@ -4450,7 +4475,7 @@
           if (pause < 0 || pause > 10) {
             addLogEntry(
               "Error: STILL pause time must be between 0.0 and 10.0",
-              "received"
+              "received",
             );
             return;
           }
@@ -4461,7 +4486,7 @@
           if (range < 1 || range > 8) {
             addLogEntry(
               "Error: STILL Sensor Range must be between 1 and 8",
-              "received"
+              "received",
             );
             return;
           }
@@ -4472,7 +4497,7 @@
           if (mode !== 0 && mode !== 1) {
             addLogEntry(
               "Error: STILL Sensor Mode must be 0 (Voltage) or 1 (Current)",
-              "received"
+              "received",
             );
             return;
           }
@@ -4483,7 +4508,7 @@
           if (curve < 0 || curve > 20) {
             addLogEntry(
               "Error: STILL Curve must be between 0 and 20",
-              "received"
+              "received",
             );
             return;
           }
@@ -4496,7 +4521,7 @@
         }
 
         const progressContainer = document.getElementById(
-          "progressContainerSTILL"
+          "progressContainerSTILL",
         );
         const progressBar = document.getElementById("progressBarSTILL");
         const progressText = document.getElementById("progressTextSTILL");
@@ -4513,7 +4538,7 @@
           } catch (error) {
             addLogEntry(
               `Error sending STILL command ${cmd}: ${error.message}`,
-              "received"
+              "received",
             );
           }
 
@@ -4521,7 +4546,7 @@
             ((commands.indexOf(cmd) + 1) / commands.length) * 100;
           progressBar.style.width = `${progress}%`;
           progressText.textContent = `Processing STILL settings... ${Math.round(
-            progress
+            progress,
           )}%`;
           await sleep(150);
         }
@@ -4535,7 +4560,7 @@
         if (tcpConnectionStatus === false) {
           addLogEntry(
             "Cannot send 50K command: No connection to TCP server",
-            "status"
+            "status",
           );
           return;
         }
@@ -4544,15 +4569,15 @@
         const pause = parseFloat(document.getElementById("pause50K").value);
         const range = parseInt(
           document.getElementById("sensorRange50K").value,
-          10
+          10,
         );
         const mode = parseInt(
           document.getElementById("sensorMode50K").value,
-          10
+          10,
         );
         const curve = parseInt(
           document.getElementById("curve50KSelect").value,
-          10
+          10,
         );
         const commands = [];
 
@@ -4560,7 +4585,7 @@
           if (dwell < 0 || dwell > 10) {
             addLogEntry(
               "Error: 50K dwell time must be between 0.0 and 10.0",
-              "received"
+              "received",
             );
             return;
           }
@@ -4571,7 +4596,7 @@
           if (pause < 0 || pause > 10) {
             addLogEntry(
               "Error: 50K pause time must be between 0.0 and 10.0",
-              "received"
+              "received",
             );
             return;
           }
@@ -4582,7 +4607,7 @@
           if (range < 1 || range > 8) {
             addLogEntry(
               "Error: 50K Sensor Range must be between 1 and 8",
-              "received"
+              "received",
             );
             return;
           }
@@ -4593,7 +4618,7 @@
           if (mode !== 0 && mode !== 1) {
             addLogEntry(
               "Error: 50K Sensor Mode must be 0 (Voltage) or 1 (Current)",
-              "received"
+              "received",
             );
             return;
           }
@@ -4604,7 +4629,7 @@
           if (curve < 0 || curve > 20) {
             addLogEntry(
               "Error: 50K Curve must be between 0 and 20",
-              "received"
+              "received",
             );
             return;
           }
@@ -4617,7 +4642,7 @@
         }
 
         const progressContainer = document.getElementById(
-          "progressContainer50K"
+          "progressContainer50K",
         );
         const progressBar = document.getElementById("progressBar50K");
         const progressText = document.getElementById("progressText50K");
@@ -4634,7 +4659,7 @@
           } catch (error) {
             addLogEntry(
               `Error sending 50K command ${cmd}: ${error.message}`,
-              "received"
+              "received",
             );
           }
 
@@ -4642,7 +4667,7 @@
             ((commands.indexOf(cmd) + 1) / commands.length) * 100;
           progressBar.style.width = `${progress}%`;
           progressText.textContent = `Processing 50K settings... ${Math.round(
-            progress
+            progress,
           )}%`;
           await sleep(150);
         }
@@ -4656,7 +4681,7 @@
         if (tcpConnectionStatus === false) {
           addLogEntry(
             "Cannot send 4K command: No connection to TCP server",
-            "status"
+            "status",
           );
           return;
         }
@@ -4665,15 +4690,15 @@
         const pause = parseFloat(document.getElementById("pause4K").value);
         const range = parseInt(
           document.getElementById("sensorRange4K").value,
-          10
+          10,
         );
         const mode = parseInt(
           document.getElementById("sensorMode4K").value,
-          10
+          10,
         );
         const curve = parseInt(
           document.getElementById("curve4KSelect").value,
-          10
+          10,
         );
         const commands = [];
 
@@ -4681,7 +4706,7 @@
           if (dwell < 0 || dwell > 10) {
             addLogEntry(
               "Error: 4K dwell time must be between 0.0 and 10.0",
-              "received"
+              "received",
             );
             return;
           }
@@ -4692,7 +4717,7 @@
           if (pause < 0 || pause > 10) {
             addLogEntry(
               "Error: 4K pause time must be between 0.0 and 10.0",
-              "received"
+              "received",
             );
             return;
           }
@@ -4703,7 +4728,7 @@
           if (range < 1 || range > 8) {
             addLogEntry(
               "Error: 4K Sensor Range must be between 1 and 8",
-              "received"
+              "received",
             );
             return;
           }
@@ -4714,7 +4739,7 @@
           if (mode !== 0 && mode !== 1) {
             addLogEntry(
               "Error: 4K Sensor Mode must be 0 (Voltage) or 1 (Current)",
-              "received"
+              "received",
             );
             return;
           }
@@ -4735,7 +4760,7 @@
         }
 
         const progressContainer = document.getElementById(
-          "progressContainer4K"
+          "progressContainer4K",
         );
         const progressBar = document.getElementById("progressBar4K");
         const progressText = document.getElementById("progressText4K");
@@ -4752,7 +4777,7 @@
           } catch (error) {
             addLogEntry(
               `Error sending 4K command ${cmd}: ${error.message}`,
-              "received"
+              "received",
             );
           }
 
@@ -4760,7 +4785,7 @@
             ((commands.indexOf(cmd) + 1) / commands.length) * 100;
           progressBar.style.width = `${progress}%`;
           progressText.textContent = `Processing 4K settings... ${Math.round(
-            progress
+            progress,
           )}%`;
           await sleep(150);
         }
@@ -4849,7 +4874,7 @@
           // Asegura un número de partículas razonable (máx. 100)
           const numParticles = Math.min(
             100,
-            Math.floor((canvas.width * canvas.height) / 15000)
+            Math.floor((canvas.width * canvas.height) / 15000),
           );
           for (let i = 0; i < numParticles; i++) {
             particles.push({
@@ -4876,7 +4901,7 @@
             for (let j = i + 1; j < particles.length; j++) {
               const p2 = particles[j];
               const dist = Math.sqrt(
-                Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2)
+                Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2),
               );
 
               // Conectar si la distancia es menor a 100px
@@ -4889,7 +4914,7 @@
                 const opacity = 1 - dist / 100;
                 ctx.strokeStyle = lineColor.replace(
                   "0.1",
-                  (opacity * 0.2).toFixed(2)
+                  (opacity * 0.2).toFixed(2),
                 );
                 ctx.lineWidth = 0.5;
                 ctx.stroke();
@@ -4931,8 +4956,16 @@
             return currentParameters.R4K;
           case "50K":
             return currentParameters.R50K;
-          case "CH7":
-            return currentParameters.RCH7;
+          case "CH9":
+            return currentParameters.RCH9;
+          case "CH10":
+            return currentParameters.RCH10;
+          case "CH12":
+            return currentParameters.RCH12;
+          case "CH13":
+            return currentParameters.RCH13;
+          case "CH14":
+            return currentParameters.RCH14;
           default:
             return null;
         }
@@ -4944,14 +4977,16 @@
 
         const ctx = canvas.getContext("2d");
         return new Chart(ctx, {
-          type: "scatter",
+          type: "line",
           data: {
             datasets: [
               {
                 label: "R(STILL) vs T(MXC)",
                 data: [],
-                showLine: false,
-                pointRadius: 2,
+                showLine: true,
+                pointRadius: 0,
+                borderWidth: 2,
+                tension: 0.0,
               },
             ],
           },
@@ -5019,23 +5054,26 @@
         if (relationDataStore[channel].length > HARD_CAP) {
           relationDataStore[channel].splice(
             0,
-            relationDataStore[channel].length - HARD_CAP
+            relationDataStore[channel].length - HARD_CAP,
           );
         }
       }
 
       function updateRelationStore() {
-        pushRelationPointFor("STILL");
-        pushRelationPointFor("4K");
-        pushRelationPointFor("50K");
-        pushRelationPointFor("CH7");
+        pushRelationPointFor("CH9");
+        pushRelationPointFor("CH10");
+        pushRelationPointFor("CH12");
+        pushRelationPointFor("CH13");
+        pushRelationPointFor("CH14");
       }
 
       function redrawRelationChart() {
         if (!relationChart) return;
 
         const pts = relationDataStore[currentRelationChannel] || [];
-        const windowPts = pts.slice(-RELATION_LIVE_POINTS);
+        const windowPts = pts
+          .slice(-RELATION_LIVE_POINTS)
+          .sort((a, b) => a.x - b.x);
 
         relationChart.data.datasets[0].data = windowPts;
         relationChart.data.datasets[0].label = `R(${currentRelationChannel}) vs T(MXC)`;

@@ -5,8 +5,8 @@ import random
 _lakeshore_mutex = threading.Lock()
 
 
-DEFAULT_CHANNELS = [1, 2, 5, 6]#, 7]
-DEFAULT_CHANNELS_ID = ["50K", "4K", "STILL", "MXC"]#, "CH7"]
+DEFAULT_CHANNELS = [1, 2, 5, 6, 9, 10, 12, 13, 14]
+DEFAULT_CHANNELS_ID = ["50K", "4K", "STILL", "MXC", "CH9", "CH10", "CH12", "CH13", "CH14"]
 ALL_CHANNELS = range(1, 17)
 
 # [dwell time, pause time, curve number, temperature coefficient]
@@ -259,28 +259,37 @@ class LakeShore370:
     def get_resistance(self, channel: int):
         """
         Devuelve resistencia en Ohmios del canal indicado.
-        El canal 7 está artificialmente correlacionado con la temperatura MXC.
+        Canales ficticios correlacionados con la temperatura MXC.
         """
         label = self._label_from_channel(channel)
 
         with _lakeshore_mutex:
 
-            # ----------- CANAL 7 FICTICIO -----------
-            if channel == 7:
+            # ----------- CANALES FICTICIOS (tipo "lo del 7") -----------
+            CORR_CHANNELS = {9, 10, 12, 13, 14}
+
+            if channel in CORR_CHANNELS:
                 T_mxc = self._temps_K.get("MXC", 0.05)
 
-                # Relación artificial pero realista:
-                # R ↓ cuando T ↓ (tipo sensor resistivo)
-                # R = R0 * (T / T0)^alpha
-                T0 = 0.05        # 50 mK referencia
-                R0 = 1000.0      # 1 kΩ a 50 mK
-                alpha = 1.2      # pendiente suave
+                # Puedes dar a cada canal una "curva" distinta para que no sean clones:
+                # (R0 en ohmios y alpha pendiente)
+                params = {
+                    9:  (1500.0, 1.15),
+                    10: (2200.0, 1.10),
+                    12: (3300.0, 1.05),
+                    13: (4700.0, 1.00),
+                    14: (6800.0, 0.95),
+                }
 
+                R0, alpha = params.get(channel, (1000.0, 1.2))
+
+                T0 = 0.05  # 50 mK referencia
                 R = R0 * (max(T_mxc, 1e-4) / T0) ** alpha
-                noise = random.uniform(-5.0, 5.0)
 
+                noise = random.uniform(-5.0, 5.0)
                 value = max(R + noise, 1.0)
-                self._resistances_ohm["CH7"] = value
+
+                self._resistances_ohm[f"CH{channel}"] = value
                 return value
 
             # ----------- RESTO DE CANALES -----------

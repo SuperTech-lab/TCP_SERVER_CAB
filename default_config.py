@@ -67,7 +67,7 @@ DEFAULT_MXC_HEATER_RANGE = "5"
 DEFAULT_SENSOR_RESISTANCE_SETTINGS = {
     1: {  # 50K
         "excitation_mode": 0,   # 0 = voltage, 1 = current
-        "excitation_range": 5,  # por ejemplo, la misma que MXC o la que tú quieras
+        "excitation_range": 5,  # por ejemplo, la misma que MXC
     },
     2: {  # 4K
         "excitation_mode": 0,

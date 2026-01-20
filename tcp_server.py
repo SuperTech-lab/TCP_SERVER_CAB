@@ -1869,7 +1869,15 @@ def lakeshore_temperature_sensor():
         except NameError:
             # Maybe ls.get_autoscan() fails and autoscan is not defined
             autoscan = ('0', '0')
-                
+        
+        extra_resistances = {}
+
+        for ch in [9, 10, 12, 13, 14]:
+            try:
+                with heater_mutex:
+                    extra_resistances[f"CH{ch}"] = ls.get_resistance(ch)
+            except Exception:
+                extra_resistances[f"CH{ch}"] = None
                 
         controlParams = {
             'MXCSP': tempSetPointMXC,
@@ -1912,7 +1920,7 @@ def lakeshore_temperature_sensor():
         last_sensorParams = sensorParams
 
         try:
-            broadcast_temperature(sensorValues, controlParams, sensorParams)
+            broadcast_temperature(sensorValues, controlParams, sensorParams, extra_resistances)
         except Exception as e:
             print(f"Error broadcasting temperature data: {e}")
 
@@ -1921,7 +1929,7 @@ def lakeshore_temperature_sensor():
         time.sleep(1)
 
 
-def broadcast_temperature(sensorValues, controlParams, sensorParams):
+def broadcast_temperature(sensorValues, controlParams, sensorParams, extra_resistances):
 
     temperatures = sensorValues['temperatures']
     resistances  = sensorValues['resistances']
@@ -2005,7 +2013,7 @@ def broadcast_temperature(sensorValues, controlParams, sensorParams):
                     f"R50K: {resistances['50K']}," +
                     f"R4K: {resistances['4K']}," +
                     f"RSTILL: {resistances['STILL']}," +
-                    f"RMXC: {resistances['MXC']},"
+                    f"RMXC: {resistances['MXC']}," +
                     f"P50K: {powers['50K']}," +
                     f"P4K: {powers['4K']}," +
                     f"PSTILL: {powers['STILL']}," +
@@ -2025,8 +2033,12 @@ def broadcast_temperature(sensorValues, controlParams, sensorParams):
                     f"curve4K: {sensorParams['curve_4K']}," +
                     f"curveSTILL: {sensorParams['curve_STILL']}," +
                     f"heaterOutputMXC: {controlParams['heaterOutputMXC']}," +
-                    f"RUNID: {CURRENT_RUN_ID}\n" 
-                    #f"RCH7: {resistances['CH7']}\n"
+                    f"RUNID: {CURRENT_RUN_ID}," +
+                    f"RCH9: {extra_resistances.get('CH9')}," +
+                    f"RCH10: {extra_resistances.get('CH10')}," +
+                    f"RCH12: {extra_resistances.get('CH12')}," +
+                    f"RCH13: {extra_resistances.get('CH13')}," +
+                    f"RCH14: {extra_resistances.get('CH14')}\n"
                     ).encode('utf-8')
         
     except Exception as e:
