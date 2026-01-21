@@ -257,7 +257,8 @@ class LakeShore370:
         """
         
         try:
-            current_status = self.device.query("SCAN?")
+            with _lakeshore_mutex:
+                current_status = self.device.query("SCAN?")
             return current_status.split(",")
         except Exception as e:
             print(f"Could not read current autoscan status. Reason: {e}")

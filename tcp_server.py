@@ -1766,9 +1766,11 @@ def handle_command(command):
                 print(message)
                 return message
 
+            scan_channels = sorted(set(DEFAULT_CHANNELS) | set(DEFAULT_EXTRA_CHANNELS))  
+
             enabled_channels = []
             with heater_mutex:
-                for ch in sorted(DEFAULT_CHANNELS):
+                for ch in scan_channels:
                     try:
                         if int(ls.get_channel_status(channel=ch)) == 1:
                             enabled_channels.append(ch)
