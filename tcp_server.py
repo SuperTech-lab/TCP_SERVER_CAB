@@ -3,14 +3,15 @@ import random
 import time
 import json
 import threading
-import datetime
 from lakeshore370 import LakeShore370
 from psycopg2.pool import ThreadedConnectionPool
 import psycopg2
 from contextlib import contextmanager
-from default_config import (DEFAULT_PID, CURRENT_RANGE_LIST, DEFAULT_MXC_RESISTANCE_RANGE_SETTINGS, SENSOR_RESISTANCE_RANGE_LIST, DEFAULT_CHANNELS, 
+from default_config import (DEFAULT_PID, CURRENT_RANGE_LIST, DEFAULT_MXC_RESISTANCE_RANGE_SETTINGS, SENSOR_RESISTANCE_RANGE_LIST, DEFAULT_CHANNELS, DEFAULT_EXTRA_CHANNELS, 
 DEFAULT_CHANNELS_ID, DEFAULT_SETTINGS, DEFAULT_MXC_SETPOINT_MK, DEFAULT_MXC_HEATER_RANGE, DEFAULT_SENSOR_RESISTANCE_SETTINGS, DB_INSERT_INTERVAL, DEFAULT_CURVES, CURVE_NAMES)
 import urllib.parse
+import re
+from datetime import datetime, timezone
 
 ls = LakeShore370()
 
@@ -32,6 +33,12 @@ CURRENT_RUN_ID = None
 last_sensorValues = None
 last_controlParams = None
 last_sensorParams = None
+
+RELATION_ACTIVE = False
+RELATION_RUN_ID = None
+RELATION_CHANNEL = None   
+RELATION_LABEL = None     
+RELATION_BUFFER = [] 
 
 
 def init_db_pool():
@@ -130,6 +137,110 @@ def end_run():
 
     print(f"🏁 RUN {CURRENT_RUN_ID} finalizado")
     CURRENT_RUN_ID = None
+
+
+def _safe_label(label: str | None) -> str:
+    if not label:
+        return "NA"
+    s = label.strip()
+    if not s:
+        return "NA"
+    s = re.sub(r"[^A-Za-z0-9_-]+", "_", s)
+    s = re.sub(r"_+", "_", s).strip("_")
+    return s[:60] if s else "NA"
+
+def _make_relation_filename(label: str | None) -> str:
+    date = datetime.now().strftime("%Y_%m_%d_%H%M%S")
+    safe = _safe_label(label)
+    return f"{date}_RvsT_{safe}.dat"
+
+def _build_relation_dat(channel_number: int, label: str | None, buf_points: list[tuple]) -> bytes:
+    lines = []
+    lines.append(f"# Relation file")
+    lines.append(f"# created_at_utc: {datetime.now(timezone.utc).isoformat()}")
+    lines.append(f"# channel_number: {channel_number}")
+    lines.append(f"# label: {label if label is not None else ''}")
+    lines.append("# columns: seq, ts_utc_iso, tmxc_k, resistance_ohm")
+    for i, (ts, tmxc_k, r_ohm) in enumerate(buf_points):
+        ts_iso = ts.isoformat()
+        lines.append(f"{i}\t{ts_iso}\t{tmxc_k:.12g}\t{r_ohm:.12g}")
+    return ("\n".join(lines) + "\n").encode("utf-8")
+
+
+def start_relation(channel_number: int, label: str | None = None):
+    global RELATION_ACTIVE, RELATION_RUN_ID, RELATION_CHANNEL, RELATION_LABEL, RELATION_BUFFER
+
+    if RELATION_ACTIVE:
+        print("⚠ Ya hay una relation en curso.")
+        return None
+
+    try:
+        channel_number = int(channel_number)
+    except (ValueError, TypeError):
+        print("❌ channel_number must be an integer")
+        return None
+
+    if label is not None:
+        label = label.strip() or None
+
+    RELATION_ACTIVE = True
+    RELATION_CHANNEL = channel_number
+    RELATION_LABEL = label
+    RELATION_BUFFER = []
+
+    RELATION_RUN_ID = _make_relation_filename(label)
+
+    print(f"▶ RELATION iniciada file={RELATION_RUN_ID} (CH{RELATION_CHANNEL}, label={RELATION_LABEL})")
+    return RELATION_RUN_ID
+
+
+def stop_relation():
+    global RELATION_ACTIVE, RELATION_RUN_ID, RELATION_CHANNEL, RELATION_LABEL, RELATION_BUFFER
+
+    if not RELATION_ACTIVE or RELATION_RUN_ID is None:
+        print("⚠ No hay relation en curso")
+        return None, 0
+
+    file_name = RELATION_RUN_ID
+    n_points = len(RELATION_BUFFER)
+    channel_number = RELATION_CHANNEL
+    label = RELATION_LABEL
+
+    dat_bytes = _build_relation_dat(channel_number, label, RELATION_BUFFER)
+
+    with get_db_conn() as conn:
+        with conn.cursor() as cur:
+            try:
+                cur.execute(
+                    """
+                    INSERT INTO relation_files (file_name, channel_number, label, n_points, data)
+                    VALUES (%s, %s, %s, %s, %s)
+                    ON CONFLICT (file_name) DO UPDATE SET
+                        created_at = now(),
+                        channel_number = EXCLUDED.channel_number,
+                        label = EXCLUDED.label,
+                        n_points = EXCLUDED.n_points,
+                        data = EXCLUDED.data;
+                    """,
+                    (file_name, channel_number, label, n_points, psycopg2.Binary(dat_bytes)),
+                )
+                conn.commit()
+            except psycopg2.Error as e:
+                conn.rollback()
+                print(f"❌ Error guardando relation file {file_name}: {e}")
+                # aunque falle DB, paramos captura para no quedar colgados
+
+    RELATION_ACTIVE = False
+    RELATION_RUN_ID = None
+    RELATION_CHANNEL = None
+    RELATION_LABEL = None
+    RELATION_BUFFER = []
+
+    print(f"⏹ RELATION finalizada. file={file_name} puntos={n_points}")
+    return file_name, n_points
+
+
+
 
 def apply_default_channel_timing(channel: int) -> bool:
     """
@@ -372,6 +483,137 @@ def handle_command(command):
                 ls.set_autoscan("off")
             time.sleep(0.1)
             print("✅ Autoscan disabled")
+
+
+    if cmd.startswith("start_relation"):
+        parts = cmd.split(":", 2)
+        if len(parts) < 2:
+            return "❌ Syntax: start_relation:<CHANNEL_NUMBER>[:<LABEL>]"
+
+        try:
+            ch = int(parts[1])
+        except (ValueError, TypeError):
+            return "❌ CHANNEL_NUMBER must be an integer"
+
+        label = None
+        if len(parts) == 3:
+            label = urllib.parse.unquote(parts[2])
+
+        relation_id = start_relation(ch, label)
+        if relation_id is None:
+            return "❌ Failed to start relation"
+
+        return f"RELATION_STARTED:{relation_id}"
+
+    elif cmd == "stop_relation":
+        relation_id, n = stop_relation()
+        if relation_id is None:
+            return "❌ No active relation"
+        return f"RELATION_STOPPED:{relation_id}:{n}"
+    
+    elif cmd == "get_relation_status":
+        if RELATION_ACTIVE and RELATION_RUN_ID is not None:
+            label = RELATION_LABEL if RELATION_LABEL is not None else ""
+            ch = RELATION_CHANNEL if RELATION_CHANNEL is not None else -1
+            n = len(RELATION_BUFFER)
+            return (
+                "RELATION_STATUS:ACTIVE:"
+                f"{RELATION_RUN_ID}:{ch}:{urllib.parse.quote(label)}:{n}"
+            )
+        else:
+            return "RELATION_STATUS:IDLE"
+    
+
+    elif cmd == "get_recent_relations":
+        """
+        Return latest saved relation .dat files stored in relation_files.
+        Output: RECENT_RELATIONS:OK:[{file_name, created_at, channel_number, label, n_points}, ...]
+        """
+        try:
+            with get_db_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT file_name, created_at, channel_number, label, n_points
+                        FROM relation_files
+                        ORDER BY created_at DESC
+                        LIMIT 50
+                    """)
+                    rows = cur.fetchall()
+
+            payload = [
+                {
+                    "file_name": r[0],
+                    "created_at": r[1].isoformat() if r[1] else None,
+                    "channel_number": int(r[2]),
+                    "label": r[3],
+                    "n_points": int(r[4]),
+                }
+                for r in rows
+            ]
+            return "RECENT_RELATIONS:OK:" + json.dumps(payload)
+
+        except Exception as e:
+            return f"ERROR:get_recent_relations:{e}"
+
+
+    elif cmd.startswith("get_relation_file:"):
+        """
+        Fetch and parse a stored relation .dat from relation_files.
+        Output: RELATION_FILE:OK:{file_name, created_at, channel_number, label, n_points, points:[{x,y},...]}
+        """
+        try:
+            parts = cmd.split(":", 1)
+            if len(parts) != 2 or not parts[1].strip():
+                return "RELATION_FILE:ERROR:Syntax. Use get_relation_file:<FILE_NAME>"
+
+            file_name = parts[1].strip()
+
+            with get_db_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT file_name, created_at, channel_number, label, n_points, data
+                        FROM relation_files
+                        WHERE file_name = %s
+                    """, (file_name,))
+                    row = cur.fetchone()
+
+            if not row:
+                return f"RELATION_FILE:ERROR:Not found: {file_name}"
+
+            file_name, created_at, ch, label, n_points, data = row
+
+            text = bytes(data).decode("utf-8", errors="ignore")
+
+            # Tu formato real: seq, ts_utc_iso, tmxc_k, resistance_ohm
+            points = []
+            for line in text.splitlines():
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                cols = line.split()
+                if len(cols) < 4:
+                    continue
+                try:
+                    x = float(cols[2])  # tmxc_k
+                    y = float(cols[3])  # resistance_ohm
+                    points.append({"x": x, "y": y})
+                except:
+                    continue
+
+            payload = {
+                "file_name": file_name,
+                "created_at": created_at.isoformat() if created_at else None,
+                "channel_number": int(ch),
+                "label": label,
+                "n_points": int(n_points) if n_points is not None else len(points),
+                "points": points,
+            }
+
+            return "RELATION_FILE:OK:" + json.dumps(payload)
+
+        except Exception as e:
+            return f"RELATION_FILE:ERROR:{e}"
+
 
     if cmd.startswith("start_run"):
         parts = cmd.split(":", 2)
@@ -1695,6 +1937,11 @@ def start_server():
             # Start the fake temperature sensor in a separate thread
             threading.Thread(target=lakeshore_temperature_sensor, daemon=True).start()
 
+            for channel in DEFAULT_EXTRA_CHANNELS:
+                if ls.get_channel_status(channel) == 0:
+                    with heater_mutex:
+                        ls.set_channel_on(channel)
+                        
             while True:
                 conn, addr = server_socket.accept()
                 print(f"Connected by {addr}")
@@ -1875,9 +2122,21 @@ def lakeshore_temperature_sensor():
         for ch in [9, 10, 12, 13, 14]:
             try:
                 with heater_mutex:
+
                     extra_resistances[f"CH{ch}"] = ls.get_resistance(ch)
             except Exception:
                 extra_resistances[f"CH{ch}"] = None
+
+        if RELATION_ACTIVE and RELATION_RUN_ID is not None and RELATION_CHANNEL is not None:
+            try:
+                tmxc_k = temperatures.get("MXC")
+                r_key = f"CH{RELATION_CHANNEL}"
+                r_ohm = extra_resistances.get(r_key)
+
+                if tmxc_k is not None and r_ohm is not None:
+                    RELATION_BUFFER.append((datetime.now(timezone.utc), float(tmxc_k), float(r_ohm)))
+            except Exception as e:
+                print(f"⚠ Relation sampling error: {e}")
                 
         controlParams = {
             'MXCSP': tempSetPointMXC,
@@ -2076,7 +2335,7 @@ def maybe_insert_measurements():
     global last_db_insert_ts
     global last_sensorValues, last_controlParams, last_sensorParams
 
-    now = datetime.datetime.now(datetime.timezone.utc)
+    now = datetime.now(timezone.utc)
     if last_db_insert_ts is not None:
         if now - last_db_insert_ts < db_delay:
             return  

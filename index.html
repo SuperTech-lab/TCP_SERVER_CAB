@@ -704,6 +704,89 @@
         text-align: left;
         margin-left: 8px;
       }
+
+      #relationLabelInput {
+        width: 90px;
+        max-width: 90px;
+        height: 32px;
+        padding: 4px 6px;
+        box-sizing: border-box;
+        flex: 0 0 auto;
+      }
+
+      .control-row select,
+      .control-row input[type="text"] {
+        height: 32px;
+        box-sizing: border-box;
+      }
+
+      .relation-reconstruction {
+        max-width: 1400px;
+        margin: 14px auto 0 auto;
+        background: white;
+        padding: 14px 18px;
+        border-radius: 8px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
+      }
+
+      .relation-reconstruction h3 {
+        margin: 0 0 10px 0;
+        font-size: 16px;
+      }
+
+      .relation-reconstruction .row {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .relation-reconstruction .meta {
+        margin-top: 8px;
+        font-size: 13px;
+        color: #4b5563;
+      }
+
+      .relation-reconstruction-section {
+        max-width: 1360px;
+        margin: 32px auto 40px;
+        background: white;
+        padding: 20px 24px;
+        border-radius: 10px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+      }
+
+      .relation-reconstruction-section h2 {
+        margin: 0 0 18px 0;
+        font-size: 24px;
+        font-weight: 700;
+        color: #222;
+      }
+
+      .relation-reconstruction-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .relation-reconstruction-row select {
+        min-width: 520px;
+      }
+
+      .relation-reconstruction-section h2 {
+        position: relative;
+        display: inline-block;
+      }
+
+      .relation-reconstruction-section h2::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        bottom: -6px;
+        width: 100%;
+        height: 3px;
+        background: #3b82f6;
+        border-radius: 2px;
+      }
     </style>
   </head>
 
@@ -1713,21 +1796,6 @@
           <div class="section-title">Relation plot</div>
           <div class="section-content">
             <div class="control-group">
-              <div class="control-row">
-                <label for="relationChannelSelect">Channel (R):</label>
-                <select
-                  id="relationChannelSelect"
-                  class="control-input"
-                  style="width: 180px; margin-left: 0"
-                  onchange="onRelationChannelChange()"
-                >
-                  <option value="CH9">CH9: Ti #1</option>
-                  <option value="CH10">CH10: TiAu #1</option>
-                  <option value="CH12">CH12: TiAlAu #1</option>
-                  <option value="CH13">CH13: Ti #2</option>
-                  <option value="CH14">CH14: Ti #3</option>
-                </select>
-              </div>
               <div class="control-row" style="margin-top: 10px">
                 <label style="width: 120px">MXC (x):</label>
                 <span id="relationCurrentMXC" class="current-value">-</span>
@@ -1736,12 +1804,89 @@
                 <label style="width: 120px">R channel (y):</label>
                 <span id="relationCurrentR" class="current-value">-</span>
               </div>
+              <div class="control-row">
+                <div id="relationCurrentConfig" class="relation-current-config">
+                  <div class="relation-config-title">
+                    <strong>Actual configuration (could be different):</strong>
+                  </div>
+                  <ul class="relation-config-list">
+                    <li>CH9 → Ti #1</li>
+                    <li>CH10 → TiAu #1</li>
+                    <li>CH12 → TiAlAu #1</li>
+                    <li>CH13 → Ti #2</li>
+                    <li>CH14 → Ti #3</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <div
+              class="control-row"
+              style="margin-top: 10px; align-items: center"
+            >
+              <label style="width: 120px">Channel:</label>
+
+              <select
+                id="relationChannelSelect"
+                class="styled-select"
+                style="width: 120px"
+                onchange="onRelationChannelChange()"
+              >
+                <option value="CH9">CH9</option>
+                <option value="CH10">CH10</option>
+                <option value="CH12">CH12</option>
+                <option value="CH13">CH13</option>
+                <option value="CH14">CH14</option>
+              </select>
+
+              <input
+                id="relationLabelInput"
+                type="text"
+                placeholder="Etiqueta"
+                style="margin-left: 10px; width: 160px"
+              />
+            </div>
+
+            <div class="control-row" style="margin-top: 14px; gap: 10px">
+              <button
+                id="relationStartButton"
+                class="inline-button run-play-button"
+                style="width: 120px"
+              >
+                ▶
+              </button>
+
+              <button
+                id="relationStopButton"
+                class="inline-button run-stop-button"
+                style="width: 120px"
+                disabled
+              >
+                ⏹
+              </button>
             </div>
           </div>
         </div>
 
         <div class="relation-plot-panel">
           <canvas id="relationChart"></canvas>
+        </div>
+      </div>
+      <!-- Relation reconstruction (historical .dat) -->
+      <div class="relation-reconstruction-section">
+        <h2>Reconstruction of saved .dat</h2>
+
+        <div class="relation-reconstruction-row">
+          <select id="relationFilesSelect" class="styled-select">
+            <option value="">Selecciona un .dat...</option>
+          </select>
+
+          <button
+            id="relationFilesRefreshButton"
+            class="inline-button"
+            title="Refresh list"
+          >
+            ⟳
+          </button>
         </div>
       </div>
     </div>
@@ -1754,6 +1899,7 @@
       let currentRelationChannel = "CH9";
       const RELATION_LIVE_POINTS = 400;
       let currentActiveRunId = null;
+      let relationRunning = false;
 
       const relationDataStore = {
         CH9: [],
@@ -1762,6 +1908,182 @@
         CH13: [],
         CH14: [],
       };
+
+      const relationFilesSelect = document.getElementById(
+        "relationFilesSelect",
+      );
+      const relationFilesRefreshButton = document.getElementById(
+        "relationFilesRefreshButton",
+      );
+
+      async function initRelationStateFromServer() {
+        try {
+          const raw = await sendCommandToServer("get_relation_status");
+
+          // 1) Normaliza: quita el prefijo "Command received - " si está
+          // (pero no dependemos solo de esto; también buscamos el marker por seguridad)
+          let response = (raw ?? "").toString().trim();
+          const prefix = "Command received - ";
+          if (response.startsWith(prefix)) {
+            response = response.slice(prefix.length).trim();
+          }
+
+          // 2) Encuentra RELATION_STATUS dentro del string (robusto ante prefijos/logs)
+          const marker = "RELATION_STATUS:";
+          const idx = response.indexOf(marker);
+          if (idx === -1) {
+            // No hay marker => no toques nada raro, solo deja UI en idle y loggea
+            relationRunning = false;
+            document.getElementById("relationStartButton").disabled = false;
+            document.getElementById("relationStopButton").disabled = true;
+            document.getElementById("relationChannelSelect").disabled = false;
+            document.getElementById("relationLabelInput").disabled = false;
+            updateRelationLabelVisibility();
+
+            addLogEntry(
+              `❌ get_relation_status: no RELATION_STATUS en "${raw}"`,
+              "received",
+            );
+            return;
+          }
+
+          const payload = response.slice(idx).trim(); // ahora empieza por RELATION_STATUS:...
+
+          // Formatos esperados (según tu código actual):
+          // ACTIVE: RELATION_STATUS:ACTIVE:<relation_run_id>:<ch>:<label_enc>:<n>
+          // IDLE:   RELATION_STATUS:IDLE
+          if (payload.startsWith("RELATION_STATUS:ACTIVE:")) {
+            const parts = payload.split(":");
+
+            // parts = ["RELATION_STATUS","ACTIVE", relation_run_id, chNum, labelEnc, n]
+            const relationRunId = parts[2] || null;
+            const chNum = parts[3] || null;
+            const labelEnc = parts[4] || "";
+            const n = parts[5] || "0";
+
+            // Validación mínima (evita petadas si viene mal)
+            if (!chNum) {
+              addLogEntry(
+                `❌ RELATION_STATUS ACTIVE malformado: "${payload}"`,
+                "received",
+              );
+              return;
+            }
+
+            relationRunning = true;
+
+            // UI: stop habilitado, start deshabilitado
+            document.getElementById("relationStartButton").disabled = true;
+            document.getElementById("relationStopButton").disabled = false;
+            document.getElementById("relationChannelSelect").disabled = true;
+            document.getElementById("relationLabelInput").disabled = true;
+
+            // Reflejar canal/label (y sincronizar variable interna usada por la gráfica)
+            const chStr = `CH${chNum}`;
+            document.getElementById("relationChannelSelect").value = chStr;
+
+            let decodedLabel = "";
+            try {
+              decodedLabel = decodeURIComponent(labelEnc);
+            } catch {
+              decodedLabel = labelEnc; // por si viene ya decodificado o con % mal
+            }
+            document.getElementById("relationLabelInput").value = decodedLabel;
+
+            currentRelationChannel = chStr; // IMPORTANTE para tu plotting
+            updateRelationLabelVisibility(); // IMPORTANTE para mostrar/ocultar label
+
+            addLogEntry(
+              `🔁 Relation activa recuperada: relation_run_id=${relationRunId ?? "?"} (CH${chNum}, n=${n})`,
+              "status",
+            );
+            return;
+          }
+
+          // Cualquier otra cosa => idle seguro
+          relationRunning = false;
+          document.getElementById("relationStartButton").disabled = false;
+          document.getElementById("relationStopButton").disabled = true;
+          document.getElementById("relationChannelSelect").disabled = false;
+          document.getElementById("relationLabelInput").disabled = false;
+          updateRelationLabelVisibility();
+        } catch (e) {
+          addLogEntry(`❌ Error get_relation_status: ${e.message}`, "received");
+        }
+      }
+
+      function updateRelationLabelVisibility() {
+        const ch = document.getElementById("relationChannelSelect").value;
+        const input = document.getElementById("relationLabelInput");
+
+        if (["CH9", "CH10", "CH12", "CH13", "CH14"].includes(ch)) {
+          input.style.display = "inline-block";
+        } else {
+          input.style.display = "none";
+          input.value = "";
+        }
+      }
+
+      document
+        .getElementById("relationChannelSelect")
+        .addEventListener("change", updateRelationLabelVisibility);
+
+      updateRelationLabelVisibility();
+
+      document
+        .getElementById("relationStartButton")
+        .addEventListener("click", async () => {
+          if (relationRunning) return;
+
+          const ch = document.getElementById("relationChannelSelect").value;
+          const chNum = ch.replace("CH", "");
+          const label =
+            document.getElementById("relationLabelInput").value || "NA";
+
+          const command = `start_relation:${chNum}:${encodeURIComponent(label)}`;
+          addLogEntry(`Sending command: ${command}`, "sent");
+
+          try {
+            const response = await sendCommandToServer(command);
+            addLogEntry(`Server response: ${response}`, "received");
+
+            relationRunning = true;
+            document.getElementById("relationStartButton").disabled = true;
+            document.getElementById("relationStopButton").disabled = false;
+            document.getElementById("relationChannelSelect").disabled = true;
+            document.getElementById("relationLabelInput").disabled = true;
+          } catch (error) {
+            addLogEntry(
+              `Error sending start_relation: ${error.message}`,
+              "received",
+            );
+          }
+        });
+
+      document
+        .getElementById("relationStopButton")
+        .addEventListener("click", async () => {
+          if (!relationRunning) return;
+
+          const command = "stop_relation";
+          addLogEntry(`Sending command: ${command}`, "sent");
+
+          try {
+            const response = await sendCommandToServer(command);
+            addLogEntry(`Server response: ${response}`, "received");
+
+            relationRunning = false;
+            document.getElementById("relationStartButton").disabled = false;
+            document.getElementById("relationStopButton").disabled = true;
+            document.getElementById("relationChannelSelect").disabled = false;
+            document.getElementById("relationLabelInput").disabled = false;
+          } catch (error) {
+            addLogEntry(
+              `Error sending stop_relation: ${error.message}`,
+              "received",
+            );
+          }
+        });
 
       function updateRunUI() {
         const playBtn = document.getElementById("runPlayButton");
@@ -1928,6 +2250,80 @@
           runIdInput.value = 1;
           expectedNextRunId = 1;
         }
+      }
+
+      async function refreshRelationFiles() {
+        if (!relationFilesSelect) return;
+
+        relationFilesSelect.innerHTML = `<option value="">(cargando...)</option>`;
+
+        try {
+          // Igual que historical runs: se manda comando via HTTP /send-command
+          const response = await sendCommandToServer("get_recent_relations");
+
+          const marker = "RECENT_RELATIONS:OK:";
+          const i = response.indexOf(marker);
+          if (i === -1) {
+            relationFilesSelect.innerHTML = `<option value="">(error cargando)</option>`;
+            addLogEntry(`❌ get_recent_relations: ${response}`, "received");
+            return;
+          }
+
+          const jsonStr = response.slice(i + marker.length).trim();
+          const files = JSON.parse(jsonStr);
+
+          if (!Array.isArray(files) || files.length === 0) {
+            relationFilesSelect.innerHTML = `<option value="">(sin relations)</option>`;
+            return;
+          }
+
+          relationFilesSelect.innerHTML =
+            `<option value="">Selecciona un .dat...</option>` +
+            files
+              .map((f) => {
+                const label = f.label ? ` — ${f.label}` : "";
+                const n =
+                  typeof f.n_points === "number" ? ` (${f.n_points} pts)` : "";
+                const when = f.created_at ? ` — ${f.created_at}` : "";
+                return `<option value="${encodeURIComponent(f.file_name)}">CH${f.channel_number}${label}${n}${when}</option>`;
+              })
+              .join("");
+        } catch (e) {
+          relationFilesSelect.innerHTML = `<option value="">(error cargando)</option>`;
+          addLogEntry(
+            `❌ Error get_recent_relations: ${e.message}`,
+            "received",
+          );
+        }
+      }
+
+      if (relationFilesRefreshButton) {
+        relationFilesRefreshButton.addEventListener(
+          "click",
+          refreshRelationFiles,
+        );
+      }
+
+      function openHistoricalRelationWindow(fileName) {
+        const url = `/plot_relation?file_name=${encodeURIComponent(fileName)}`;
+        window.open(url, "_blank", "width=1200,height=800");
+        addLogEntry(
+          `✅ Abierta ventana con gráfica Python de relation: ${fileName}`,
+          "status",
+        );
+      }
+
+      if (relationFilesSelect) {
+        relationFilesSelect.addEventListener("change", async () => {
+          const v = relationFilesSelect.value;
+          if (!v) return;
+
+          const fileName = decodeURIComponent(v);
+
+          // NO redibujes la gráfica principal. Solo abre ventana auxiliar.
+          addLogEntry(`📂 Abriendo relation histórica: ${fileName}`, "status");
+          openHistoricalRelationWindow(fileName);
+        });
       }
 
       function sleep(ms) {
@@ -3841,6 +4237,7 @@
         // Initial data fetch
         await fetchSensorData();
         await refreshRecentRuns();
+        await refreshRelationFiles();
       });
 
       // Fetch data every 1 seconds
@@ -5089,9 +5486,11 @@
         redrawRelationChart();
       }
 
-      document.addEventListener("DOMContentLoaded", () => {
+      document.addEventListener("DOMContentLoaded", async () => {
         const sel = document.getElementById("relationChannelSelect");
         if (sel) currentRelationChannel = sel.value;
+
+        await initRelationStateFromServer();
 
         relationChart = createRelationChart();
         redrawRelationChart();

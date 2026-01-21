@@ -176,6 +176,27 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(html.encode('utf-8'))
 
+
+        elif path == '/plot_relation':
+            file_vals = query.get("file_name")
+            if not file_vals:
+                self.send_error(400, "Missing file_name")
+                return
+
+            file_name = file_vals[0]
+
+            relation_payload = self.get_relation_payload(file_name)
+            if relation_payload is None:
+                self.send_error(500, "Could not retrieve RELATION_FILE")
+                return
+
+            html = self.render_relation_plot_html(relation_payload)
+
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/html; charset=utf-8')
+            self.end_headers()
+            self.wfile.write(html.encode('utf-8'))
+
         else:
             self.send_error(404)
 
@@ -493,7 +514,130 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
     </html>"""
         return html
 
+    def get_relation_payload(self, file_name: str):
+            """
+            Envía 'get_relation_file:<file_name>' al servidor TCP y extrae el JSON
+            después de 'RELATION_FILE:OK:'.
+            """
+            from urllib.parse import quote
 
+            # Igual que haces desde JS: mandas el file_name encodeado
+            cmd = f"get_relation_file:{quote(file_name)}"
+            raw = self.send_command_to_tcp_server(cmd)
+            print("RAW RELATION_FILE response:", repr(raw))
+
+            prefix = "RELATION_FILE:"
+            idx = raw.find(prefix)
+            if idx == -1:
+                print("RELATION_FILE not found in response")
+                return None
+
+            part = raw[idx + len(prefix):].strip()
+
+            if part.startswith("ERROR:"):
+                print("RELATION_FILE error from TCP:", part)
+                return None
+
+            ok_prefix = "OK:"
+            if part.startswith(ok_prefix):
+                json_str = part[len(ok_prefix):].strip()
+            else:
+                json_str = part
+
+            end = json_str.rfind("}")
+            if end != -1:
+                json_str = json_str[:end + 1]
+
+            try:
+                payload = json.loads(json_str)
+                return payload
+            except Exception as e:
+                print("Error decoding RELATION_FILE JSON:", e)
+                print("JSON candidate was:", json_str)
+                return None
+
+    def render_relation_plot_html(self, relation_payload: dict) -> str:
+        import io, base64
+        import matplotlib.pyplot as plt
+
+        file_name = relation_payload.get("file_name", "relation")
+        ch = relation_payload.get("channel_number", "?")
+        label = relation_payload.get("label", "")
+        created = relation_payload.get("created_at", "")
+        points = relation_payload.get("points", [])
+
+        # points esperado: [{x: Tmxc_K, y: R_ohm}, ...]
+        xs, ys = [], []
+        if isinstance(points, list):
+            for p in points:
+                try:
+                    x = p.get("x", None)
+                    y = p.get("y", None)
+                    if x is None or y is None:
+                        continue
+                    xs.append(float(x))
+                    ys.append(float(y))
+                except Exception:
+                    continue
+
+        fig = plt.figure(figsize=(10.5, 5.5))
+        ax = fig.add_subplot(111)
+
+        if len(xs) == 0:
+            ax.set_title(f"Relation CH{ch} — {file_name}")
+            ax.text(0.5, 0.5, "No points in file", ha="center", va="center")
+            ax.set_xlim(0, 1)
+            ax.set_ylim(0, 1)
+            ax.grid(True, alpha=0.3)
+        else:
+            # orden por T
+            order = sorted(range(len(xs)), key=lambda i: xs[i])
+            xs = [xs[i] for i in order]
+            ys = [ys[i] for i in order]
+
+            ttl = f"Relation CH{ch}"
+            if label:
+                ttl += f" — {label}"
+            ax.set_title(ttl)
+
+            ax.plot(xs, ys)
+            ax.set_xlabel("T(MXC) [K]")
+            ax.set_ylabel(f"R(CH{ch}) [Ohm]")
+            ax.grid(True, alpha=0.3)
+
+        meta = f"{file_name}"
+        if created:
+            meta += f" | {created}"
+        fig.suptitle(meta, fontsize=10, y=0.98)
+
+        buf = io.BytesIO()
+        fig.tight_layout()
+        fig.savefig(buf, format="png", dpi=130)
+        plt.close(fig)
+
+        img_b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+
+        return f"""
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Relation plot — {file_name}</title>
+  <style>
+    body {{ font-family: Arial, sans-serif; margin: 16px; background: #f5f5f5; }}
+    .card {{ background: white; border-radius: 10px; padding: 14px; box-shadow: 0 2px 8px rgba(0,0,0,.08); }}
+    img {{ width: 100%; height: auto; border-radius: 8px; }}
+    .small {{ color:#666; margin-top: 8px; font-size: 13px; }}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <img src="data:image/png;base64,{img_b64}" />
+    <div class="small">file: {file_name} | CH{ch}{(" | label: " + label) if label else ""}</div>
+  </div>
+</body>
+</html>
+"""
 
 def connect_to_tcp_server():
     # Connect to the TCP server

@@ -258,46 +258,39 @@ class LakeShore370:
 
     def get_resistance(self, channel: int):
         """
-        Devuelve resistencia en Ohmios del canal indicado.
-        Canales ficticios correlacionados con la temperatura MXC.
+        Dummy: resistencia lineal con la temperatura MXC.
+        Ideal para verificar que el plot R vs T(MXC) funciona.
         """
         label = self._label_from_channel(channel)
 
         with _lakeshore_mutex:
 
-            # ----------- CANALES FICTICIOS (tipo "lo del 7") -----------
-            CORR_CHANNELS = {9, 10, 12, 13, 14}
+            # Parámetros por canal: (R0 [Ohm], alpha [Ohm/K])
+            DUMMY_RELATION = {
+                9:  (90.0,  500.0),
+                10: (100.0, 800.0),
+                12: (120.0, 1200.0),
+                13: (130.0, 1600.0),
+                14: (140.0, 2000.0),
+            }
 
-            if channel in CORR_CHANNELS:
-                T_mxc = self._temps_K.get("MXC", 0.05)
+            # Canales dummy correlacionados con MXC
+            if channel in DUMMY_RELATION:
+                R0, alpha = DUMMY_RELATION[channel]
 
-                # Puedes dar a cada canal una "curva" distinta para que no sean clones:
-                # (R0 en ohmios y alpha pendiente)
-                params = {
-                    9:  (1500.0, 1.15),
-                    10: (2200.0, 1.10),
-                    12: (3300.0, 1.05),
-                    13: (4700.0, 1.00),
-                    14: (6800.0, 0.95),
-                }
+                # Temperatura MXC en K
+                T_mxc = self._temps_K.get("MXC", 0.0)
 
-                R0, alpha = params.get(channel, (1000.0, 1.2))
-
-                T0 = 0.05  # 50 mK referencia
-                R = R0 * (max(T_mxc, 1e-4) / T0) ** alpha
-
-                noise = random.uniform(-5.0, 5.0)
-                value = max(R + noise, 1.0)
+                value = R0 + alpha * T_mxc
 
                 self._resistances_ohm[f"CH{channel}"] = value
                 return value
 
-            # ----------- RESTO DE CANALES -----------
+            # ----------- RESTO DE CANALES (sin cambio) -----------
+
             base = self._resistances_ohm.get(label, 0.0)
-            noise = random.uniform(-0.5, 0.5)
-            value = max(base + noise, 0.0)
-            self._resistances_ohm[label] = value
-            return value
+            self._resistances_ohm[label] = base
+            return base
 
     def get_power(self, channel: int):
         """
