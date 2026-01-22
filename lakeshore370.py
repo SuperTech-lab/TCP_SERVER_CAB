@@ -5,7 +5,7 @@ import time
 # Shared mutex lock for safe device access
 _lakeshore_mutex = threading.Lock()
 
-DEFAULT_CHANNELS = [1, 2, 5, 6]
+DEFAULT_CHANNELS = [1, 2, 5, 6, 9, 10, 11, 12, 13, 14, 15]
 DEFAULT_CHANNELS_ID = ["50K", "4K", "STILL", "MXC"]
 ALL_CHANNELS = range(1, 17)
 
@@ -64,11 +64,11 @@ RESISTANCE_RANGE_LIST = {
 }
 
 DEFAULT_MXC_RESISTANCE_RANGE_SETTINGS = {
-    "excitation_mode": 0,       # 0 for voltage, 1 for current
-    "excitation_range": 5,      # 5 for 200 uV and 100 pA
-    "resistance_range": 14,     # 14 for 3.15 uA R = 6.32 kOhm
-    "autorange": 1,             # 0 for NO, 1 for YES
-    "excitation": 1,            # 0 for excitation on, 1 = exctiation off
+    "excitation_mode"  : 0,      # 0 for voltage, 1 for current
+    "excitation_range" : 5,      # 5 for 200 uV and 100 pA
+    "resistance_range" : 14,     # 14 for 3.15 uA R = 6.32 kOhm
+    "autorange"        : 1,      # 0 for NO, 1 for YES
+    "excitation"       : 1,      # 0 for excitation on, 1 = exctiation off
 }
 
 CURVE_NAMES = {

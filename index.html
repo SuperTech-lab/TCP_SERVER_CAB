@@ -834,7 +834,7 @@
                     <span class="slider round"></span>
                   </label>
                 </div>
-                <!-- Desplegable de canales -->
+                <!-- Main Channel List -->
                 <details class="channel-dropdown" style="position: relative">
                   <summary class="channel-dropdown-summary">
                     <strong>CHANNEL ON/OFF </strong>
@@ -1791,8 +1791,103 @@
     <div id="relation-tab" class="tab-content">
       <div class="container relation-container">
         <div class="relation-control-panel">
-          <h1>MXC comparison</h1>
+          <h1>Resistance vs. TMXC</h1>
 
+          <!-- Main Channel List -->
+          <details class="channel-dropdown" style="position: relative">
+            <summary class="channel-dropdown-summary">
+              <strong>CHANNEL ON/OFF </strong>
+              <span class="channel-dropdown-arrow">▾</span>
+            </summary>
+
+            <div class="channel-dropdown-menu">
+              <div class="control-row">
+                <label>Ch 9</label>
+                <label class="switch">
+                  <input
+                    type="checkbox"
+                    id="toggleExtraChannel9"
+                    onchange="globalToggleChannel('9')"
+                  />
+                  <span class="slider round"></span>
+                </label>
+              </div>
+
+              <div class="control-row">
+                <label>Ch 10</label>
+                <label class="switch">
+                  <input
+                    type="checkbox"
+                    id="toggleExtraChannel10"
+                    onchange="globalToggleChannel('10')"
+                  />
+                  <span class="slider round"></span>
+                </label>
+              </div>
+
+              <div class="control-row">
+                <label>Ch 11</label>
+                <label class="switch">
+                  <input
+                    type="checkbox"
+                    id="toggleExtraChannel11"
+                    onchange="globalToggleChannel('11')"
+                  />
+                  <span class="slider round"></span>
+                </label>
+              </div>
+              
+              <div class="control-row">
+                <label>Ch 12</label>
+                <label class="switch">
+                  <input
+                    type="checkbox"
+                    id="toggleExtraChannel12"
+                    onchange="globalToggleChannel('12')"
+                  />
+                  <span class="slider round"></span>
+                </label>
+              </div>
+
+              <div class="control-row">
+                <label>Ch 13</label>
+                <label class="switch">
+                  <input
+                    type="checkbox"
+                    id="toggleExtraChannel13"
+                    onchange="globalToggleChannel('13')"
+                  />
+                  <span class="slider round"></span>
+                </label>
+              </div>
+
+              <div class="control-row">
+                <label>Ch 14</label>
+                <label class="switch">
+                  <input
+                    type="checkbox"
+                    id="toggleExtraChannel14"
+                    onchange="globalToggleChannel('14')"
+                  />
+                  <span class="slider round"></span>
+                </label>
+              </div>
+
+              <div class="control-row">
+                <label>Ch 15</label>
+                <label class="switch">
+                  <input
+                    type="checkbox"
+                    id="toggleExtraChannel15"
+                    onchange="globalToggleChannel('15')"
+                  />
+                  <span class="slider round"></span>
+                </label>
+              </div>
+
+            </div>
+          </details>
+          
           <div class="section-title">Relation plot</div>
           <div class="section-content">
             <div class="control-group">
@@ -1833,9 +1928,11 @@
               >
                 <option value="CH9">CH9</option>
                 <option value="CH10">CH10</option>
+                <option value="CH11">CH11</option>
                 <option value="CH12">CH12</option>
                 <option value="CH13">CH13</option>
                 <option value="CH14">CH14</option>
+                <option value="CH15">CH15</option>
               </select>
 
               <input
@@ -1845,7 +1942,6 @@
                 style="margin-left: 10px; width: 160px"
               />
             </div>
-
             <div class="control-row" style="margin-top: 14px; gap: 10px">
               <button
                 id="relationStartButton"
@@ -1904,9 +2000,11 @@
       const relationDataStore = {
         CH9: [],
         CH10: [],
+        CH11: [],
         CH12: [],
         CH13: [],
         CH14: [],
+        CH15: []
       };
 
       const relationFilesSelect = document.getElementById(
@@ -1915,6 +2013,9 @@
       const relationFilesRefreshButton = document.getElementById(
         "relationFilesRefreshButton",
       );
+
+      const SAMPLE_CHANNELS = [9, 10, 11, 12, 13, 14, 15];
+      const pendingSampleToggle = {};
 
       async function initRelationStateFromServer() {
         try {
@@ -2016,7 +2117,7 @@
         const ch = document.getElementById("relationChannelSelect").value;
         const input = document.getElementById("relationLabelInput");
 
-        if (["CH9", "CH10", "CH12", "CH13", "CH14"].includes(ch)) {
+        if (["CH9", "CH10", "CH11", "CH12", "CH13", "CH14", "CH15"].includes(ch)) {
           input.style.display = "inline-block";
         } else {
           input.style.display = "none";
@@ -2464,6 +2565,10 @@
       let pending4KToggle = false;
       let pendingSTILLToggle = false;
       let pendingAutoscanToggle = false;
+      let pendingExtraChannels = {
+        9: false, 10: false, 11: false, 12: false, 13: false, 14: false, 15: false
+      };
+      
 
       // Variables to store temperature data and timestamps
       let temperatureData = [];
@@ -2534,9 +2639,18 @@
         heaterOutputMXC: null,
         RCH9: null,
         RCH10: null,
+        RCH11: null,
         RCH12: null,
         RCH13: null,
         RCH14: null,
+        RCH15: null,
+        enabledCH9: null,
+        enabledCH10: null,
+        enabledCH11: null,
+        enabledCH12: null,
+        enabledCH13: null,
+        enabledCH14: null,
+        enabledCH15: null,
       };
 
       // Track last sent values
@@ -4143,6 +4257,28 @@
           }
           updateStageVisibility();
 
+          SAMPLE_CHANNELS.forEach(chNum => {
+              const checkbox = document.getElementById(`toggleExtraChannel${chNum}`);
+              const backendEnabled = !!currentParameters[`enabledCH${chNum}`]; // Obtenido del JSON del servidor
+
+              if (checkbox) {
+                  if (pendingExtraChannels[chNum]) {
+                      if (checkbox.checked === backendEnabled) {
+                          pendingExtraChannels[chNum] = false;
+                          console.log(`✅ Extra Channel ${chNum} synced.`);
+                      } else {
+                          console.log(`⏳ Waiting for Channel ${chNum} backend...`);
+                      }
+                  } else {
+                      // Sincronización normal si no hay operación pendiente
+                      if (checkbox.checked !== backendEnabled) {
+                          checkbox.checked = backendEnabled;
+                          console.log(`🔁 Sync Extra CH${chNum} -> ${backendEnabled ? "ON" : "OFF"}`);
+                      }
+                  }
+              }
+          });
+
           const autoscanToggle = document.getElementById("autoscanToggle");
           if (autoscanToggle && currentParameters.autoscan !== undefined) {
             const backendAutoscanOn = currentParameters.autoscan === "on";
@@ -5228,8 +5364,43 @@
             break;
           case "STILL":
             toggleChannelSTILL();
-            break;
+            break; 
         }
+
+        const match = String(channel).match(/^(?:CH)?(9|10|11|12|13|14|15)$/);
+        if (match) return toggleSampleChannelGlobal(parseInt(match[1], 10));
+
+        console.warn("Unknown channel in globalToggleChannel:", channel);
+      }
+
+
+      function toggleSampleChannelGlobal(channel) {
+        const checkbox = document.getElementById(`toggleExtraChannel${channel}`);
+        if (!checkbox) return;
+
+        const state = checkbox.checked ? 1 : 0;
+        const command = `set_channel_${channel}: ${state}`;
+
+        // Marcamos como pendiente para que el "fetchSensorData" no sobrescriba el toggle
+        pendingExtraChannels[channel] = true; 
+
+        addLogEntry(`Sending command: ${command}`, "sent");
+
+        fetch("/send-command", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ command })
+        })
+        .then(r => r.json())
+        .then(data => {
+            addLogEntry(`Server response: ${data.status}`, "received");
+        })
+        .catch(err => {
+            console.error("❌ Error:", err);
+            // Si hay error, revertimos el checkbox y liberamos el pendiente
+            checkbox.checked = !checkbox.checked;
+            pendingExtraChannels[channel] = false;
+        });
       }
 
       function toggleStageElements(stageClass, visible) {
@@ -5459,9 +5630,11 @@
       function updateRelationStore() {
         pushRelationPointFor("CH9");
         pushRelationPointFor("CH10");
+        pushRelationPointFor("CH11");
         pushRelationPointFor("CH12");
         pushRelationPointFor("CH13");
         pushRelationPointFor("CH14");
+        pushRelationPointFor("CH15");
       }
 
       function redrawRelationChart() {
@@ -5479,11 +5652,27 @@
         updateRelationCurrentLabels();
       }
 
-      function onRelationChannelChange() {
+      async function onRelationChannelChange() {
         const sel = document.getElementById("relationChannelSelect");
         if (!sel) return;
-        currentRelationChannel = sel.value;
-        redrawRelationChart();
+
+        const ch = sel.value;          // "CH9".."CH15"
+
+        currentRelationChannel = ch;
+
+        const chNum = ch.replace("CH", "");  // "9".."15"
+        const cmd = `select_measure_channel:${chNum}`;
+
+        try {
+          addLogEntry(`Sending: ${cmd}`, "sent");
+          const resp = await sendCommandToServer(cmd);
+          addLogEntry(`Server response: ${resp}`, "received");
+
+          await new Promise((r) => setTimeout(r, 300));
+          await fetchSensorData(true);
+        } catch (e) {
+          addLogEntry(`Error: ${e.message}`, "received");
+        }
       }
 
       document.addEventListener("DOMContentLoaded", async () => {

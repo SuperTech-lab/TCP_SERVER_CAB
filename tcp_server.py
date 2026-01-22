@@ -8,7 +8,9 @@ from psycopg2.pool import ThreadedConnectionPool
 import psycopg2
 from contextlib import contextmanager
 from default_config import (DEFAULT_PID, CURRENT_RANGE_LIST, DEFAULT_MXC_RESISTANCE_RANGE_SETTINGS, SENSOR_RESISTANCE_RANGE_LIST, DEFAULT_CHANNELS, DEFAULT_EXTRA_CHANNELS, 
-DEFAULT_CHANNELS_ID, DEFAULT_SETTINGS, DEFAULT_MXC_SETPOINT_MK, DEFAULT_MXC_HEATER_RANGE, DEFAULT_SENSOR_RESISTANCE_SETTINGS, DB_INSERT_INTERVAL, DEFAULT_CURVES, CURVE_NAMES)
+                            DEFAULT_CHANNELS_ID, DEFAULT_SETTINGS, DEFAULT_MXC_SETPOINT_MK, DEFAULT_MXC_HEATER_RANGE, DEFAULT_SENSOR_RESISTANCE_SETTINGS, DB_INSERT_INTERVAL, 
+                            DEFAULT_CURVES, CURVE_NAMES, SAMPLE_CHANNELS
+                            )
 import urllib.parse
 import re
 from datetime import datetime, timezone
@@ -38,7 +40,7 @@ RELATION_ACTIVE = False
 RELATION_RUN_ID = None
 RELATION_CHANNEL = None   
 RELATION_LABEL = None     
-RELATION_BUFFER = [] 
+RELATION_BUFFER = []
 
 
 def init_db_pool():
@@ -1506,6 +1508,287 @@ def handle_command(command):
             print(message)
             return message
 
+
+    elif command.startswith("set_channel_9"):
+        try:
+            parts = command.split(":")
+            channel_status = int(parts[1])
+
+            with heater_mutex:
+                current_status = int(ls.get_channel_status(channel=9))
+
+            time.sleep(0.5)
+            if current_status == channel_status:
+                message = f"❌ Channel 9 is already {'On' if bool(current_status) else 'Off'}"
+                print(message)
+                return message
+
+            attempts = 5
+            success = False
+            for _ in range(attempts):
+                if bool(channel_status):
+                    with heater_mutex:
+                        success = ls.set_channel_on(9)
+                else:
+                    with heater_mutex:
+                        success = ls.set_channel_off(9)
+                time.sleep(0.5)
+                if success:
+                    break
+
+            if success:
+                message = f"✅ Channel 9 is now {'On' if bool(channel_status) else 'Off'}"
+            else:
+                message = f"❌ Failed to set Channel 9 {'On' if bool(channel_status) else 'Off'}"
+
+            print(message)
+            return message
+
+        except Exception as e:
+            message = f"❌ Error setting Channel 9 status: {e}"
+            print(message)
+            return message
+
+    elif command.startswith("set_channel_10"):
+        try:
+            parts = command.split(":")
+            channel_status = int(parts[1])
+
+            with heater_mutex:
+                current_status = int(ls.get_channel_status(channel=10))
+
+            time.sleep(0.5)
+            if current_status == channel_status:
+                message = f"❌ Channel 10 is already {'On' if bool(current_status) else 'Off'}"
+                print(message)
+                return message
+
+            attempts = 5
+            success = False
+            for _ in range(attempts):
+                if bool(channel_status):
+                    with heater_mutex:
+                        success = ls.set_channel_on(10)
+                else:
+                    with heater_mutex:
+                        success = ls.set_channel_off(10)
+                time.sleep(0.5)
+                if success:
+                    break
+
+            if success:
+                message = f"✅ Channel 10 is now {'On' if bool(channel_status) else 'Off'}"
+            else:
+                message = f"❌ Failed to set Channel 10 {'On' if bool(channel_status) else 'Off'}"
+
+            print(message)
+            return message
+
+        except Exception as e:
+            message = f"❌ Error setting Channel 10 status: {e}"
+            print(message)
+            return message
+    
+    elif command.startswith("set_channel_11"):
+        try:
+            parts = command.split(":")
+            channel_status = int(parts[1])
+
+            with heater_mutex:
+                current_status = int(ls.get_channel_status(channel=11))
+
+            time.sleep(0.5)
+            if current_status == channel_status:
+                message = f"❌ Channel 11 is already {'On' if bool(current_status) else 'Off'}"
+                print(message)
+                return message
+
+            attempts = 5
+            success = False
+            for _ in range(attempts):
+                if bool(channel_status):
+                    with heater_mutex:
+                        success = ls.set_channel_on(11)
+                else:
+                    with heater_mutex:
+                        success = ls.set_channel_off(11)
+                time.sleep(0.5)
+                if success:
+                    break
+
+            if success:
+                message = f"✅ Channel 11 is now {'On' if bool(channel_status) else 'Off'}"
+            else:
+                message = f"❌ Failed to set Channel 11 {'On' if bool(channel_status) else 'Off'}"
+
+            print(message)
+            return message
+
+        except Exception as e:
+            message = f"❌ Error setting Channel 11 status: {e}"
+            print(message)
+            return message
+
+    elif command.startswith("set_channel_12"):
+        try:
+            parts = command.split(":")
+            channel_status = int(parts[1])
+
+            with heater_mutex:
+                current_status = int(ls.get_channel_status(channel=12))
+
+            time.sleep(0.5)
+            if current_status == channel_status:
+                message = f"❌ Channel 12 is already {'On' if bool(current_status) else 'Off'}"
+                print(message)
+                return message
+
+            attempts = 5
+            success = False
+            for _ in range(attempts):
+                if bool(channel_status):
+                    with heater_mutex:
+                        success = ls.set_channel_on(12)
+                else:
+                    with heater_mutex:
+                        success = ls.set_channel_off(12)
+                time.sleep(0.5)
+                if success:
+                    break
+
+            if success:
+                message = f"✅ Channel 12 is now {'On' if bool(channel_status) else 'Off'}"
+            else:
+                message = f"❌ Failed to set Channel 12 {'On' if bool(channel_status) else 'Off'}"
+
+            print(message)
+            return message
+
+        except Exception as e:
+            message = f"❌ Error setting Channel 12 status: {e}"
+            print(message)
+            return message
+
+    elif command.startswith("set_channel_13"):
+        try:
+            parts = command.split(":")
+            channel_status = int(parts[1])
+
+            with heater_mutex:
+                current_status = int(ls.get_channel_status(channel=13))
+
+            time.sleep(0.5)
+            if current_status == channel_status:
+                message = f"❌ Channel 13 is already {'On' if bool(current_status) else 'Off'}"
+                print(message)
+                return message
+
+            attempts = 5
+            success = False
+            for _ in range(attempts):
+                if bool(channel_status):
+                    with heater_mutex:
+                        success = ls.set_channel_on(13)
+                else:
+                    with heater_mutex:
+                        success = ls.set_channel_off(13)
+                time.sleep(0.5)
+                if success:
+                    break
+
+            if success:
+                message = f"✅ Channel 13 is now {'On' if bool(channel_status) else 'Off'}"
+            else:
+                message = f"❌ Failed to set Channel 13 {'On' if bool(channel_status) else 'Off'}"
+
+            print(message)
+            return message
+
+        except Exception as e:
+            message = f"❌ Error setting Channel 13 status: {e}"
+            print(message)
+            return message
+
+    elif command.startswith("set_channel_14"):
+        try:
+            parts = command.split(":")
+            channel_status = int(parts[1])
+
+            with heater_mutex:
+                current_status = int(ls.get_channel_status(channel=14))
+
+            time.sleep(0.5)
+            if current_status == channel_status:
+                message = f"❌ Channel 14 is already {'On' if bool(current_status) else 'Off'}"
+                print(message)
+                return message
+
+            attempts = 5
+            success = False
+            for _ in range(attempts):
+                if bool(channel_status):
+                    with heater_mutex:
+                        success = ls.set_channel_on(14)
+                else:
+                    with heater_mutex:
+                        success = ls.set_channel_off(14)
+                time.sleep(0.5)
+                if success:
+                    break
+
+            if success:
+                message = f"✅ Channel 14 is now {'On' if bool(channel_status) else 'Off'}"
+            else:
+                message = f"❌ Failed to set Channel 14 {'On' if bool(channel_status) else 'Off'}"
+
+            print(message)
+            return message
+
+        except Exception as e:
+            message = f"❌ Error setting Channel 14 status: {e}"
+            print(message)
+            return message
+
+    elif command.startswith("set_channel_15"):
+        try:
+            parts = command.split(":")
+            channel_status = int(parts[1])
+
+            with heater_mutex:
+                current_status = int(ls.get_channel_status(channel=15))
+
+            time.sleep(0.5)
+            if current_status == channel_status:
+                message = f"❌ Channel 15 is already {'On' if bool(current_status) else 'Off'}"
+                print(message)
+                return message
+
+            attempts = 5
+            success = False
+            for _ in range(attempts):
+                if bool(channel_status):
+                    with heater_mutex:
+                        success = ls.set_channel_on(15)
+                else:
+                    with heater_mutex:
+                        success = ls.set_channel_off(15)
+                time.sleep(0.5)
+                if success:
+                    break
+
+            if success:
+                message = f"✅ Channel 15 is now {'On' if bool(channel_status) else 'Off'}"
+            else:
+                message = f"❌ Failed to set Channel 15 {'On' if bool(channel_status) else 'Off'}"
+
+            print(message)
+            return message
+
+        except Exception as e:
+            message = f"❌ Error setting Channel 15 status: {e}"
+            print(message)
+            return message
+
     elif command == "reset_defaults_mxc":
         try:
             ok_timing = apply_default_channel_timing(6)
@@ -1918,13 +2201,39 @@ def handle_command(command):
             message = f"❌ Error setting STILL curve: {e}"
             print(message)
             return message  
-        
-    else:
-        print("Unknown command")
+    
+    elif command.startswith("select_measure_channel:"):
+        try:
+            parts = command.split(":")
+            print('parts', parts)
+            if len(parts) != 2:
+                return "❌ Syntax: select_measure_channel:<9-15>"
 
+            target = int(parts[1])
+            
+            print('target', target)
+            if target not in SAMPLE_CHANNELS:
+                return "❌ Target must be one of 9..15"
 
+            # Shotdown all channel excepts the selected one
+            with heater_mutex:
+                for ch in SAMPLE_CHANNELS:
+                    time.sleep(0.5)
+                    if ch == target:
+                        ls.set_channel_on(ch)
+                    else:
+                        ls.set_channel_off(ch)
+                    
+
+            return f"✅ Measurement channel selected: CH{target} (others OFF)"
+
+        except Exception as e:
+            return f"❌ Error selecting measurement channel: {e}"
 
     
+    else:
+        print("Unknown command")
+ 
             
 
 def start_server():
@@ -2028,8 +2337,8 @@ def lakeshore_temperature_sensor():
         # Which channels are enabled?
         try:
             with heater_mutex: 
-                channel_enabled_MXC = int(ls.get_channel_status(6))  # MXC is channel 6
-                channel_enabled_50K = int(ls.get_channel_status(1))
+                channel_enabled_MXC   = int(ls.get_channel_status(6))  # MXC is channel 6
+                channel_enabled_50K   = int(ls.get_channel_status(1))
                 channel_enabled_STILL = int(ls.get_channel_status(5))
 
         except Exception as e:
@@ -2046,8 +2355,8 @@ def lakeshore_temperature_sensor():
         try:
             with heater_mutex: LSPID = ls.get_control_parameters()
             proportionalMXC = LSPID['P']
-            integralMXC = LSPID['I']
-            derivativeMXC = LSPID['D']
+            integralMXC     = LSPID['I']
+            derivativeMXC   = LSPID['D']
 
             time.sleep(0.1) # Small delay to ensure communictation channel is ready
             
@@ -2121,13 +2430,15 @@ def lakeshore_temperature_sensor():
         
         extra_resistances = {}
 
-        for ch in [9, 10, 12, 13, 14]:
-            try:
-                with heater_mutex:
-
-                    extra_resistances[f"CH{ch}"] = ls.get_resistance(ch)
-            except Exception:
-                extra_resistances[f"CH{ch}"] = None
+        for ch in SAMPLE_CHANNELS:
+            if ls.get_channel_status(ch):
+                try:
+                    with heater_mutex:
+                        extra_resistances[f"CH{ch}"] = ls.get_resistance(ch)
+                except Exception:
+                    extra_resistances[f"CH{ch}"] = None
+            else:
+                extra_resistances[f"CH{ch}"] = "OFF"
 
         if RELATION_ACTIVE and RELATION_RUN_ID is not None and RELATION_CHANNEL is not None:
             try:
@@ -2141,38 +2452,39 @@ def lakeshore_temperature_sensor():
                 print(f"⚠ Relation sampling error: {e}")
                 
         controlParams = {
-            'MXCSP': tempSetPointMXC,
-            'P': proportionalMXC,
-            'I': integralMXC,
-            'D': derivativeMXC,
-            'HR': heaterRangeMXC,
-            'heaterOutputMXC': heaterOutputMXC,
+            'MXCSP'           : tempSetPointMXC,
+            'P'               : proportionalMXC,
+            'I'               : integralMXC,
+            'D'               : derivativeMXC,
+            'HR'              : heaterRangeMXC,
+            'heaterOutputMXC' : heaterOutputMXC,
         }
 
         sensorParams = {
-            'sensor_mode'      : modeMXC,
-            'sensor_range'     : excitationMXC,
-            'sensor_autorange' : autorangeMXC,
+            'sensor_mode'       : modeMXC,
+            'sensor_range'      : excitationMXC,
+            'sensor_autorange'  : autorangeMXC,
             'sensor_mode_50K'   : mode50K,
             'sensor_range_50K'  : excitation50K,
             'sensor_mode_4K'    : mode4K,
             'sensor_range_4K'   : excitation4K,
             'sensor_mode_STILL' : modeSTILL,
             'sensor_range_STILL': excitationSTILL,
-            'dwell_times'      : dwell_times,
-            'pause_times'      : pause_times,
-            'autoscan'         : autoscan,
-            'enabledMXC'       : channel_enabled_MXC,
-            'curve_MXC'        : current_curves[6],
-            'curve_50K'        : current_curves[1],
-            'curve_4K'         : current_curves[2],
-            'curve_STILL'      : current_curves[5]
+            'dwell_times'       : dwell_times,
+            'pause_times'       : pause_times,
+            'autoscan'          : autoscan,
+            'enabledMXC'        : channel_enabled_MXC,
+            'curve_MXC'         : current_curves[6],
+            'curve_50K'         : current_curves[1],
+            'curve_4K'          : current_curves[2],
+            'curve_STILL'       : current_curves[5]
         }
 
         sensorValues = {
-            'temperatures' : temperatures,
-            'resistances'  : resistances,
-            'powers'       : powers,
+            'temperatures'      : temperatures,
+            'resistances'       : resistances,
+            'powers'            : powers,
+            'extra_resistances' : extra_resistances,
         }
         
         global last_sensorValues, last_controlParams, last_sensorParams
@@ -2181,7 +2493,7 @@ def lakeshore_temperature_sensor():
         last_sensorParams = sensorParams
 
         try:
-            broadcast_temperature(sensorValues, controlParams, sensorParams, extra_resistances)
+            broadcast_temperature(sensorValues, controlParams, sensorParams)
         except Exception as e:
             print(f"Error broadcasting temperature data: {e}")
 
@@ -2190,11 +2502,12 @@ def lakeshore_temperature_sensor():
         time.sleep(1)
 
 
-def broadcast_temperature(sensorValues, controlParams, sensorParams, extra_resistances):
+def broadcast_temperature(sensorValues, controlParams, sensorParams):
 
-    temperatures = sensorValues['temperatures']
-    resistances  = sensorValues['resistances']
-    powers       = sensorValues['powers']
+    temperatures      = sensorValues['temperatures']
+    resistances       = sensorValues['resistances']
+    powers            = sensorValues['powers']
+    extra_resistances = sensorValues['extra_resistances']
     
     dwell_times = sensorParams['dwell_times']
     pause_times = sensorParams['pause_times']
@@ -2229,7 +2542,12 @@ def broadcast_temperature(sensorValues, controlParams, sensorParams, extra_resis
             formated_temperature = f"{channel_temperature if channel_temperature > 1.0 else channel_temperature * 1000}"
             formated_units = "K" if channel_temperature > 1.0 else "mK"
             print(f"Channel {DEFAULT_CHANNELS_ID[index]} Temperature: {formated_temperature} {formated_units}")
-    
+
+    for index, channel in enumerate(list(extra_resistances.keys())):
+        if extra_resistances[channel] != "OFF":
+            formated_resistance = extra_resistances[channel]
+            print(f"Channel {channel} Resistance: {formated_resistance} Ohms")
+
     if CURRENT_RANGE_LIST[controlParams['HR']][0] != 0:
         print(f"MXC Temperature Setpoint: {controlParams['MXCSP']} K")
         print(f"Heater Range MXC: {controlParams['HR']} ({CURRENT_RANGE_LIST[controlParams['HR']][0]} {CURRENT_RANGE_LIST[controlParams['HR']][1]})")
@@ -2297,9 +2615,18 @@ def broadcast_temperature(sensorValues, controlParams, sensorParams, extra_resis
                     f"RUNID: {CURRENT_RUN_ID}," +
                     f"RCH9: {extra_resistances.get('CH9')}," +
                     f"RCH10: {extra_resistances.get('CH10')}," +
+                    f"RCH11: {extra_resistances.get('CH11')}," +
                     f"RCH12: {extra_resistances.get('CH12')}," +
                     f"RCH13: {extra_resistances.get('CH13')}," +
-                    f"RCH14: {extra_resistances.get('CH14')}\n"
+                    f"RCH14: {extra_resistances.get('CH14')}," +
+                    f"RCH15: {extra_resistances.get('CH15')}," +
+                    f"enabledCH9: {int(ls.get_channel_status(9))}," +
+                    f"enabledCH10: {int(ls.get_channel_status(10))}," +
+                    f"enabledCH11: {int(ls.get_channel_status(11))}," +
+                    f"enabledCH12: {int(ls.get_channel_status(12))}," +
+                    f"enabledCH13: {int(ls.get_channel_status(13))}," +
+                    f"enabledCH14: {int(ls.get_channel_status(14))}," +
+                    f"enabledCH15: {int(ls.get_channel_status(15))}\n"
                     ).encode('utf-8')
         
     except Exception as e:

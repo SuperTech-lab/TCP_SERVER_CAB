@@ -81,3 +81,5 @@ DEFAULT_SENSOR_RESISTANCE_SETTINGS = {
 }
 
 DB_INSERT_INTERVAL = datetime.timedelta(seconds=1)
+
+SAMPLE_CHANNELS = [9, 10, 11, 12, 13, 14, 15]

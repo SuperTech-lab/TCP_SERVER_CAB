@@ -70,9 +70,18 @@ current_heater_output_MXC = None
 current_RUNID = None
 current_RCH9  = None
 current_RCH10 = None
+current_RCH11 = None
 current_RCH12 = None
 current_RCH13 = None
 current_RCH14 = None
+current_RCH15 = None
+current_enabled_CH9  = None
+current_enabled_CH10 = None
+current_enabled_CH11 = None
+current_enabled_CH12 = None
+current_enabled_CH13 = None
+current_enabled_CH14 = None
+current_enabled_CH15 = None
 
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
 
@@ -92,62 +101,71 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.end_headers()
-            response = json.dumps({"50K": current_50K,
-                                   "4K": current_4K,
-                                   "STILL": current_STILL,
-                                   "MXC": current_MXC,
-                                   "MXCSP": current_mxc_temperature_setpoint,
-                                   "MXCP": current_mxc_proportional_gain,
-                                   "MXCI": current_mxc_integral_gain,
-                                   "MXCD": current_mxc_derivative_gain,
-                                   "MXCHR": current_mxc_heater_range,
-                                   "dwellMXC": current_dwell_MXC,
-                                   "pauseMXC": current_pause_MXC,
-                                   "modeMXC": current_excitation_mode_MXC,
-                                   "rangeMXC": current_excitation_range_MXC,
-                                   "autorangeMXC": current_excitation_autorange_MXC,
-                                   "dwell50K": current_dwell_50K,
-                                   "dwell4K": current_dwell_4K,
-                                   "dwellSTILL": current_dwell_STILL,
-                                   "pause50K": current_pause_50K,
-                                   "pause4K": current_pause_4K,
-                                   "pauseSTILL": current_pause_STILL,
-                                   "setpoint": current_temperature_setpoint,
-                                   "heater_power": current_heater_power,
-                                   "heater_range": current_heater_range,
-                                   "temperature_limit": current_temperature_limit,
-                                   "timeout": current_timeout,
-                                   "proportional_gain": current_proportional_gain,
-                                   "integral_gain": current_integral_gain,
-                                   "derivative_gain": current_derivative_gain,
-                                   "R50K": current_R50K,
-                                   "R4K": current_R4K,
-                                   "RSTILL": current_RSTILL,
-                                   "RMXC": current_RMXC,
-                                   "PMXC": current_PMXC,
-                                   "enabledMXC": current_enabled_MXC,
-                                   "enabled50K": current_enabled_50K,
-                                   "enabled4K": current_enabled_4K,
-                                   "enabledSTILL": current_enabled_STILL,
-                                   "autoscan": current_autoscan,
-                                   "mode50K": current_excitation_mode_50K,
-                                   "range50K": current_excitation_range_50K,
-                                   "mode4K": current_excitation_mode_4K,
-                                   "range4K": current_excitation_range_4K,
-                                   "modeSTILL": current_excitation_mode_STILL,
-                                   "rangeSTILL": current_excitation_range_STILL,
-                                   "curveMXC": current_curve_MXC,
-                                   "curve50K": current_curve_50K,
-                                   "curve4K": current_curve_4K,
-                                   "curveSTILL": current_curve_STILL,      
-                                   "heaterOutputMXC": current_heater_output_MXC,    
-                                   "runID": current_RUNID,      
-                                   "RCH9":  current_RCH9,
-                                    "RCH10": current_RCH10,
-                                    "RCH12": current_RCH12,
-                                    "RCH13": current_RCH13,
-                                    "RCH14": current_RCH14,
-                                   })
+            response = json.dumps({"50K"               : current_50K,
+                                   "4K"                : current_4K,
+                                   "STILL"             : current_STILL,
+                                   "MXC"               : current_MXC,
+                                   "MXCSP"             : current_mxc_temperature_setpoint,
+                                   "MXCP"              : current_mxc_proportional_gain,
+                                   "MXCI"              : current_mxc_integral_gain,
+                                   "MXCD"              : current_mxc_derivative_gain,
+                                   "MXCHR"             : current_mxc_heater_range,
+                                   "dwellMXC"          : current_dwell_MXC,
+                                   "pauseMXC"          : current_pause_MXC,
+                                   "modeMXC"           : current_excitation_mode_MXC,
+                                   "rangeMXC"          : current_excitation_range_MXC,
+                                   "autorangeMXC"      : current_excitation_autorange_MXC,
+                                   "dwell50K"          : current_dwell_50K,
+                                   "dwell4K"           : current_dwell_4K,
+                                   "dwellSTILL"        : current_dwell_STILL,
+                                   "pause50K"          : current_pause_50K,
+                                   "pause4K"           : current_pause_4K,
+                                   "pauseSTILL"        : current_pause_STILL,
+                                   "setpoint"          : current_temperature_setpoint,
+                                   "heater_power"      : current_heater_power,
+                                   "heater_range"      : current_heater_range,
+                                   "temperature_limit" : current_temperature_limit,
+                                   "timeout"           : current_timeout,
+                                   "proportional_gain" : current_proportional_gain,
+                                   "integral_gain"     : current_integral_gain,
+                                   "derivative_gain"   : current_derivative_gain,
+                                   "R50K"              : current_R50K,
+                                   "R4K"               : current_R4K,
+                                   "RSTILL"            : current_RSTILL,
+                                   "RMXC"              : current_RMXC,
+                                   "PMXC"              : current_PMXC,
+                                   "enabledMXC"        : current_enabled_MXC,
+                                   "enabled50K"        : current_enabled_50K,
+                                   "enabled4K"         : current_enabled_4K,
+                                   "enabledSTILL"      : current_enabled_STILL,
+                                   "autoscan"          : current_autoscan,
+                                   "mode50K"           : current_excitation_mode_50K,
+                                   "range50K"          : current_excitation_range_50K,
+                                   "mode4K"            : current_excitation_mode_4K,
+                                   "range4K"           : current_excitation_range_4K,
+                                   "modeSTILL"         : current_excitation_mode_STILL,
+                                   "rangeSTILL"        : current_excitation_range_STILL,
+                                   "curveMXC"          : current_curve_MXC,
+                                   "curve50K"          : current_curve_50K,
+                                   "curve4K"           : current_curve_4K,
+                                   "curveSTILL"        : current_curve_STILL,      
+                                   "heaterOutputMXC"   : current_heater_output_MXC,    
+                                   "runID"             : current_RUNID,      
+                                   "RCH9"              : current_RCH9,
+                                   "RCH10"             : current_RCH10,
+                                   "RCH11"             : current_RCH11,
+                                   "RCH12"             : current_RCH12,
+                                   "RCH13"             : current_RCH13,
+                                   "RCH14"             : current_RCH14,
+                                   "RCH15"             : current_RCH15,
+                                   "enabledCH9"        : current_enabled_CH9,
+                                   "enabledCH10"       : current_enabled_CH10,
+                                   "enabledCH11"       : current_enabled_CH11,
+                                   "enabledCH12"       : current_enabled_CH12,
+                                   "enabledCH13"       : current_enabled_CH13,
+                                   "enabledCH14"       : current_enabled_CH14,
+                                   "enabledCH15"       : current_enabled_CH15,
+                                })
                                    
 
             self.wfile.write(response.encode('utf-8'))
@@ -682,6 +700,13 @@ def receive_sensor_data(tcp_socket):
     global current_enabled_50K
     global current_enabled_4K
     global current_enabled_STILL
+    global current_enabled_CH9
+    global current_enabled_CH10
+    global current_enabled_CH11
+    global current_enabled_CH12
+    global current_enabled_CH13
+    global current_enabled_CH14
+    global current_enabled_CH15
     
     global current_mxc_temperature_setpoint
     global current_mxc_proportional_gain
@@ -720,7 +745,9 @@ def receive_sensor_data(tcp_socket):
     global current_curve_STILL
     global current_heater_output_MXC
     global current_RUNID
-    global current_RCH9, current_RCH10, current_RCH12, current_RCH13, current_RCH14
+    global current_RCH9, current_RCH10, current_RCH11, current_RCH12, current_RCH13, current_RCH14, current_RCH15
+
+
 
 
     buf = b""
@@ -880,19 +907,38 @@ def receive_sensor_data(tcp_socket):
                 try:
                     def _parse_rch(i):
                         v = params[i].split(':')[-1].strip()
-                        if not v or v.upper() == "NONE":
+                        if not v:
                             return None
-                        return float(v)
+                        vu = v.upper()
+                        if vu in ("NONE", "OFF", "NAN"):
+                            return None
+                        try:
+                            return float(v)
+                        except:
+                            return None
 
                     current_RCH9  = _parse_rch(53)
                     current_RCH10 = _parse_rch(54)
-                    current_RCH12 = _parse_rch(55)
-                    current_RCH13 = _parse_rch(56)
-                    current_RCH14 = _parse_rch(57)
+                    current_RCH11 = _parse_rch(55)
+                    current_RCH12 = _parse_rch(56)
+                    current_RCH13 = _parse_rch(57)
+                    current_RCH14 = _parse_rch(58)
+                    current_RCH15 = _parse_rch(59)
 
                 except Exception as e:
-                    print(f"Error parsing extra resistances RCH9/10/12/13/14: {e}")
-                    current_RCH9 = current_RCH10 = current_RCH12 = current_RCH13 = current_RCH14 = None
+                    print(f"Error parsing extra resistances RCH9/10/11/12/13/14/15: {e}")
+                    current_RCH9 = current_RCH10 = current_RCH11 = current_RCH12 = current_RCH13 = current_RCH14 = current_RCH15 = None
+
+                try:
+                    current_enabled_CH9 = int(params[60].split(':')[-1])
+                    current_enabled_CH10 = int(params[61].split(':')[-1])
+                    current_enabled_CH11 = int(params[62].split(':')[-1])
+                    current_enabled_CH12 = int(params[63].split(':')[-1])
+                    current_enabled_CH13 = int(params[64].split(':')[-1])
+                    current_enabled_CH14 = int(params[65].split(':')[-1])
+                    current_enabled_CH15 = int(params[66].split(':')[-1])
+                except Exception as e:
+                    print(f"Error parsing enabled EXTRA-CHANNELS variables: {e}")
 
         except socket.timeout:
             continue
