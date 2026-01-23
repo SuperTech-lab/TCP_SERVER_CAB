@@ -5,8 +5,8 @@ import random
 _lakeshore_mutex = threading.Lock()
 
 
-DEFAULT_CHANNELS = [1, 2, 5, 6, 9, 10, 12, 13, 14]
-DEFAULT_CHANNELS_ID = ["50K", "4K", "STILL", "MXC", "CH9", "CH10", "CH12", "CH13", "CH14"]
+DEFAULT_CHANNELS = [1, 2, 5, 6, 9, 10, 11, 12, 13, 14, 15]
+DEFAULT_CHANNELS_ID = ["50K", "4K", "STILL", "MXC", "CH9", "CH10", "CH11", "CH12", "CH13", "CH14", "CH15"]
 ALL_CHANNELS = range(1, 17)
 
 # [dwell time, pause time, curve number, temperature coefficient]
@@ -189,6 +189,9 @@ class LakeShore370:
         # Canales ON por defecto
         self._channel_status = {ch: 1 for ch in DEFAULT_CHANNELS}
 
+        self._channel_status[14] = 0
+        self._channel_status[15] = 0
+
         # PID del heater (canal controlado, por defecto MXC=6)
         self._pid = DEFAULT_PID.copy()
         self._control_channel = 6
@@ -269,9 +272,11 @@ class LakeShore370:
             DUMMY_RELATION = {
                 9:  (90.0,  500.0),
                 10: (100.0, 800.0),
+                11: (110.0, 1000.0),
                 12: (120.0, 1200.0),
                 13: (130.0, 1600.0),
                 14: (140.0, 2000.0),
+                15: (150.0, 2500.0),
             }
 
             # Canales dummy correlacionados con MXC

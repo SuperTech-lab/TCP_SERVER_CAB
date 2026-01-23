@@ -787,6 +787,23 @@
         background: #3b82f6;
         border-radius: 2px;
       }
+
+      .channel-dropdown-menu .rch-box {
+        min-width: 70px;
+        text-align: right;
+        padding: 2px 6px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        background: #f8f8f8;
+        font-family:
+          ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+          "Liberation Mono", "Courier New", monospace;
+        font-size: 12px;
+      }
+
+      .channel-dropdown-menu .control-row {
+        gap: 10px;
+      }
     </style>
   </head>
 
@@ -801,7 +818,7 @@
           Black Body Control
         </button>
         <button class="tab-button" data-target="relation-tab">
-          MXC comparison
+          Resistance vs. TMXC
         </button>
       </div>
     </div>
@@ -1803,6 +1820,9 @@
             <div class="channel-dropdown-menu">
               <div class="control-row">
                 <label>Ch 9</label>
+
+                <span class="rch-box" id="currentRCH9">--</span>
+
                 <label class="switch">
                   <input
                     type="checkbox"
@@ -1815,6 +1835,7 @@
 
               <div class="control-row">
                 <label>Ch 10</label>
+                <span class="rch-box" id="currentRCH10">--</span>
                 <label class="switch">
                   <input
                     type="checkbox"
@@ -1827,6 +1848,7 @@
 
               <div class="control-row">
                 <label>Ch 11</label>
+                <span class="rch-box" id="currentRCH11">--</span>
                 <label class="switch">
                   <input
                     type="checkbox"
@@ -1836,9 +1858,10 @@
                   <span class="slider round"></span>
                 </label>
               </div>
-              
+
               <div class="control-row">
                 <label>Ch 12</label>
+                <span class="rch-box" id="currentRCH12">--</span>
                 <label class="switch">
                   <input
                     type="checkbox"
@@ -1851,6 +1874,7 @@
 
               <div class="control-row">
                 <label>Ch 13</label>
+                <span class="rch-box" id="currentRCH13">--</span>
                 <label class="switch">
                   <input
                     type="checkbox"
@@ -1863,6 +1887,7 @@
 
               <div class="control-row">
                 <label>Ch 14</label>
+                <span class="rch-box" id="currentRCH14">--</span>
                 <label class="switch">
                   <input
                     type="checkbox"
@@ -1875,6 +1900,7 @@
 
               <div class="control-row">
                 <label>Ch 15</label>
+                <span class="rch-box" id="currentRCH15">--</span>
                 <label class="switch">
                   <input
                     type="checkbox"
@@ -1884,10 +1910,9 @@
                   <span class="slider round"></span>
                 </label>
               </div>
-
             </div>
           </details>
-          
+
           <div class="section-title">Relation plot</div>
           <div class="section-content">
             <div class="control-group">
@@ -2004,7 +2029,7 @@
         CH12: [],
         CH13: [],
         CH14: [],
-        CH15: []
+        CH15: [],
       };
 
       const relationFilesSelect = document.getElementById(
@@ -2021,19 +2046,15 @@
         try {
           const raw = await sendCommandToServer("get_relation_status");
 
-          // 1) Normaliza: quita el prefijo "Command received - " si está
-          // (pero no dependemos solo de esto; también buscamos el marker por seguridad)
           let response = (raw ?? "").toString().trim();
           const prefix = "Command received - ";
           if (response.startsWith(prefix)) {
             response = response.slice(prefix.length).trim();
           }
 
-          // 2) Encuentra RELATION_STATUS dentro del string (robusto ante prefijos/logs)
           const marker = "RELATION_STATUS:";
           const idx = response.indexOf(marker);
           if (idx === -1) {
-            // No hay marker => no toques nada raro, solo deja UI en idle y loggea
             relationRunning = false;
             document.getElementById("relationStartButton").disabled = false;
             document.getElementById("relationStopButton").disabled = true;
@@ -2117,7 +2138,9 @@
         const ch = document.getElementById("relationChannelSelect").value;
         const input = document.getElementById("relationLabelInput");
 
-        if (["CH9", "CH10", "CH11", "CH12", "CH13", "CH14", "CH15"].includes(ch)) {
+        if (
+          ["CH9", "CH10", "CH11", "CH12", "CH13", "CH14", "CH15"].includes(ch)
+        ) {
           input.style.display = "inline-block";
         } else {
           input.style.display = "none";
@@ -2136,16 +2159,29 @@
         .addEventListener("click", async () => {
           if (relationRunning) return;
 
-          const ch = document.getElementById("relationChannelSelect").value;
-          const chNum = ch.replace("CH", "");
+          const ch = document.getElementById("relationChannelSelect").value; // "CH9".."CH15"
+          const chNum = ch.replace("CH", ""); // "9".."15"
           const label =
             document.getElementById("relationLabelInput").value || "NA";
 
-          const command = `start_relation:${chNum}:${encodeURIComponent(label)}`;
-          addLogEntry(`Sending command: ${command}`, "sent");
+          // 1) AHORA el select_measure_channel se hace al darle al play (▶)
+          const selectCmd = `select_measure_channel:${chNum}`;
+          addLogEntry(`Sending: ${selectCmd}`, "sent");
 
           try {
-            const response = await sendCommandToServer(command);
+            const respSel = await sendCommandToServer(selectCmd);
+            addLogEntry(`Server response: ${respSel}`, "received");
+
+            // deja que el backend aplique ON/OFF y sincroniza toggles 9..15 con el estado real
+            clearPendingExtraChannelsForSampleChannels();
+            await new Promise((r) => setTimeout(r, 300));
+            await fetchSensorData(true);
+
+            // 2) Luego ya arrancas la relation
+            const startCmd = `start_relation:${chNum}:${encodeURIComponent(label)}`;
+            addLogEntry(`Sending command: ${startCmd}`, "sent");
+
+            const response = await sendCommandToServer(startCmd);
             addLogEntry(`Server response: ${response}`, "received");
 
             relationRunning = true;
@@ -2155,7 +2191,7 @@
             document.getElementById("relationLabelInput").disabled = true;
           } catch (error) {
             addLogEntry(
-              `Error sending start_relation: ${error.message}`,
+              `Error starting relation: ${error.message}`,
               "received",
             );
           }
@@ -2566,9 +2602,14 @@
       let pendingSTILLToggle = false;
       let pendingAutoscanToggle = false;
       let pendingExtraChannels = {
-        9: false, 10: false, 11: false, 12: false, 13: false, 14: false, 15: false
+        9: false,
+        10: false,
+        11: false,
+        12: false,
+        13: false,
+        14: false,
+        15: false,
       };
-      
 
       // Variables to store temperature data and timestamps
       let temperatureData = [];
@@ -2752,6 +2793,14 @@
               }
             });
             title.dataset.listenerAttached = true;
+          }
+        });
+      }
+
+      function clearPendingExtraChannelsForSampleChannels() {
+        [9, 10, 11, 12, 13, 14, 15].forEach((ch) => {
+          if (pendingExtraChannels && pendingExtraChannels[ch] !== undefined) {
+            pendingExtraChannels[ch] = false;
           }
         });
       }
@@ -3876,6 +3925,38 @@
         }
       }
 
+      function normalizeEnabled(v) {
+        if (v === undefined || v === null) return false;
+
+        if (typeof v === "boolean") return v;
+
+        if (typeof v === "number") {
+          return v !== 0 && !Number.isNaN(v);
+        }
+
+        if (typeof v === "string") {
+          const t = v.trim().toLowerCase();
+          if (t === "") return false;
+
+          if (["1", "on", "true", "yes", "enabled"].includes(t)) return true;
+          if (
+            ["0", "off", "false", "no", "disabled", "none", "nan"].includes(t)
+          )
+            return false;
+
+          const n = Number(t);
+          if (!Number.isNaN(n)) return n !== 0;
+
+          return false;
+        }
+
+        try {
+          return !!v;
+        } catch {
+          return false;
+        }
+      }
+
       // Function that handles fetching sensor data from the server
       // and updates the UI accordingly
       async function fetchSensorData(forceUpdateControls = false) {
@@ -4064,13 +4145,26 @@
             currentParameters.RCH9 = parseFloat(data.RCH9);
           if (data.RCH10 !== undefined)
             currentParameters.RCH10 = parseFloat(data.RCH10);
+          if (data.RCH11 !== undefined)
+            currentParameters.RCH11 = parseFloat(data.RCH11);
           if (data.RCH12 !== undefined)
             currentParameters.RCH12 = parseFloat(data.RCH12);
           if (data.RCH13 !== undefined)
             currentParameters.RCH13 = parseFloat(data.RCH13);
           if (data.RCH14 !== undefined)
             currentParameters.RCH14 = parseFloat(data.RCH14);
+          if (data.RCH15 !== undefined)
+            currentParameters.RCH15 = parseFloat(data.RCH15);
 
+          for (let i = 9; i <= 15; i++) {
+            if (data[`enabledCH${i}`] !== undefined) {
+              currentParameters[`enabledCH${i}`] = normalizeEnabled(
+                data[`enabledCH${i}`],
+              )
+                ? 1
+                : 0;
+            }
+          }
           // Update UI controls if parameters changed every minute
           // (or the time specified in parameterBoxUpdateInterval variable)
           const now = Date.now();
@@ -4257,26 +4351,46 @@
           }
           updateStageVisibility();
 
-          SAMPLE_CHANNELS.forEach(chNum => {
-              const checkbox = document.getElementById(`toggleExtraChannel${chNum}`);
-              const backendEnabled = !!currentParameters[`enabledCH${chNum}`]; // Obtenido del JSON del servidor
+          SAMPLE_CHANNELS.forEach((chNum) => {
+            const checkbox = document.getElementById(
+              `toggleExtraChannel${chNum}`,
+            );
+            const backendEnabled = normalizeEnabled(
+              currentParameters[`enabledCH${chNum}`],
+            );
 
-              if (checkbox) {
-                  if (pendingExtraChannels[chNum]) {
-                      if (checkbox.checked === backendEnabled) {
-                          pendingExtraChannels[chNum] = false;
-                          console.log(`✅ Extra Channel ${chNum} synced.`);
-                      } else {
-                          console.log(`⏳ Waiting for Channel ${chNum} backend...`);
-                      }
-                  } else {
-                      // Sincronización normal si no hay operación pendiente
-                      if (checkbox.checked !== backendEnabled) {
-                          checkbox.checked = backendEnabled;
-                          console.log(`🔁 Sync Extra CH${chNum} -> ${backendEnabled ? "ON" : "OFF"}`);
-                      }
-                  }
+            if (checkbox) {
+              if (pendingExtraChannels[chNum]) {
+                if (checkbox.checked === backendEnabled) {
+                  pendingExtraChannels[chNum] = false;
+                  console.log(`✅ Extra Channel ${chNum} synced.`);
+                } else {
+                  console.log(`⏳ Waiting for Channel ${chNum} backend...`);
+                }
+              } else {
+                // Sincronización normal si no hay operación pendiente
+                if (checkbox.checked !== backendEnabled) {
+                  checkbox.checked = backendEnabled;
+                  console.log(
+                    `🔁 Sync Extra CH${chNum} -> ${backendEnabled ? "ON" : "OFF"}`,
+                  );
+                }
               }
+            }
+
+            const rBox = document.getElementById(`currentRCH${chNum}`);
+            if (rBox) {
+              if (!backendEnabled) {
+                rBox.textContent = "--";
+              } else {
+                const rVal = currentParameters[`RCH${chNum}`];
+                if (rVal === undefined || rVal === null || Number.isNaN(rVal)) {
+                  rBox.textContent = "--";
+                } else {
+                  rBox.textContent = `${Number(rVal).toFixed(2)} Ω`;
+                }
+              }
+            }
           });
 
           const autoscanToggle = document.getElementById("autoscanToggle");
@@ -5364,7 +5478,7 @@
             break;
           case "STILL":
             toggleChannelSTILL();
-            break; 
+            break;
         }
 
         const match = String(channel).match(/^(?:CH)?(9|10|11|12|13|14|15)$/);
@@ -5373,34 +5487,35 @@
         console.warn("Unknown channel in globalToggleChannel:", channel);
       }
 
-
       function toggleSampleChannelGlobal(channel) {
-        const checkbox = document.getElementById(`toggleExtraChannel${channel}`);
+        const checkbox = document.getElementById(
+          `toggleExtraChannel${channel}`,
+        );
         if (!checkbox) return;
 
         const state = checkbox.checked ? 1 : 0;
         const command = `set_channel_${channel}: ${state}`;
 
         // Marcamos como pendiente para que el "fetchSensorData" no sobrescriba el toggle
-        pendingExtraChannels[channel] = true; 
+        pendingExtraChannels[channel] = true;
 
         addLogEntry(`Sending command: ${command}`, "sent");
 
         fetch("/send-command", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ command })
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ command }),
         })
-        .then(r => r.json())
-        .then(data => {
+          .then((r) => r.json())
+          .then((data) => {
             addLogEntry(`Server response: ${data.status}`, "received");
-        })
-        .catch(err => {
+          })
+          .catch((err) => {
             console.error("❌ Error:", err);
             // Si hay error, revertimos el checkbox y liberamos el pendiente
             checkbox.checked = !checkbox.checked;
             pendingExtraChannels[channel] = false;
-        });
+          });
       }
 
       function toggleStageElements(stageClass, visible) {
@@ -5528,12 +5643,16 @@
             return currentParameters.RCH9;
           case "CH10":
             return currentParameters.RCH10;
+          case "CH11":
+            return currentParameters.RCH11;
           case "CH12":
             return currentParameters.RCH12;
           case "CH13":
             return currentParameters.RCH13;
           case "CH14":
             return currentParameters.RCH14;
+          case "CH15":
+            return currentParameters.RCH15;
           default:
             return null;
         }
@@ -5652,27 +5771,15 @@
         updateRelationCurrentLabels();
       }
 
-      async function onRelationChannelChange() {
+      function onRelationChannelChange() {
         const sel = document.getElementById("relationChannelSelect");
         if (!sel) return;
 
-        const ch = sel.value;          // "CH9".."CH15"
+        currentRelationChannel = sel.value; // "CH9".."CH15"
 
-        currentRelationChannel = ch;
-
-        const chNum = ch.replace("CH", "");  // "9".."15"
-        const cmd = `select_measure_channel:${chNum}`;
-
-        try {
-          addLogEntry(`Sending: ${cmd}`, "sent");
-          const resp = await sendCommandToServer(cmd);
-          addLogEntry(`Server response: ${resp}`, "received");
-
-          await new Promise((r) => setTimeout(r, 300));
-          await fetchSensorData(true);
-        } catch (e) {
-          addLogEntry(`Error: ${e.message}`, "received");
-        }
+        updateRelationLabelVisibility();
+        redrawRelationChart();
+        updateRelationCurrentLabels?.(); // por si existe en tu archivo
       }
 
       document.addEventListener("DOMContentLoaded", async () => {

@@ -2248,10 +2248,6 @@ def start_server():
             # Start the fake temperature sensor in a separate thread
             threading.Thread(target=lakeshore_temperature_sensor, daemon=True).start()
 
-            for channel in DEFAULT_EXTRA_CHANNELS:
-                if ls.get_channel_status(channel) == 0:
-                    with heater_mutex:
-                        ls.set_channel_on(channel)
                         
             while True:
                 conn, addr = server_socket.accept()
