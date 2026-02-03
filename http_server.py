@@ -82,6 +82,7 @@ current_enabled_CH12 = None
 current_enabled_CH13 = None
 current_enabled_CH14 = None
 current_enabled_CH15 = None
+current_scanning_channel= None
 
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
 
@@ -165,6 +166,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
                                    "enabledCH13"       : current_enabled_CH13,
                                    "enabledCH14"       : current_enabled_CH14,
                                    "enabledCH15"       : current_enabled_CH15,
+                                   "scanning_channel"   : current_scanning_channel,
                                 })
                                    
 
@@ -746,6 +748,7 @@ def receive_sensor_data(tcp_socket):
     global current_heater_output_MXC
     global current_RUNID
     global current_RCH9, current_RCH10, current_RCH11, current_RCH12, current_RCH13, current_RCH14, current_RCH15
+    global current_scanning_channel
 
 
 
@@ -939,6 +942,11 @@ def receive_sensor_data(tcp_socket):
                     current_enabled_CH15 = int(params[66].split(':')[-1])
                 except Exception as e:
                     print(f"Error parsing enabled EXTRA-CHANNELS variables: {e}")
+
+                try:
+                    current_scanning_channel = int(params[67].split(':')[-1])
+                except Exception as e:
+                    print(f"Error parsing scanning_channel variable: {e}")
 
         except socket.timeout:
             continue

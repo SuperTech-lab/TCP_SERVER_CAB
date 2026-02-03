@@ -2549,7 +2549,9 @@ def broadcast_temperature(sensorValues, controlParams, sensorParams):
         print(f"Heater Range MXC: {controlParams['HR']} ({CURRENT_RANGE_LIST[controlParams['HR']][0]} {CURRENT_RANGE_LIST[controlParams['HR']][1]})")
 
     print("Autoscan is set " + ("ON" if str(sensorParams['autoscan'][1]) == '1' else "OFF"))
-    if sensorParams['autoscan'][1] == '1': print(f"Scanning channel {int(sensorParams['autoscan'][0])}")
+    if sensorParams['autoscan'][1] == '1': 
+        print(f"Scanning channel {int(sensorParams['autoscan'][0])}")
+        scanning_channel = int(sensorParams['autoscan'][0])
     
     if not int(sensorParams['sensor_mode']): print(f"Sensor Mode MXC: voltage ({SENSOR_RESISTANCE_RANGE_LIST[sensorParams['sensor_range']][0]} {SENSOR_RESISTANCE_RANGE_LIST[sensorParams['sensor_range']][1]})")
     else: print(f"Sensor Mode MXC: current ({SENSOR_RESISTANCE_RANGE_LIST[sensorParams['sensor_range']][2]} {SENSOR_RESISTANCE_RANGE_LIST[sensorParams['sensor_range']][3]})")
@@ -2622,7 +2624,8 @@ def broadcast_temperature(sensorValues, controlParams, sensorParams):
                     f"enabledCH12: {int(ls.get_channel_status(12))}," +
                     f"enabledCH13: {int(ls.get_channel_status(13))}," +
                     f"enabledCH14: {int(ls.get_channel_status(14))}," +
-                    f"enabledCH15: {int(ls.get_channel_status(15))}\n"
+                    f"enabledCH15: {int(ls.get_channel_status(15))}," +
+                    f"scanning_channel:{scanning_channel if sensorParams['autoscan'][1] == '1' else 0}\n"
                     ).encode('utf-8')
         
     except Exception as e:

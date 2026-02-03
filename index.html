@@ -805,15 +805,56 @@
         gap: 10px;
       }
 
-      .status-dot {
-        width: 12px;
-        height: 12px;
+      .status-indicator-circle {
+        width: 20px;
+        height: 20px;
         border-radius: 50%;
+        background-color: #000000;
+        border: 2px solid #333;
         display: inline-block;
-        margin-left: 10px;
-        vertical-align: middle;
-        background-color: #101112; 
-        box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
+        align-self: center;
+        transition:
+          background-color 0.3s ease,
+          box-shadow 0.3s ease;
+        flex-shrink: 0;
+      }
+
+      .status-indicator-circle.active {
+        background-color: #22c55e;
+        border-color: #16a34a;
+        box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
+      }
+
+      .channel-dropdown-menu {
+        position: absolute;
+        z-index: 101;
+        top: 100%;
+        left: 0;
+        margin-top: 4px;
+        padding: 8px 12px;
+        background-color: #fff;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+        /* CAMBIO: De 170px a 240px para que quepa todo en una línea */
+        min-width: 240px;
+      }
+
+      .channel-dropdown-menu .control-row {
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        padding: 6px 0;
+        width: 100%; /* Asegura que ocupe todo el ancho del menú */
+      }
+
+      /* Ajuste fino del círculo para que no mueva el texto */
+      .channel-dropdown-menu .status-indicator-circle {
+        width: 10px !important;
+        height: 10px !important;
+        border-width: 1px !important;
+        flex-shrink: 0;
+        margin-left: 6px; /* Separación del texto "Ch X" */
       }
     </style>
   </head>
@@ -1130,7 +1171,7 @@
             "
           >
             <!-- Fila superior: Write Sensor, reset, time range, autorange, valor actual -->
-            <
+            <div
               class="control-row"
               style="
                 margin-bottom: 15px;
@@ -1183,7 +1224,7 @@
                 <option value="60" selected>1 Minute</option>
               </select>
 
-              <span id="timeRangeMXCDot" class="status-dot" aria-hidden="true"></span>
+              <div id="statusCircleCH6" class="status-indicator-circle"></div>
 
               <select id="currentMXCValue" class="current-stage-value">
                 <option value="temperature">- mK</option>
@@ -1408,6 +1449,8 @@
                 <option value="3600">1 Hour</option>
                 <option value="21600">6 Hours</option>
               </select>
+
+              <div id="statusCircleCH5" class="status-indicator-circle"></div>
               <select id="currentSTILLValue" class="current-stage-value">
                 <option value="temperature">- mK</option>
                 <option value="resistance">- Ω</option>
@@ -1538,6 +1581,9 @@
                 <option value="3600">1 Hour</option>
                 <option value="21600">6 Hours</option>
               </select>
+
+              <div id="statusCircleCH2" class="status-indicator-circle"></div>
+
               <select id="current4KValue" class="current-stage-value">
                 <option value="temperature">- mK</option>
                 <option value="resistance">- Ω</option>
@@ -1665,6 +1711,9 @@
                 <option value="3600">1 Hour</option>
                 <option value="21600">6 Hours</option>
               </select>
+
+              <div id="statusCircleCH1" class="status-indicator-circle"></div>
+
               <select id="current50KValue" class="current-stage-value">
                 <option value="temperature">- mK</option>
                 <option value="resistance">- Ω</option>
@@ -1832,10 +1881,21 @@
 
             <div class="channel-dropdown-menu">
               <div class="control-row">
-                <label>Ch 9</label>
-
-                <span class="rch-box" id="currentRCH9">--</span>
-
+                <div style="display: flex; align-items: center; width: 75px">
+                  <label style="width: auto; margin: 0; font-size: 14px"
+                    >Ch 9</label
+                  >
+                  <div
+                    id="statusCircleCH9"
+                    class="status-indicator-circle"
+                  ></div>
+                </div>
+                <span
+                  class="rch-box"
+                  id="currentRCH9"
+                  style="margin-left: auto; margin-right: 10px"
+                  >--</span
+                >
                 <label class="switch">
                   <input
                     type="checkbox"
@@ -1847,8 +1907,21 @@
               </div>
 
               <div class="control-row">
-                <label>Ch 10</label>
-                <span class="rch-box" id="currentRCH10">--</span>
+                <div style="display: flex; align-items: center; width: 75px">
+                  <label style="width: auto; margin: 0; font-size: 14px"
+                    >Ch 10</label
+                  >
+                  <div
+                    id="statusCircleCH10"
+                    class="status-indicator-circle"
+                  ></div>
+                </div>
+                <span
+                  class="rch-box"
+                  id="currentRCH10"
+                  style="margin-left: auto; margin-right: 10px"
+                  >--</span
+                >
                 <label class="switch">
                   <input
                     type="checkbox"
@@ -1860,8 +1933,21 @@
               </div>
 
               <div class="control-row">
-                <label>Ch 11</label>
-                <span class="rch-box" id="currentRCH11">--</span>
+                <div style="display: flex; align-items: center; width: 75px">
+                  <label style="width: auto; margin: 0; font-size: 14px"
+                    >Ch 11</label
+                  >
+                  <div
+                    id="statusCircleCH11"
+                    class="status-indicator-circle"
+                  ></div>
+                </div>
+                <span
+                  class="rch-box"
+                  id="currentRCH11"
+                  style="margin-left: auto; margin-right: 10px"
+                  >--</span
+                >
                 <label class="switch">
                   <input
                     type="checkbox"
@@ -1873,8 +1959,21 @@
               </div>
 
               <div class="control-row">
-                <label>Ch 12</label>
-                <span class="rch-box" id="currentRCH12">--</span>
+                <div style="display: flex; align-items: center; width: 75px">
+                  <label style="width: auto; margin: 0; font-size: 14px"
+                    >Ch 12</label
+                  >
+                  <div
+                    id="statusCircleCH12"
+                    class="status-indicator-circle"
+                  ></div>
+                </div>
+                <span
+                  class="rch-box"
+                  id="currentRCH12"
+                  style="margin-left: auto; margin-right: 10px"
+                  >--</span
+                >
                 <label class="switch">
                   <input
                     type="checkbox"
@@ -1886,8 +1985,21 @@
               </div>
 
               <div class="control-row">
-                <label>Ch 13</label>
-                <span class="rch-box" id="currentRCH13">--</span>
+                <div style="display: flex; align-items: center; width: 75px">
+                  <label style="width: auto; margin: 0; font-size: 14px"
+                    >Ch 13</label
+                  >
+                  <div
+                    id="statusCircleCH13"
+                    class="status-indicator-circle"
+                  ></div>
+                </div>
+                <span
+                  class="rch-box"
+                  id="currentRCH13"
+                  style="margin-left: auto; margin-right: 10px"
+                  >--</span
+                >
                 <label class="switch">
                   <input
                     type="checkbox"
@@ -1899,8 +2011,21 @@
               </div>
 
               <div class="control-row">
-                <label>Ch 14</label>
-                <span class="rch-box" id="currentRCH14">--</span>
+                <div style="display: flex; align-items: center; width: 75px">
+                  <label style="width: auto; margin: 0; font-size: 14px"
+                    >Ch 14</label
+                  >
+                  <div
+                    id="statusCircleCH14"
+                    class="status-indicator-circle"
+                  ></div>
+                </div>
+                <span
+                  class="rch-box"
+                  id="currentRCH14"
+                  style="margin-left: auto; margin-right: 10px"
+                  >--</span
+                >
                 <label class="switch">
                   <input
                     type="checkbox"
@@ -1912,8 +2037,21 @@
               </div>
 
               <div class="control-row">
-                <label>Ch 15</label>
-                <span class="rch-box" id="currentRCH15">--</span>
+                <div style="display: flex; align-items: center; width: 75px">
+                  <label style="width: auto; margin: 0; font-size: 14px"
+                    >Ch 15</label
+                  >
+                  <div
+                    id="statusCircleCH15"
+                    class="status-indicator-circle"
+                  ></div>
+                </div>
+                <span
+                  class="rch-box"
+                  id="currentRCH15"
+                  style="margin-left: auto; margin-right: 10px"
+                  >--</span
+                >
                 <label class="switch">
                   <input
                     type="checkbox"
@@ -2705,6 +2843,7 @@
         enabledCH13: null,
         enabledCH14: null,
         enabledCH15: null,
+        scanning_channel: null,
       };
 
       // Track last sent values
@@ -4177,6 +4316,12 @@
                 ? 1
                 : 0;
             }
+          }
+          if (data.scanning_channel !== undefined) {
+            currentParameters.scanning_channel = parseInt(
+              data.scanning_channel,
+            );
+            updateScanningChannel(data.scanning_channel);
           }
           // Update UI controls if parameters changed every minute
           // (or the time specified in parameterBoxUpdateInterval variable)
@@ -5807,6 +5952,26 @@
 
       // CALL THE FUNCTION WHEN THE PAGE LOADS
       document.addEventListener("DOMContentLoaded", initParticles);
+
+      function updateScanningChannel(scanningChannel) {
+        document.querySelectorAll(".status-indicator-circle").forEach((el) => {
+          el.classList.remove("active");
+        });
+
+        if (
+          scanningChannel === null ||
+          scanningChannel === undefined ||
+          scanningChannel === 0
+        )
+          return;
+
+        const ch = parseInt(scanningChannel, 10);
+        if (!Number.isFinite(ch)) return;
+
+        // Soporta ambos patrones de ID
+        const el = document.getElementById(`statusCircleCH${ch}`);
+        if (el) el.classList.add("active");
+      }
     </script>
   </body>
 </html>
