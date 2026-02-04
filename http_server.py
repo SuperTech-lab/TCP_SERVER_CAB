@@ -83,6 +83,13 @@ current_enabled_CH13 = None
 current_enabled_CH14 = None
 current_enabled_CH15 = None
 current_scanning_channel= None
+current_modeCH9 = current_rangeCH9 = None
+current_modeCH10 = current_rangeCH10 = None
+current_modeCH11 = current_rangeCH11 = None
+current_modeCH12 = current_rangeCH12 = None
+current_modeCH13 = current_rangeCH13 = None
+current_modeCH14 = current_rangeCH14 = None
+current_modeCH15 = current_rangeCH15 = None
 
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
 
@@ -166,7 +173,21 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
                                    "enabledCH13"       : current_enabled_CH13,
                                    "enabledCH14"       : current_enabled_CH14,
                                    "enabledCH15"       : current_enabled_CH15,
-                                   "scanning_channel"   : current_scanning_channel,
+                                   "scanning_channel"  : current_scanning_channel,
+                                   "modeCH9"           : current_modeCH9,
+                                   "rangeCH9"          : current_rangeCH9,
+                                   "modeCH10"          : current_modeCH10,
+                                   "rangeCH10"         : current_rangeCH10,
+                                   "modeCH11"          : current_modeCH11,
+                                   "rangeCH11"         : current_rangeCH11,
+                                   "modeCH12"          : current_modeCH12,
+                                   "rangeCH12"         : current_rangeCH12,
+                                   "modeCH13"          : current_modeCH13,
+                                   "rangeCH13"         : current_rangeCH13,
+                                   "modeCH14"          : current_modeCH14,
+                                   "rangeCH14"         : current_rangeCH14,
+                                   "modeCH15"          : current_modeCH15,
+                                   "rangeCH15"         : current_rangeCH15,
                                 })
                                    
 
@@ -749,6 +770,13 @@ def receive_sensor_data(tcp_socket):
     global current_RUNID
     global current_RCH9, current_RCH10, current_RCH11, current_RCH12, current_RCH13, current_RCH14, current_RCH15
     global current_scanning_channel
+    global current_modeCH9, current_rangeCH9
+    global current_modeCH10, current_rangeCH10
+    global current_modeCH11, current_rangeCH11
+    global current_modeCH12, current_rangeCH12
+    global current_modeCH13, current_rangeCH13
+    global current_modeCH14, current_rangeCH14
+    global current_modeCH15, current_rangeCH15
 
 
 
@@ -947,6 +975,25 @@ def receive_sensor_data(tcp_socket):
                     current_scanning_channel = int(params[67].split(':')[-1])
                 except Exception as e:
                     print(f"Error parsing scanning_channel variable: {e}")
+
+                try:
+                    for p in params:
+                        p = p.strip()
+                        if p.startswith("modeCH"):
+                            k, v = p.split(":", 1)
+                            ch = int(k.replace("modeCH", ""))
+                            if 9 <= ch <= 15:
+                                val = v.strip()
+                                globals()[f"current_modeCH{ch}"] = int(val) if val and val.upper() != "NONE" else None
+
+                        elif p.startswith("rangeCH"):
+                            k, v = p.split(":", 1)
+                            ch = int(k.replace("rangeCH", ""))
+                            if 9 <= ch <= 15:
+                                val = v.strip()
+                                globals()[f"current_rangeCH{ch}"] = int(val) if val and val.upper() != "NONE" else None
+                except Exception as e:
+                    print(f"Error parsing extra excitation settings CH9..15: {e}")
 
         except socket.timeout:
             continue

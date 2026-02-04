@@ -401,6 +401,11 @@ current_curves = {
     6: DEFAULT_CURVES[6],  # MXC
 }
 
+extra_excitation = {
+    ch: {"excitation_mode": None, "excitation_range": None}
+    for ch in SAMPLE_CHANNELS  # [9..15]
+}
+
 def _is_connected(sock) -> bool:
     try:
         return sock.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR) == 0 and sock.fileno() != -1
@@ -447,6 +452,7 @@ def handle_command(command):
     global current_proportional_gain
     global current_integral_gain
     global current_derivative_gain
+    global extra_excitation
 
     cmd = command.strip()
 
@@ -2229,6 +2235,70 @@ def handle_command(command):
 
         except Exception as e:
             return f"❌ Error selecting measurement channel: {e}"
+        
+    
+    elif cmd.startswith("set_sensor_range_ch"):
+        try:
+            # format: set_sensor_range_ch<CH>:<RANGE>
+            head, val = cmd.split(":", 1)
+            ch = int(head.replace("set_sensor_range_ch", "").strip())
+            new_range = int(val.strip())
+
+            if ch not in SAMPLE_CHANNELS:
+                return "❌ Target must be one of 9..15"
+            if not (1 <= new_range <= 8):
+                return "❌ Sensor range must be between 1 and 8"
+
+            with heater_mutex:
+                current_settings = ls.get_sensor_resistance_settings(channel=ch, return_dict=True)
+
+            time.sleep(0.1)
+            current_settings["excitation_range"] = str(new_range)
+
+            with heater_mutex:
+                ok = ls.set_sensor_resistance_settings(channel=ch, settings=current_settings)
+
+            if ok:
+                if isinstance(extra_excitation, dict) and ch in extra_excitation:
+                    extra_excitation[ch]["excitation_range"] = new_range
+                return f"✅ Sensor range for CH{ch} set to {new_range}"
+            else:
+                return f"❌ Failed to set sensor range for CH{ch}"
+
+        except Exception as e:
+            return f"❌ Error setting sensor range for extra channel: {e}"
+
+    elif cmd.startswith("set_sensor_mode_ch"):
+        try:
+            # format: set_sensor_mode_ch<CH>:<MODE>
+            head, val = cmd.split(":", 1)
+            ch = int(head.replace("set_sensor_mode_ch", "").strip())
+            new_mode = int(val.strip())
+
+            if ch not in SAMPLE_CHANNELS:
+                return "❌ Target must be one of 9..15"
+            if new_mode not in (0, 1):
+                return "❌ Sensor mode must be 0 (Voltage) or 1 (Current)"
+
+            with heater_mutex:
+                current_settings = ls.get_sensor_resistance_settings(channel=ch, return_dict=True)
+
+            time.sleep(0.1)
+            current_settings["excitation_mode"] = new_mode
+
+            with heater_mutex:
+                ok = ls.set_sensor_resistance_settings(channel=ch, settings=current_settings)
+
+            if ok:
+                if isinstance(extra_excitation, dict) and ch in extra_excitation:
+                    extra_excitation[ch]["excitation_mode"] = new_mode
+                mode_str = "voltage" if new_mode == 0 else "current"
+                return f"✅ Sensor mode for CH{ch} set to {mode_str}"
+            else:
+                return f"❌ Failed to set sensor mode for CH{ch}"
+
+        except Exception as e:
+            return f"❌ Error setting sensor mode for extra channel: {e}"
 
     
     else:
@@ -2315,6 +2385,7 @@ def lakeshore_temperature_sensor():
     temperatures = {}
     resistances = {}
     powers = {}
+    
 
     while True:
         try:
@@ -2393,6 +2464,17 @@ def lakeshore_temperature_sensor():
             mode50K = excitation50K = None
             mode4K = excitation4K = None
             modeSTILL = excitationSTILL = None
+
+        global extra_excitation
+        for ch in SAMPLE_CHANNELS:
+            try:
+                with heater_mutex:
+                    s = ls.get_sensor_resistance_settings(channel=ch, return_dict=True)
+                extra_excitation[ch]["excitation_mode"] = s.get("excitation_mode")
+                extra_excitation[ch]["excitation_range"] = s.get("excitation_range")
+            except Exception:
+                extra_excitation[ch]["excitation_mode"] = None
+                extra_excitation[ch]["excitation_range"] = None
 
         try:
             with heater_mutex: dwell_times = ls.get_channels_dwell_time(DEFAULT_CHANNELS)
@@ -2625,7 +2707,21 @@ def broadcast_temperature(sensorValues, controlParams, sensorParams):
                     f"enabledCH13: {int(ls.get_channel_status(13))}," +
                     f"enabledCH14: {int(ls.get_channel_status(14))}," +
                     f"enabledCH15: {int(ls.get_channel_status(15))}," +
-                    f"scanning_channel:{scanning_channel if sensorParams['autoscan'][1] == '1' else 0}\n"
+                    f"scanning_channel:{scanning_channel if sensorParams['autoscan'][1] == '1' else 0}," +
+                    f"modeCH9:{extra_excitation[9]['excitation_mode']}," +
+                    f"rangeCH9:{extra_excitation[9]['excitation_range']}," +
+                    f"modeCH10:{extra_excitation[10]['excitation_mode']}," +
+                    f"rangeCH10:{extra_excitation[10]['excitation_range']}," +
+                    f"modeCH11:{extra_excitation[11]['excitation_mode']}," +
+                    f"rangeCH11:{extra_excitation[11]['excitation_range']}," +
+                    f"modeCH12:{extra_excitation[12]['excitation_mode']}," +
+                    f"rangeCH12:{extra_excitation[12]['excitation_range']}," +
+                    f"modeCH13:{extra_excitation[13]['excitation_mode']}," +
+                    f"rangeCH13:{extra_excitation[13]['excitation_range']}," +
+                    f"modeCH14:{extra_excitation[14]['excitation_mode']}," +
+                    f"rangeCH14:{extra_excitation[14]['excitation_range']}," +
+                    f"modeCH15:{extra_excitation[15]['excitation_mode']}," +
+                    f"rangeCH15:{extra_excitation[15]['excitation_range']}\n"
                     ).encode('utf-8')
         
     except Exception as e:

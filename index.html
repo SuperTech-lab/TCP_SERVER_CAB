@@ -1145,7 +1145,7 @@
               <div
                 id="progressContainerMXC"
                 style="display: none; margin-top: 10px"
-              >
+          <div class="relation-plot-panel">
                 <div style="width: 100%; background-color: #ddd">
                   <div
                     id="progressBarMXC"
@@ -1904,6 +1904,70 @@
                   />
                   <span class="slider round"></span>
                 </label>
+                <details
+                  class="channel-dropdown"
+                  style="position: relative; margin-left: 10px"
+                >
+                  <summary
+                    class="channel-dropdown-summary"
+                    style="min-width: 100px; padding: 4px 8px"
+                  >
+                    <strong>Settings</strong>
+                    <span class="channel-dropdown-arrow">▾</span>
+                  </summary>
+                  <div class="channel-dropdown-menu" style="min-width: 320px">
+                    <div class="control-row">
+                      <label
+                        for="sensorRangeCH9"
+                        style="width: auto; margin-right: 8px"
+                        >Excitation:</label
+                      >
+                      <select
+                        id="sensorRangeCH9"
+                        class="control-input"
+                        style="width: 160px; margin-left: 0"
+                      >
+                        <option value="1">2.00 uV and 1.00 pA</option>
+                        <option value="2">6.32 uV and 3.16 pA</option>
+                        <option value="3">20.0 uV and 10.0 pA</option>
+                        <option value="4">63.2 uV and 31.6 pA</option>
+                        <option value="5">200 uV and 100 pA</option>
+                        <option value="6">632 uV and 316 pA</option>
+                        <option value="7">2.00 mV and 1.00 nA</option>
+                        <option value="8">6.32 mV and 3.16 nA</option>
+                      </select>
+                    </div>
+                    <div class="control-row">
+                      <label
+                        for="sensorModeCH9"
+                        style="width: auto; margin-right: 8px"
+                        >Mode:</label
+                      >
+                      <select
+                        id="sensorModeCH9"
+                        class="control-input"
+                        style="width: 90px; margin-left: 0"
+                      >
+                        <option value="0">Voltage</option>
+                        <option value="1">Current</option>
+                      </select>
+                    </div>
+                    <div class="control-row" style="margin-top: 10px">
+                      <button
+                        onclick="writeSettingsExtraChannel9()"
+                        class="inline-button"
+                      >
+                        Write Settings
+                      </button>
+                    </div>
+                    <div id="progressContainerCH9" style="display: none; margin-top: 8px">
+                      <div style="width: 100%; background-color: #eee">
+                        <div id="progressBarCH9" style="width: 0%; height: 12px; background-color: #4caf50"></div>
+                      </div>
+                      <div id="progressTextCH9" style="font-size: 11px; margin-top: 4px">Processing...</div>
+                    </div>
+                  </div>
+                </details>
               </div>
 
               <div class="control-row">
@@ -1930,6 +1994,70 @@
                   />
                   <span class="slider round"></span>
                 </label>
+                <details
+                  class="channel-dropdown"
+                  style="position: relative; margin-left: 10px"
+                >
+                  <summary
+                    class="channel-dropdown-summary"
+                    style="min-width: 100px; padding: 4px 8px"
+                  >
+                    <strong>Settings</strong>
+                    <span class="channel-dropdown-arrow">▾</span>
+                  </summary>
+                  <div class="channel-dropdown-menu" style="min-width: 320px">
+                    <div class="control-row">
+                      <label
+                        for="sensorRangeCH10"
+                        style="width: auto; margin-right: 8px"
+                        >Excitation:</label
+                      >
+                      <select
+                        id="sensorRangeCH10"
+                        class="control-input"
+                        style="width: 160px; margin-left: 0"
+                      >
+                        <option value="1">2.00 uV and 1.00 pA</option>
+                        <option value="2">6.32 uV and 3.16 pA</option>
+                        <option value="3">20.0 uV and 10.0 pA</option>
+                        <option value="4">63.2 uV and 31.6 pA</option>
+                        <option value="5">200 uV and 100 pA</option>
+                        <option value="6">632 uV and 316 pA</option>
+                        <option value="7">2.00 mV and 1.00 nA</option>
+                        <option value="8">6.32 mV and 3.16 nA</option>
+                      </select>
+                    </div>
+                    <div class="control-row">
+                      <label
+                        for="sensorModeCH10"
+                        style="width: auto; margin-right: 8px"
+                        >Mode:</label
+                      >
+                      <select
+                        id="sensorModeCH10"
+                        class="control-input"
+                        style="width: 90px; margin-left: 0"
+                      >
+                        <option value="0">Voltage</option>
+                        <option value="1">Current</option>
+                      </select>
+                    </div>
+                    <div class="control-row" style="margin-top: 10px">
+                      <button
+                        onclick="writeSettingsExtraChannel10()"
+                        class="inline-button"
+                      >
+                        Write Settings
+                      </button>
+                    </div>
+                    <div id="progressContainerCH10" style="display: none; margin-top: 8px">
+                      <div style="width: 100%; background-color: #eee">
+                        <div id="progressBarCH10" style="width: 0%; height: 12px; background-color: #4caf50"></div>
+                      </div>
+                      <div id="progressTextCH10" style="font-size: 11px; margin-top: 4px">Processing...</div>
+                    </div>
+                  </div>
+                </details>
               </div>
 
               <div class="control-row">
@@ -1956,6 +2084,70 @@
                   />
                   <span class="slider round"></span>
                 </label>
+                <details
+                  class="channel-dropdown"
+                  style="position: relative; margin-left: 10px"
+                >
+                  <summary
+                    class="channel-dropdown-summary"
+                    style="min-width: 100px; padding: 4px 8px"
+                  >
+                    <strong>Settings</strong>
+                    <span class="channel-dropdown-arrow">▾</span>
+                  </summary>
+                  <div class="channel-dropdown-menu" style="min-width: 320px">
+                    <div class="control-row">
+                      <label
+                        for="sensorRangeCH11"
+                        style="width: auto; margin-right: 8px"
+                        >Excitation:</label
+                      >
+                      <select
+                        id="sensorRangeCH11"
+                        class="control-input"
+                        style="width: 160px; margin-left: 0"
+                      >
+                        <option value="1">2.00 uV and 1.00 pA</option>
+                        <option value="2">6.32 uV and 3.16 pA</option>
+                        <option value="3">20.0 uV and 10.0 pA</option>
+                        <option value="4">63.2 uV and 31.6 pA</option>
+                        <option value="5">200 uV and 100 pA</option>
+                        <option value="6">632 uV and 316 pA</option>
+                        <option value="7">2.00 mV and 1.00 nA</option>
+                        <option value="8">6.32 mV and 3.16 nA</option>
+                      </select>
+                    </div>
+                    <div class="control-row">
+                      <label
+                        for="sensorModeCH11"
+                        style="width: auto; margin-right: 8px"
+                        >Mode:</label
+                      >
+                      <select
+                        id="sensorModeCH11"
+                        class="control-input"
+                        style="width: 90px; margin-left: 0"
+                      >
+                        <option value="0">Voltage</option>
+                        <option value="1">Current</option>
+                      </select>
+                    </div>
+                    <div class="control-row" style="margin-top: 10px">
+                      <button
+                        onclick="writeSettingsExtraChannel11()"
+                        class="inline-button"
+                      >
+                        Write Settings
+                      </button>
+                    </div>
+                    <div id="progressContainerCH11" style="display: none; margin-top: 8px">
+                      <div style="width: 100%; background-color: #eee">
+                        <div id="progressBarCH11" style="width: 0%; height: 12px; background-color: #4caf50"></div>
+                      </div>
+                      <div id="progressTextCH11" style="font-size: 11px; margin-top: 4px">Processing...</div>
+                    </div>
+                  </div>
+                </details>
               </div>
 
               <div class="control-row">
@@ -1982,6 +2174,70 @@
                   />
                   <span class="slider round"></span>
                 </label>
+                <details
+                  class="channel-dropdown"
+                  style="position: relative; margin-left: 10px"
+                >
+                  <summary
+                    class="channel-dropdown-summary"
+                    style="min-width: 100px; padding: 4px 8px"
+                  >
+                    <strong>Settings</strong>
+                    <span class="channel-dropdown-arrow">▾</span>
+                  </summary>
+                  <div class="channel-dropdown-menu" style="min-width: 320px">
+                    <div class="control-row">
+                      <label
+                        for="sensorRangeCH12"
+                        style="width: auto; margin-right: 8px"
+                        >Excitation:</label
+                      >
+                      <select
+                        id="sensorRangeCH12"
+                        class="control-input"
+                        style="width: 160px; margin-left: 0"
+                      >
+                        <option value="1">2.00 uV and 1.00 pA</option>
+                        <option value="2">6.32 uV and 3.16 pA</option>
+                        <option value="3">20.0 uV and 10.0 pA</option>
+                        <option value="4">63.2 uV and 31.6 pA</option>
+                        <option value="5">200 uV and 100 pA</option>
+                        <option value="6">632 uV and 316 pA</option>
+                        <option value="7">2.00 mV and 1.00 nA</option>
+                        <option value="8">6.32 mV and 3.16 nA</option>
+                      </select>
+                    </div>
+                    <div class="control-row">
+                      <label
+                        for="sensorModeCH12"
+                        style="width: auto; margin-right: 8px"
+                        >Mode:</label
+                      >
+                      <select
+                        id="sensorModeCH12"
+                        class="control-input"
+                        style="width: 90px; margin-left: 0"
+                      >
+                        <option value="0">Voltage</option>
+                        <option value="1">Current</option>
+                      </select>
+                    </div>
+                    <div class="control-row" style="margin-top: 10px">
+                      <button
+                        onclick="writeSettingsExtraChannel12()"
+                        class="inline-button"
+                      >
+                        Write Settings
+                      </button>
+                    </div>
+                    <div id="progressContainerCH12" style="display: none; margin-top: 8px">
+                      <div style="width: 100%; background-color: #eee">
+                        <div id="progressBarCH12" style="width: 0%; height: 12px; background-color: #4caf50"></div>
+                      </div>
+                      <div id="progressTextCH12" style="font-size: 11px; margin-top: 4px">Processing...</div>
+                    </div>
+                  </div>
+                </details>
               </div>
 
               <div class="control-row">
@@ -2008,6 +2264,70 @@
                   />
                   <span class="slider round"></span>
                 </label>
+                <details
+                  class="channel-dropdown"
+                  style="position: relative; margin-left: 10px"
+                >
+                  <summary
+                    class="channel-dropdown-summary"
+                    style="min-width: 100px; padding: 4px 8px"
+                  >
+                    <strong>Settings</strong>
+                    <span class="channel-dropdown-arrow">▾</span>
+                  </summary>
+                  <div class="channel-dropdown-menu" style="min-width: 320px">
+                    <div class="control-row">
+                      <label
+                        for="sensorRangeCH13"
+                        style="width: auto; margin-right: 8px"
+                        >Excitation:</label
+                      >
+                      <select
+                        id="sensorRangeCH13"
+                        class="control-input"
+                        style="width: 160px; margin-left: 0"
+                      >
+                        <option value="1">2.00 uV and 1.00 pA</option>
+                        <option value="2">6.32 uV and 3.16 pA</option>
+                        <option value="3">20.0 uV and 10.0 pA</option>
+                        <option value="4">63.2 uV and 31.6 pA</option>
+                        <option value="5">200 uV and 100 pA</option>
+                        <option value="6">632 uV and 316 pA</option>
+                        <option value="7">2.00 mV and 1.00 nA</option>
+                        <option value="8">6.32 mV and 3.16 nA</option>
+                      </select>
+                    </div>
+                    <div class="control-row">
+                      <label
+                        for="sensorModeCH13"
+                        style="width: auto; margin-right: 8px"
+                        >Mode:</label
+                      >
+                      <select
+                        id="sensorModeCH13"
+                        class="control-input"
+                        style="width: 90px; margin-left: 0"
+                      >
+                        <option value="0">Voltage</option>
+                        <option value="1">Current</option>
+                      </select>
+                    </div>
+                    <div class="control-row" style="margin-top: 10px">
+                      <button
+                        onclick="writeSettingsExtraChannel13()"
+                        class="inline-button"
+                      >
+                        Write Settings
+                      </button>
+                    </div>
+                    <div id="progressContainerCH13" style="display: none; margin-top: 8px">
+                      <div style="width: 100%; background-color: #eee">
+                        <div id="progressBarCH13" style="width: 0%; height: 12px; background-color: #4caf50"></div>
+                      </div>
+                      <div id="progressTextCH13" style="font-size: 11px; margin-top: 4px">Processing...</div>
+                    </div>
+                  </div>
+                </details>
               </div>
 
               <div class="control-row">
@@ -2034,6 +2354,70 @@
                   />
                   <span class="slider round"></span>
                 </label>
+                <details
+                  class="channel-dropdown"
+                  style="position: relative; margin-left: 10px"
+                >
+                  <summary
+                    class="channel-dropdown-summary"
+                    style="min-width: 100px; padding: 4px 8px"
+                  >
+                    <strong>Settings</strong>
+                    <span class="channel-dropdown-arrow">▾</span>
+                  </summary>
+                  <div class="channel-dropdown-menu" style="min-width: 320px">
+                    <div class="control-row">
+                      <label
+                        for="sensorRangeCH14"
+                        style="width: auto; margin-right: 8px"
+                        >Excitation:</label
+                      >
+                      <select
+                        id="sensorRangeCH14"
+                        class="control-input"
+                        style="width: 160px; margin-left: 0"
+                      >
+                        <option value="1">2.00 uV and 1.00 pA</option>
+                        <option value="2">6.32 uV and 3.16 pA</option>
+                        <option value="3">20.0 uV and 10.0 pA</option>
+                        <option value="4">63.2 uV and 31.6 pA</option>
+                        <option value="5">200 uV and 100 pA</option>
+                        <option value="6">632 uV and 316 pA</option>
+                        <option value="7">2.00 mV and 1.00 nA</option>
+                        <option value="8">6.32 mV and 3.16 nA</option>
+                      </select>
+                    </div>
+                    <div class="control-row">
+                      <label
+                        for="sensorModeCH14"
+                        style="width: auto; margin-right: 8px"
+                        >Mode:</label
+                      >
+                      <select
+                        id="sensorModeCH14"
+                        class="control-input"
+                        style="width: 90px; margin-left: 0"
+                      >
+                        <option value="0">Voltage</option>
+                        <option value="1">Current</option>
+                      </select>
+                    </div>
+                    <div class="control-row" style="margin-top: 10px">
+                      <button
+                        onclick="writeSettingsExtraChannel14()"
+                        class="inline-button"
+                      >
+                        Write Settings
+                      </button>
+                    </div>
+                    <div id="progressContainerCH14" style="display: none; margin-top: 8px">
+                      <div style="width: 100%; background-color: #eee">
+                        <div id="progressBarCH14" style="width: 0%; height: 12px; background-color: #4caf50"></div>
+                      </div>
+                      <div id="progressTextCH14" style="font-size: 11px; margin-top: 4px">Processing...</div>
+                    </div>
+                  </div>
+                </details>
               </div>
 
               <div class="control-row">
@@ -2060,6 +2444,70 @@
                   />
                   <span class="slider round"></span>
                 </label>
+                <details
+                  class="channel-dropdown"
+                  style="position: relative; margin-left: 10px"
+                >
+                  <summary
+                    class="channel-dropdown-summary"
+                    style="min-width: 100px; padding: 4px 8px"
+                  >
+                    <strong>Settings</strong>
+                    <span class="channel-dropdown-arrow">▾</span>
+                  </summary>
+                  <div class="channel-dropdown-menu" style="min-width: 320px">
+                    <div class="control-row">
+                      <label
+                        for="sensorRangeCH15"
+                        style="width: auto; margin-right: 8px"
+                        >Excitation:</label
+                      >
+                      <select
+                        id="sensorRangeCH15"
+                        class="control-input"
+                        style="width: 160px; margin-left: 0"
+                      >
+                        <option value="1">2.00 uV and 1.00 pA</option>
+                        <option value="2">6.32 uV and 3.16 pA</option>
+                        <option value="3">20.0 uV and 10.0 pA</option>
+                        <option value="4">63.2 uV and 31.6 pA</option>
+                        <option value="5">200 uV and 100 pA</option>
+                        <option value="6">632 uV and 316 pA</option>
+                        <option value="7">2.00 mV and 1.00 nA</option>
+                        <option value="8">6.32 mV and 3.16 nA</option>
+                      </select>
+                    </div>
+                    <div class="control-row">
+                      <label
+                        for="sensorModeCH15"
+                        style="width: auto; margin-right: 8px"
+                        >Mode:</label
+                      >
+                      <select
+                        id="sensorModeCH15"
+                        class="control-input"
+                        style="width: 90px; margin-left: 0"
+                      >
+                        <option value="0">Voltage</option>
+                        <option value="1">Current</option>
+                      </select>
+                    </div>
+                    <div class="control-row" style="margin-top: 10px">
+                      <button
+                        onclick="writeSettingsExtraChannel15()"
+                        class="inline-button"
+                      >
+                        Write Settings
+                      </button>
+                    </div>
+                    <div id="progressContainerCH15" style="display: none; margin-top: 8px">
+                      <div style="width: 100%; background-color: #eee">
+                        <div id="progressBarCH15" style="width: 0%; height: 12px; background-color: #4caf50"></div>
+                      </div>
+                      <div id="progressTextCH15" style="font-size: 11px; margin-top: 4px">Processing...</div>
+                    </div>
+                  </div>
+                </details>
               </div>
             </div>
           </details>
@@ -2143,6 +2591,14 @@
           <canvas id="relationChart"></canvas>
         </div>
       </div>
+      <!-- Progress bar for Extra channels (CH9..CH15) -->
+      <div id="progressContainerEXTRA" style="display: none; margin-top: 10px">
+        <div style="width: 100%; background-color: #ddd">
+          <div id="progressBarEXTRA" style="width: 0%; height: 20px; background-color: #4caf50"></div>
+        </div>
+        <div id="progressTextEXTRA" style="font-size: 12px; margin-top: 5px">Processing...</div>
+      </div>
+
       <!-- Relation reconstruction (historical .dat) -->
       <div class="relation-reconstruction-section">
         <h2>Reconstruction of saved .dat</h2>
@@ -2844,6 +3300,20 @@
         enabledCH14: null,
         enabledCH15: null,
         scanning_channel: null,
+        modeCH9: null,
+        rangeCH9: null,
+        modeCH10: null,
+        rangeCH10: null,
+        modeCH11: null,
+        rangeCH11: null,
+        modeCH12: null,
+        rangeCH12: null,
+        modeCH13: null,
+        rangeCH13: null,
+        modeCH14: null,
+        rangeCH14: null,
+        modeCH15: null,
+        rangeCH15: null,
       };
 
       // Track last sent values
@@ -4323,6 +4793,21 @@
             );
             updateScanningChannel(data.scanning_channel);
           }
+
+          for (let i = 9; i <= 15; i++) {
+            if (data[`modeCH${i}`] !== undefined) {
+              currentParameters[`modeCH${i}`] =
+                data[`modeCH${i}`] === null
+                  ? null
+                  : parseInt(data[`modeCH${i}`]);
+            }
+            if (data[`rangeCH${i}`] !== undefined) {
+              currentParameters[`rangeCH${i}`] =
+                data[`rangeCH${i}`] === null
+                  ? null
+                  : parseInt(data[`rangeCH${i}`]);
+            }
+          }
           // Update UI controls if parameters changed every minute
           // (or the time specified in parameterBoxUpdateInterval variable)
           const now = Date.now();
@@ -5598,6 +6083,141 @@
         setTimeout(() => {
           progressContainer.style.display = "none";
         }, 1000);
+      }
+
+      function getSelectedExtraChannel() {
+        const sel = document.getElementById("relationChannelSelect");
+        if (!sel) return null;
+        const ch = parseInt(String(sel.value).replace("CH", ""), 10);
+        return Number.isFinite(ch) ? ch : null;
+      }
+
+      async function writeSettingsExtraChannel() {
+        if (tcpConnectionStatus === false) {
+          addLogEntry(
+            "Cannot send Extra channel command: No connection to TCP server",
+            "status",
+          );
+          return;
+        }
+
+        const ch = getSelectedExtraChannel();
+        if (!ch || ch < 9 || ch > 15) {
+          addLogEntry("Error: Extra channel must be CH9..CH15", "received");
+          return;
+        }
+
+        // Read per-channel inputs (sensorRangeCHx / sensorModeCHx)
+        const rangeEl = document.getElementById(`sensorRangeCH${ch}`);
+        const modeEl = document.getElementById(`sensorModeCH${ch}`);
+        const range = rangeEl ? parseInt(rangeEl.value, 10) : NaN;
+        const mode = modeEl ? parseInt(modeEl.value, 10) : NaN;
+
+        const commands = [];
+
+        if (!isNaN(range)) {
+          if (range < 1 || range > 8) {
+            addLogEntry(
+              "Error: Sensor Range must be between 1 and 8",
+              "received",
+            );
+            return;
+          }
+          commands.push(`set_sensor_range_ch${ch}:${range}`);
+        }
+
+        if (!isNaN(mode)) {
+          if (mode !== 0 && mode !== 1) {
+            addLogEntry(
+              "Error: Sensor Mode must be 0 (Voltage) or 1 (Current)",
+              "received",
+            );
+            return;
+          }
+          commands.push(`set_sensor_mode_ch${ch}:${mode}`);
+        }
+
+        if (commands.length === 0) {
+          addLogEntry("No Extra channel parameter changes detected", "status");
+          return;
+        }
+
+        // Prefer per-channel small progress bar inside the channel box
+        let progressContainer = document.getElementById(`progressContainerCH${ch}`);
+        let progressBar = document.getElementById(`progressBarCH${ch}`);
+        let progressText = document.getElementById(`progressTextCH${ch}`);
+
+        // Fallback to global EXTRA progress if per-channel not present
+        if (!progressContainer) {
+          progressContainer = document.getElementById("progressContainerEXTRA");
+          progressBar = document.getElementById("progressBarEXTRA");
+          progressText = document.getElementById("progressTextEXTRA");
+        }
+
+        if (progressContainer) {
+          progressContainer.style.display = "block";
+        }
+        if (progressBar) progressBar.style.width = "0%";
+        if (progressText) progressText.textContent = `Processing CH${ch} settings...`;
+
+        for (let i = 0; i < commands.length; i++) {
+          const cmd = commands[i];
+          try {
+            addLogEntry(`Sending CH${ch} command: ${cmd}`, "sent");
+            const response = await sendCommandToServer(cmd);
+            addLogEntry(`Server response: ${response}`, "received");
+          } catch (error) {
+            addLogEntry(
+              `Error sending CH${ch} command ${cmd}: ${error.message}`,
+              "received",
+            );
+          }
+
+          const progress = ((i + 1) / commands.length) * 100;
+          if (progressBar) progressBar.style.width = `${progress}%`;
+          if (progressText) progressText.textContent = `Processing CH${ch} settings... ${Math.round(progress)}%`;
+          await sleep(150);
+        }
+
+        setTimeout(() => {
+          if (progressContainer) progressContainer.style.display = "none";
+        }, 1000);
+      }
+
+      // Wrapper functions for individual extra channels
+      async function writeSettingsExtraChannel9() {
+        document.getElementById("relationChannelSelect").value = "CH9";
+        await writeSettingsExtraChannel();
+      }
+
+      async function writeSettingsExtraChannel10() {
+        document.getElementById("relationChannelSelect").value = "CH10";
+        await writeSettingsExtraChannel();
+      }
+
+      async function writeSettingsExtraChannel11() {
+        document.getElementById("relationChannelSelect").value = "CH11";
+        await writeSettingsExtraChannel();
+      }
+
+      async function writeSettingsExtraChannel12() {
+        document.getElementById("relationChannelSelect").value = "CH12";
+        await writeSettingsExtraChannel();
+      }
+
+      async function writeSettingsExtraChannel13() {
+        document.getElementById("relationChannelSelect").value = "CH13";
+        await writeSettingsExtraChannel();
+      }
+
+      async function writeSettingsExtraChannel14() {
+        document.getElementById("relationChannelSelect").value = "CH14";
+        await writeSettingsExtraChannel();
+      }
+
+      async function writeSettingsExtraChannel15() {
+        document.getElementById("relationChannelSelect").value = "CH15";
+        await writeSettingsExtraChannel();
       }
     </script>
 
