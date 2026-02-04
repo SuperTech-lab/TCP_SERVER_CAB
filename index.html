@@ -551,7 +551,8 @@
       .current-stage-value {
         width: 120px;
         margin-left: 30px;
-        margin-top: 10px;
+        margin-top: 0;      
+        align-self: center; 
       }
       .run-control {
         display: flex;
@@ -1200,37 +1201,35 @@
                 Reset to default
               </button>
 
-              <label
-                for="timeRangeMXC"
-                style="
-                  margin: 0 10px 0 25px;
-                  align-self: center;
-                  display: flex;
-                  align-items: center;
-                "
-              >
-                Time Range:
-              </label>
-              <select
-                id="timeRangeMXC"
-                style="margin-right: 50px"
-                onchange="updateTimeRange()"
-              >
-                <option value="21600">6 Hours</option>
-                <option value="3600">1 Hour</option>
-                <option value="1800">30 Minutes</option>
-                <option value="900">15 Minutes</option>
-                <option value="300">5 Minutes</option>
-                <option value="60" selected>1 Minute</option>
-              </select>
+              <div style="display: flex; align-items: center;">
+                <label
+                  for="timeRangeMXC"
+                  style="margin: 0 10px 0 25px;"
+                >
+                  Time Range:
+                </label>
 
-              <div id="statusCircleCH6" class="status-indicator-circle"></div>
+                <select
+                  id="timeRangeMXC"
+                  style="margin-right: 50px;"
+                  onchange="updateTimeRange()"
+                >
+                  <option value="21600">6 Hours</option>
+                  <option value="3600">1 Hour</option>
+                  <option value="1800">30 Minutes</option>
+                  <option value="900">15 Minutes</option>
+                  <option value="300">5 Minutes</option>
+                  <option value="60" selected>1 Minute</option>
+                </select>
 
-              <select id="currentMXCValue" class="current-stage-value">
-                <option value="temperature">- mK</option>
-                <option value="resistance">- Ω</option>
-                <option value="power">- W</option>
-              </select>
+                <div id="statusCircleCH6" class="status-indicator-circle"></div>
+
+                <select id="currentMXCValue" class="current-stage-value">
+                  <option value="temperature">- mK</option>
+                  <option value="resistance">- Ω</option>
+                  <option value="power">- W</option>
+                </select>
+              </div>
             </div>
 
             <!-- Gráfica -->
