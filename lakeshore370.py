@@ -3,7 +3,31 @@ import threading
 import time
 
 # Shared mutex lock for safe device access
-_lakeshore_mutex = threading.Lock()
+# Changed Lock for RLock (Reentrant Lock) to allow the same thread to acquire the lock multiple times if needed
+# It is convenient when a protected function calls another protected function.
+_lakeshore_mutex = threading.RLock()
+
+# LakeShore 370 device communication requires at least 50 ms between commands
+# Using 55 ms as safe margin
+MIN_COMMUNICATION_INTERVAL_S = 0.055
+
+# Ramp implementation for temperature control min and max rate values in Kelvin/min
+MIN_RAMP_RATE_K_PER_MIN = 0.001
+MAX_RAMP_RATE_K_PER_MIN = 10.0
+
+# These reading status flags are used to identify the LakeShore 370 channel status and act accordingly
+# The flags are represented as bit masks.
+# These flags can be combined; for example, 00000101 means (CS OVL and VMIX OVL combined)
+READING_STATUS_FLAGS = {
+    1   : "CS OVL",     # 00000001
+    2   : "VCM OVL",    # 00000010
+    4   : "VMIX OVL",   # 00000100
+    8   : "VDIF OVL",   # 00001000
+    16  : "R. OVER",    # 00010000
+    32  : "R. UNDER",   # 00100000
+    64  : "T. OVER",    # 01000000
+    128 : "T. UNDER",   # 10000000
+}
 
 DEFAULT_CHANNELS = [1, 2, 5, 6, 9, 10, 11, 12, 13, 14, 15]
 DEFAULT_CHANNELS_ID = ["50K", "4K", "STILL", "MXC"]
@@ -111,7 +135,79 @@ class LakeShore370:
         self.device.write_termination = '\r\n'
         self.device.read_termination = '\r\n'
         self.device.timeout = timeout  # milliseconds
-    
+        self._when_last_communication_completed = 0.0
+
+    #! -- Communication Methods -- #
+    def _wait_for_communication_slot(self):
+        """
+        Wait until another Lake Shore communication is permitted
+        It compares the current time with the time of completition of the last communication.
+        If the elapsed time between the completition and current time is less than the minimumum
+        communication interval it waits.
+        """
+        elapsed_time = time.monotonic() - self._when_last_communication_completed
+        # monotonic avoids issues with system clock changes
+
+        remaining_time = MIN_COMMUNICATION_INTERVAL_S - elapsed_time
+
+        if remaining_time > 0:
+            time.sleep(remaining_time)
+
+    def _query(self, command: str) -> str:
+        """
+        Execute one VISA query with locking.
+        Checks if communication slot is available and waits if needed.
+        Stores the completition time of the command.
+        """
+        with _lakeshore_mutex:
+            self._wait_for_communication_slot()
+            try:
+                return self.device.query(command)
+            finally:
+                self._when_last_communication_completed = time.monotonic()
+
+    def _write(self, command: str) -> None:
+        """
+        Execute one VISA write command with locking.
+        Checks if communication slot is availablea and waits if necessary.
+        Stores the completition time of the command.
+        """
+        with _lakeshore_mutex:
+            self._wait_for_communication_slot()
+            try:
+                self.device.write(command)
+            finally:
+                self._when_last_communication_completed = time.monotonic()
+
+    #! -- Device status Methods -- #
+    def get_reading_status(self, channel: int) -> int:
+        """
+        Get the reading status for a specific channel.
+        Args:
+            channel (int): The channel number.
+        Returns:
+            int: The reading status in lakeshore code (check READING_STATUS_FLAGS for meanings).
+        """
+        try:
+            response = self._query(f"RDGST? {channel}")
+            return int(response.strip())
+        except Exception as e:
+            print(f"Getting reading status for channel {channel} failed.\nReason: {e}")
+            return None
+
+    @staticmethod
+    def describe_reading_status(status_code: int) -> list[str]:
+        """
+        Convert an RDGST bit mask into readable status labels.
+        """
+        errors = []
+
+        for flag, description in READING_STATUS_FLAGS.items():
+            if status_code & flag:
+                errors.append(description)
+
+        return errors
+
     #! -- Device get Methods -- #
     def get_temperature(self, channel: int):
         """ 
@@ -120,8 +216,28 @@ class LakeShore370:
         """
         try:
             with _lakeshore_mutex:
-                response = self.device.query(f"RDGK? {channel}")
+                # RLock maintains the lock for the same thread,
+                # allowing making multiple queries (RDGST? and RDGK?) without releasing the lock in between.
+                status_code = self.get_reading_status(channel)
+
+                if status_code is None:
+                    # The exception message is managed in get_reading_status()
+                    return None
+
+                if status_code != 0:
+                    errors = self.describe_reading_status(status_code)
+                    description = " | ".join(errors)
+
+                    if not description:
+                        description = f"Unknown error code: {status_code}"
+
+                    print(f"Warning: Reading status for channel {channel} indicates an error: {description}")
+
+                    return None
+
+                response = self._query(f"RDGK? {channel}")
             return float(response.strip())
+
         except Exception as e:
             print(f"Reading channel {channel} failed.\nReason: {e}")
             return None
@@ -133,7 +249,7 @@ class LakeShore370:
         """
         try:
             with _lakeshore_mutex:
-                response = self.device.query(f"RDGR? {channel}")
+                response = self._query(f"RDGR? {channel}")
             return float(response.strip())
         except Exception as e:
             print(f"Reading channel {channel} failed.\nReason: {e}")
@@ -146,7 +262,7 @@ class LakeShore370:
         """
         try:
             with _lakeshore_mutex:
-                response = self.device.query(f"RDGPWR? {channel}")
+                response = self._query(f"RDGPWR? {channel}")
             return float(response.strip())
         except Exception as e:
             print(f"Reading channel {channel} failed.\nReason: {e}")
@@ -155,7 +271,7 @@ class LakeShore370:
     def get_channel_status(self, channel: int, verbose=False):
         try:
             with _lakeshore_mutex:
-                response = self.device.query(f"INSET? {channel}")
+                response = self._query(f"INSET? {channel}")
             status = int(response.split(",")[0])
             #time.sleep(0.1)  # Wait for the device to respond
             if verbose:
@@ -184,7 +300,7 @@ class LakeShore370:
 
         try:
             with _lakeshore_mutex:
-                response = self.device.query(f"SETP? {channel}")
+                response = self._query("SETP?") # removed channel since there's only one setpoint for the device
             return float(response.strip())
 
         except Exception as e:
@@ -195,10 +311,74 @@ class LakeShore370:
         try:
             channel = 6 # MXC channel
             with _lakeshore_mutex:
-                response = self.device.query(f"SETP? {channel}")
+                response = self._query("SETP?") # removed channel since there's only one setpoint for the device
             return float(response.strip())
         except Exception as e:
             print(f"Getting temperature setpoint for channel {channel} failed.\nReason: {e}")
+            return None
+
+    def get_control_mode(self) -> int | None:
+        """
+        Return the temperature-control mode reported by CMODE?.
+
+        Mode 1 is closed-loop PID control.
+        Mode 4 disables temperature control.
+        """
+        try:
+            response = self._query("CMODE?")
+            return int(response.strip())
+
+        except Exception as e:
+            print(
+                "Getting temperature control mode failed."
+                f"\nReason: {e}"
+            )
+            return None
+
+    def get_ramp_parameters(self) -> dict | None:
+        """
+        Return the configured ramp state and rate.
+
+        Returns:
+            dict: Ramp enabled state and rate in K/min.
+        """
+        try:
+            response = self._query("RAMP?")
+            fields = [
+                field.strip()
+                for field in response.strip().split(",")
+            ]
+
+            if len(fields) != 2:
+                raise ValueError(
+                    f"Unexpected RAMP? response: {response!r}"
+                )
+
+            return {
+                "enabled": bool(int(fields[0])),
+                "rate_k_per_min": float(fields[1]),
+            }
+
+        except Exception as e:
+            print(
+                "Getting setpoint ramp parameters failed."
+                f"\nReason: {e}"
+            )
+            return None
+
+    def get_ramp_status(self) -> bool | None:
+        """
+        Return True only while the setpoint is actively ramping.
+        """
+        try:
+            response = self._query("RAMPST?")
+            return bool(int(response.strip()))
+
+        except Exception as e:
+            print(
+                "Getting setpoint ramp status failed."
+                f"\nReason: {e}"
+            )
             return None
 
     def get_control_parameters(self) -> dict:
@@ -216,7 +396,7 @@ class LakeShore370:
         """
         try:
             with _lakeshore_mutex:
-                response = self.device.query("PID?")
+                response = self._query("PID?")
             parameters = response.split(",")
             control_params = {
                 "P": float(parameters[0]),
@@ -233,7 +413,7 @@ class LakeShore370:
     def get_dwell_time(self, channel: int):
         try:
             with _lakeshore_mutex:
-                response = self.device.query(f"INSET? {channel}")
+                response = self._query(f"INSET? {channel}")
             dwell_time = int(response.split(",")[1])
             return dwell_time
         except Exception as e:
@@ -243,7 +423,7 @@ class LakeShore370:
     def get_pause_time(self, channel: int):
         try:
             with _lakeshore_mutex:
-                response = self.device.query(f"INSET? {channel}")
+                response = self._query(f"INSET? {channel}")
             pause_time = int(response.split(",")[2])
             return pause_time
         except Exception as e:
@@ -258,7 +438,7 @@ class LakeShore370:
         
         try:
             with _lakeshore_mutex:
-                current_status = self.device.query("SCAN?")
+                current_status = self._query("SCAN?")
             return current_status.split(",")
         except Exception as e:
             print(f"Could not read current autoscan status. Reason: {e}")
@@ -341,7 +521,7 @@ class LakeShore370:
 
         try:
             with _lakeshore_mutex:
-                response = self.device.query("CSET?")
+                response = self._query("CSET?")
             
             if return_dict: 
                 control_params = response.strip().split(",")
@@ -391,7 +571,7 @@ class LakeShore370:
 
         try:
             with _lakeshore_mutex:
-                response = self.device.query("HTRRNG?")
+                response = self._query("HTRRNG?")
             control_heater_range = response.strip()
             time.sleep(0.1)  # Wait for the device to respond
             control_settings = self.get_control_settings()
@@ -426,7 +606,7 @@ class LakeShore370:
         
         try:
             with _lakeshore_mutex:
-                response = self.device.query(f"RDGRNG? {channel}")
+                response = self._query(f"RDGRNG? {channel}")
             
             values = response.strip().split(",")
 
@@ -450,7 +630,7 @@ class LakeShore370:
 
         try:
             with _lakeshore_mutex:
-                parameters = self.device.query(f"INSET? {channel}").split(",")
+                parameters = self._query(f"INSET? {channel}").split(",")
             curve = int(parameters[3])
             return curve
         except Exception as e:
@@ -463,7 +643,7 @@ class LakeShore370:
         """
         try:
             with _lakeshore_mutex:
-                response = self.device.query("HTR?")
+                response = self._query("HTR?")
             return float(response.strip())
         except Exception as e:
             print(f"Getting heater output failed.\nReason: {e}")
@@ -478,14 +658,14 @@ class LakeShore370:
             return
         try:
             with _lakeshore_mutex:
-                self.device.write(f"SETP {value}")
+                self._write(f"SETP {value}")
             if verbose: print(f"Set temperature setpoint to {value} {units}.")
         except Exception as e:
             print(f"Setting temperature setpoint failed.\nReason: {e}")
 
     def set_channel_off(self, channel: int, verbose: bool = False):
         try:
-            parameters = self.device.query(f"INSET? {channel}").split(",")
+            parameters = self._query(f"INSET? {channel}").split(",")
             time.sleep(0.5)  # Wait for the device to respond
             if parameters[0] == '0':
                 print(f"Channel {channel} is already off.")
@@ -497,7 +677,7 @@ class LakeShore370:
                 curve = parameters[3]
                 temp_coeff = parameters[4]
                 if verbose: print(f"Setting channel {channel} off.")
-                self.device.write(f"INSET {channel},0,{dwell},{pause},{curve},{temp_coeff}")
+                self._write(f"INSET {channel},0,{dwell},{pause},{curve},{temp_coeff}")
                 if verbose: print(f"Channel {channel} is now set off")
                 # if the other parameters are not specificied command won't work
                 return True
@@ -515,14 +695,14 @@ class LakeShore370:
         if settings is None:
             try:
                 with _lakeshore_mutex:
-                    parameters = self.device.query(f"INSET? {channel}").split(",")
+                    parameters = self._query(f"INSET? {channel}").split(",")
                 time.sleep(0.5)  # Wait for the device to respond
                 dwell = parameters[1]
                 pause = parameters[2]
                 curve = parameters[3]
                 temp_coeff = parameters[4]
                 if verbose: print(f"Setting channel {channel} on.")
-                self.device.write(f"INSET {channel},1,{dwell},{pause},{curve},{temp_coeff}")
+                self._write(f"INSET {channel},1,{dwell},{pause},{curve},{temp_coeff}")
                 if verbose: print(f"Channel {channel} is set on with parameters: {dwell}, {pause}, {curve}, {temp_coeff}")
                 return True
             except Exception as e:
@@ -536,7 +716,7 @@ class LakeShore370:
             
             try:
                 with _lakeshore_mutex:
-                    self.device.write(f"INSET {channel},1,{dwell},{pause},{curve},{temp_coeff}")
+                    self._write(f"INSET {channel},1,{dwell},{pause},{curve},{temp_coeff}")
                 print(f"Channel {channel} is set on with custom parameters: {dwell}, {pause}, {curve}, {temp_coeff}")
                 return True
             except Exception as e:
@@ -566,7 +746,7 @@ class LakeShore370:
 
         # Read current status from the instrument
         try:
-            current_status = self.device.query("SCAN?")  # e.g., "... ,0" or "... ,1"
+            current_status = self._query("SCAN?")  # e.g., "... ,0" or "... ,1"
             print(current_status)
             current_status = current_status.strip().split(",")[-1].strip()
             current_bool = bool(int(current_status))  # 0 -> False, 1 -> True
@@ -576,14 +756,63 @@ class LakeShore370:
 
         if status_bool == current_bool:
             print(f"Autoscan is already {'ON' if current_bool else 'OFF'}")
-            return False
+            return True
         else:
             try:
-                self.device.write(f"SCAN {int(channel)},{int(status_bool)}")
+                self._write(f"SCAN {int(channel)},{int(status_bool)}")
                 return True
             except Exception as e:
                 print(f"Could not set autoscan {'ON' if current_bool else 'OFF'}.\nReason: {e}")
                 return False
+    def recover_scan(self) -> bool:
+        """
+        Reinitialize the Lake Shore scan and verify the final state.
+
+        SCAN 6,0 selects channel 6 with autoscan disabled.
+        SCAN 1,1 restarts autoscan from channel 1.
+        """
+        try:
+            # Keep the complete recovery sequence atomic.
+            with _lakeshore_mutex:
+                self._write("SCAN 6,0")
+                self._write("SCAN 1,1")
+                response = self._query("SCAN?")
+
+            fields = [
+                field.strip()
+                for field in response.strip().split(",")
+            ]
+
+            if len(fields) < 2:
+                print(
+                    "Unexpected SCAN? response after recovery: "
+                    f"{response!r}"
+                )
+                return False
+
+            channel = int(fields[0])
+            autoscan_enabled = int(fields[1])
+
+            if channel == 1 and autoscan_enabled == 1:
+                print(
+                    "Scan recovered: autoscan ON "
+                    "starting at channel 1"
+                )
+                return True
+
+            print(
+                "Scan recovery verification failed: "
+                f"SCAN? returned channel={channel}, "
+                f"autoscan={autoscan_enabled}"
+            )
+            return False
+
+        except Exception as e:
+            print(
+                "Scan recovery failed.\n"
+                f"Reason: {e}"
+            )
+            return False
     
     def set_channel_setpoint(self, value: float, channel: int = 6, verbose = True, units: str = 'mK'):
         
@@ -616,12 +845,368 @@ class LakeShore370:
         try:
             print(f"✏️ Setting temperature setpoint for channel {channel} to {value} K.")
             with _lakeshore_mutex:
-                self.device.write(f"SETP {value},{channel}")
+                self._write(f"SETP {value},{channel}")
             if verbose: print(f"Set temperature setpoint for channel {channel} to {value} K.")
             return True
         except Exception as e:
             print(f"❌Setting temperature setpoint for channel {channel} failed.\nReason: {e}")
             return False
+
+    def set_ramp(
+        self,
+        enabled: bool,
+        rate_k_per_min: float,
+    ) -> bool:
+        """
+        Configure the native setpoint ramp and verify it with RAMP?.
+
+        Args:
+            enabled: True to enable ramping, False to disable it.
+            rate_k_per_min: Ramp rate in K/min.
+
+        Returns:
+            bool: True if the requested configuration was accepted.
+        """
+        try:
+            rate_k_per_min = float(rate_k_per_min)
+
+        except (TypeError, ValueError):
+            print("Ramp rate must be numeric.")
+            return False
+
+        if not (
+            MIN_RAMP_RATE_K_PER_MIN
+            <= rate_k_per_min
+            <= MAX_RAMP_RATE_K_PER_MIN
+        ):
+            print(
+                "Ramp rate must be between "
+                f"{MIN_RAMP_RATE_K_PER_MIN} and "
+                f"{MAX_RAMP_RATE_K_PER_MIN} K/min."
+            )
+            return False
+
+        enabled_value = int(bool(enabled))
+
+        try:
+            with _lakeshore_mutex:
+                self._write(
+                    f"RAMP {enabled_value},{rate_k_per_min:.6g}"
+                )
+                response = self._query("RAMP?")
+
+            fields = [
+                field.strip()
+                for field in response.strip().split(",")
+            ]
+
+            if len(fields) != 2:
+                print(
+                    f"Unexpected RAMP? response: {response!r}"
+                )
+                return False
+
+            configured_enabled = int(fields[0])
+            configured_rate = float(fields[1])
+
+            return (
+                configured_enabled == enabled_value
+                and abs(
+                    configured_rate - rate_k_per_min
+                ) <= 5e-7
+            )
+
+        except Exception as e:
+            print(
+                "Setting setpoint ramp failed."
+                f"\nReason: {e}"
+            )
+            return False
+
+    def start_ramp(
+        self,
+        target_mk: float,
+        rate_mk_per_min: float,
+        channel: int = 6,
+    ) -> dict:
+        """
+        Validate the closed-loop MXC setup and start the native 370 ramp.
+
+        The complete preflight and RAMP/SETP sequence is kept atomic with the
+        same communication RLock used by every query and write.
+        """
+        try:
+            target_mk = float(target_mk)
+            rate_mk_per_min = float(rate_mk_per_min)
+
+        except (TypeError, ValueError) as e:
+            return {
+                "ok": False,
+                "error": f"Invalid numeric value: {e}",
+            }
+
+        if channel != 6:
+            return {
+                "ok": False,
+                "error": "The controlled MXC channel must be 6.",
+            }
+
+        if not 10.0 <= target_mk <= 500.0:
+            return {
+                "ok": False,
+                "error": (
+                    "Target temperature must be between "
+                    "10 and 500 mK."
+                ),
+            }
+
+        rate_k_per_min = rate_mk_per_min / 1000.0
+
+        if not (
+            MIN_RAMP_RATE_K_PER_MIN
+            <= rate_k_per_min
+            <= MAX_RAMP_RATE_K_PER_MIN
+        ):
+            return {
+                "ok": False,
+                "error": (
+                    "Ramp rate must be between "
+                    "1 and 10000 mK/min."
+                ),
+            }
+
+        target_k = target_mk / 1000.0
+
+        try:
+            with _lakeshore_mutex:
+                control_settings = self.get_control_settings(
+                    return_dict=True
+                )
+                control_mode = self.get_control_mode()
+                heater_range = self._query("HTRRNG?").strip()
+                mxc_status = self.get_reading_status(channel)
+                initial_setpoint_k = (
+                    self.get_temperature_setpoint()
+                )
+
+                if control_settings is None:
+                    return {
+                        "ok": False,
+                        "error": (
+                            "CSET? did not return valid data."
+                        ),
+                    }
+
+                if (
+                    int(control_settings["controlled_channel"])
+                    != channel
+                ):
+                    return {
+                        "ok": False,
+                        "error": (
+                            "CSET control channel is not "
+                            "MXC channel 6."
+                        ),
+                    }
+
+                if control_settings["units"] != "Kelvin":
+                    return {
+                        "ok": False,
+                        "error": (
+                            "CSET units must be Kelvin for "
+                            "setpoint ramping."
+                        ),
+                    }
+
+                if control_mode != 1:
+                    return {
+                        "ok": False,
+                        "error": (
+                            "CMODE must be 1 "
+                            "(closed-loop PID)."
+                        ),
+                    }
+
+                if int(heater_range) <= 0:
+                    return {
+                        "ok": False,
+                        "error": "The MXC heater range is off.",
+                    }
+
+                if mxc_status is None or mxc_status != 0:
+                    return {
+                        "ok": False,
+                        "error": (
+                            f"MXC RDGST status is "
+                            f"{mxc_status!r}, not 000."
+                        ),
+                    }
+
+                if initial_setpoint_k is None:
+                    return {
+                        "ok": False,
+                        "error": (
+                            "Could not read the initial "
+                            "MXC setpoint."
+                        ),
+                    }
+
+                if not self.set_ramp(
+                    True,
+                    rate_k_per_min,
+                ):
+                    return {
+                        "ok": False,
+                        "error": (
+                            "RAMP configuration "
+                            "verification failed."
+                        ),
+                    }
+
+                self._write(f"SETP {target_k:.12g}")
+
+                current_setpoint_k = (
+                    self.get_temperature_setpoint()
+                )
+                ramp_active = self.get_ramp_status()
+
+            if (
+                current_setpoint_k is None
+                or ramp_active is None
+            ):
+                return {
+                    "ok": False,
+                    "error": (
+                        "Could not verify SETP?/RAMPST? "
+                        "after ramp start."
+                    ),
+                }
+
+            return {
+                "ok": True,
+                "initial_setpoint_k": float(
+                    initial_setpoint_k
+                ),
+                "target_k": target_k,
+                "rate_k_per_min": rate_k_per_min,
+                "current_setpoint_k": float(
+                    current_setpoint_k
+                ),
+                "ramp_active": bool(ramp_active),
+            }
+
+        except Exception as e:
+            print(
+                "Starting MXC ramp failed."
+                f"\nReason: {e}"
+            )
+            return {
+                "ok": False,
+                "error": str(e),
+            }
+
+    def stop_ramp(self) -> dict:
+        """
+        Stop an active native ramp at its present setpoint.
+
+        The ramp configuration remains enabled, but the active
+        movement towards the previous target is cancelled.
+        """
+        try:
+            with _lakeshore_mutex:
+                ramp_active_before = self.get_ramp_status()
+
+                if ramp_active_before is None:
+                    return {
+                        "ok": False,
+                        "error": (
+                            "Could not read the initial "
+                            "ramp status."
+                        ),
+                    }
+
+                hold_setpoint_k = (
+                    self.get_temperature_setpoint()
+                )
+
+                if hold_setpoint_k is None:
+                    return {
+                        "ok": False,
+                        "error": (
+                            "Could not read the current "
+                            "setpoint."
+                        ),
+                    }
+
+                hold_setpoint_k = float(hold_setpoint_k)
+
+                if not ramp_active_before:
+                    return {
+                        "ok": True,
+                        "was_active": False,
+                        "hold_setpoint_k": hold_setpoint_k,
+                        "ramp_active": False,
+                    }
+
+                # Re-entering the present setpoint cancels
+                # the active ramp at its current value.
+                self._write(
+                    f"SETP {hold_setpoint_k:.12g}"
+                )
+
+                confirmed_setpoint_k = (
+                    self.get_temperature_setpoint()
+                )
+                ramp_active_after = (
+                    self.get_ramp_status()
+                )
+
+            if confirmed_setpoint_k is None:
+                return {
+                    "ok": False,
+                    "error": (
+                        "Could not verify the hold setpoint."
+                    ),
+                }
+
+            if ramp_active_after is None:
+                return {
+                    "ok": False,
+                    "error": (
+                        "Could not verify the final "
+                        "ramp status."
+                    ),
+                }
+
+            if ramp_active_after:
+                return {
+                    "ok": False,
+                    "error": (
+                        "The ramp remains active after "
+                        "the stop command."
+                    ),
+                    "hold_setpoint_k": hold_setpoint_k,
+                }
+
+            return {
+                "ok": True,
+                "was_active": True,
+                "hold_setpoint_k": hold_setpoint_k,
+                "confirmed_setpoint_k": float(
+                    confirmed_setpoint_k
+                ),
+                "ramp_active": False,
+            }
+
+        except Exception as e:
+            print(
+                "Stopping MXC ramp failed."
+                f"\nReason: {e}"
+            )
+            return {
+                "ok": False,
+                "error": str(e),
+            }
     
     def set_control_parameters(self, P: float = None, I: float = None, D: float = None, channel: int = 6, verbose: bool = False):
         """
@@ -646,7 +1231,7 @@ class LakeShore370:
             if I is None: I = self.get_control_parameters().get("I", DEFAULT_PID["I"])
             if D is None: D = self.get_control_parameters().get("D", DEFAULT_PID["D"])
             with _lakeshore_mutex:
-                self.device.write(f"PID {P},{I},{D}")
+                self._write(f"PID {P},{I},{D}")
             if verbose: print(f"Set control parameters for channel {channel}: P={P}, I={I}, D={D}.")
             return True
         except Exception as e:
@@ -678,11 +1263,11 @@ class LakeShore370:
                 return False 
             else:
                 with _lakeshore_mutex:
-                    parameters = self.device.query(f"INSET? {channel}").split(",")
+                    parameters = self._query(f"INSET? {channel}").split(",")
                 pause = parameters[2]
                 curve = parameters[3]
                 temp_coeff = parameters[4]
-                self.device.write(f"INSET {channel},1,{dwell_time},{pause},{curve},{temp_coeff}")
+                self._write(f"INSET {channel},1,{dwell_time},{pause},{curve},{temp_coeff}")
                 print(f"Dwell time for channel {channel} set to {dwell_time} seconds.")
                 return True
 
@@ -710,14 +1295,14 @@ class LakeShore370:
                 return False
 
             with _lakeshore_mutex:
-                parameters = self.device.query(f"INSET? {channel}").split(",")
+                parameters = self._query(f"INSET? {channel}").split(",")
 
             dwell = parameters[1]
             curve = parameters[3]
             temp_coeff = parameters[4]
 
             with _lakeshore_mutex:
-                self.device.write(f"INSET {channel},1,{dwell},{int(pause_time)},{curve},{temp_coeff}")
+                self._write(f"INSET {channel},1,{dwell},{int(pause_time)},{curve},{temp_coeff}")
 
             print(f"Pause time for channel {channel} set to {pause_time} seconds.")
             return True
@@ -754,7 +1339,7 @@ class LakeShore370:
 
         try:
             with _lakeshore_mutex:
-                parameters = self.device.query(f"INSET? {channel}").split(",")
+                parameters = self._query(f"INSET? {channel}").split(",")
             current_curve = parameters[3]
             if int(current_curve) == int(curve_number):
                 print(f"Curve number {int(curve_number)} is already set to channel {int(channel)}")
@@ -762,7 +1347,7 @@ class LakeShore370:
             dwell = parameters[1]
             pause = parameters[2]
             temp_coeff = parameters[4]
-            self.device.write(f"INSET {channel},1,{dwell},{pause},{int(curve_number)},{temp_coeff}")
+            self._write(f"INSET {channel},1,{dwell},{pause},{int(curve_number)},{temp_coeff}")
             print(f"Curve #{int(curve_number)} succesfully set to channel {channel}.")
             return True
 
@@ -803,7 +1388,7 @@ class LakeShore370:
 
         try:
             with _lakeshore_mutex:
-                self.device.write(f"CSET {controlled_channel},{filtered_readings},{units},{delay},{heater_display},{str(heater_range)},{heater_resistance}")
+                self._write(f"CSET {controlled_channel},{filtered_readings},{units},{delay},{heater_display},{str(heater_range)},{heater_resistance}")
             if verbose: print(f"Control settings set to: {settings}")
             return True
         except Exception as e:
@@ -827,7 +1412,7 @@ class LakeShore370:
 
         try:
             with _lakeshore_mutex:
-                self.device.write(f"HTRRNG {range_value}")
+                self._write(f"HTRRNG {range_value}")
             if verbose: print(f"Control range set to: {CURRENT_RANGE_LIST[range_value][0]}")
             return True
         except Exception as e:
@@ -857,7 +1442,7 @@ class LakeShore370:
         else:
             try:
                 with _lakeshore_mutex:
-                    self.device.write(f"CSET {channel},{current_settings[1]},{current_settings[2]},{current_settings[3]},{current_settings[4]},{current_settings[5]},{current_settings[6]}")
+                    self._write(f"CSET {channel},{current_settings[1]},{current_settings[2]},{current_settings[3]},{current_settings[4]},{current_settings[5]},{current_settings[6]}")
                 if verbose: print(f"Control channel set to {channel}.")
                 return True
 
@@ -920,7 +1505,7 @@ class LakeShore370:
         
         try:
             with _lakeshore_mutex:
-                self.device.write(cmd)
+                self._write(cmd)
             if verbose: 
                 print(f"Sensor resistance settings for channel {channel} set to: {settings}")
             return True

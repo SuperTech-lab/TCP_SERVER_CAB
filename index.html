@@ -24,11 +24,12 @@
         align-items: center;
         justify-content: space-between;
         min-width: 150px;
-        padding: 4px 8px;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-        background-color: #fff;
+        padding: 8px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        background-color: #f9fafb;
         font-size: 14px;
+        font-weight: 500;
         cursor: pointer;
       }
 
@@ -43,16 +44,21 @@
         top: 100%;
         left: 0;
         margin-top: 4px;
-        padding: 8px 10px;
+        padding: 8px 12px;
         background-color: #fff;
         border: 1px solid #ccc;
         border-radius: 4px;
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
-        min-width: 170px;
+        min-width: 240px;
       }
 
       .channel-dropdown-menu .control-row {
-        justify-content: space-between;
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 10px;
+        padding: 6px 0;
+        width: 100%;
       }
       body {
         font-family: Arial, sans-serif;
@@ -181,6 +187,8 @@
         border-radius: 8px;
         box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
         min-width: 250px;
+        height: auto;
+        align-self: stretch;
       }
       .blackbody-plot-panel {
         flex: 2;
@@ -306,20 +314,16 @@
       }
 
       #timeRangeMXC {
-        display: flex;
         width: 150px;
       }
 
-      #excitationMXC {
-        width: 170px;
-      }
-      #heaterRangeMXC {
-        width: 150px;
+      #control-settings-mxc #heaterRangeMXC {
+        width: 120px;
       }
 
-      #dwellMXC,
-      #pauseMXC {
-        width: 100px;
+      #mxcTitleControls #dwellMXC,
+      #mxcTitleControls #pauseMXC {
+        width: 64px;
       }
 
       select {
@@ -389,11 +393,6 @@
         background-color: #007bff; /* blue fill when checked */
       }
 
-      .current-value {
-        font-weight: bold;
-        color: #007bff; /* blue */
-        margin-left: 8px;
-      }
       .reset-toggle {
         display: flex;
         align-items: center;
@@ -432,17 +431,6 @@
         height: 40px;
         padding: 4px 8px;
         line-height: 1.1;
-      }
-
-      .lakeshore-control-panel {
-        flex: 1;
-        background-color: white;
-        padding: 20px;
-        border-radius: 8px;
-        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-        min-width: 250px;
-        height: auto;
-        align-self: stretch;
       }
       .lakeshore-control-panel .section-content {
         overflow: visible !important;
@@ -490,14 +478,16 @@
       }
 
       /* Ajuste del desplegable para que se parezca al panel anterior */
-      .channel-dropdown-summary {
-        /* Mantiene las propiedades existentes, pero asegura el mismo aspecto de panel */
-        padding: 8px 12px;
-        border: 1px solid #d1d5db;
+
+      .log-card {
+        width: 100%;
+        background-color: white;
         border-radius: 8px;
-        background-color: #f9fafb;
-        font-weight: 500;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.10);
+        margin: 15px 0 30px 0;
+        overflow: hidden;
       }
+
       .log-section-title {
         display: flex;
         align-items: center;
@@ -505,21 +495,114 @@
         font-size: 1.1rem;
         font-weight: 700;
         color: #1f2937;
-        margin: 15px 0 10px 0;
-        padding: 15px 24px;
+        margin: 0;
+        padding: 18px 24px;
         cursor: pointer;
         justify-content: space-between;
         background-color: white;
         border-radius: 8px 8px 0 0;
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        box-shadow: none;
         border-bottom: none;
+      }
+      .log-card .section-title {
+        border-bottom: none;
+        padding-bottom: 0;
       }
 
       .log-section-title .icon {
         font-size: 1.2rem;
-        color: #ef4444;
       }
 
+      .log-section {
+        padding: 10px 24px 18px 24px;
+        margin: 0;
+      }
+
+      .log-card .log-box {
+        width: 100%;
+        height: 120px;
+        margin-top: 0;
+        box-sizing: border-box;
+        background-color: #f9f9f9;
+      }
+
+
+      .stage-card {
+        width: 100%;
+        background-color: white;
+        border-radius: 12px;
+        margin-top: 30px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+        overflow: hidden;
+        transition: all 0.3s ease;
+      }
+
+      /* Colores por canal */
+      .stage-card.stage-mxc {
+        border-left: 5px solid #3b82f6;
+        box-shadow: 0 4px 12px rgba(34, 103, 214, 0.2);
+      }
+
+      .stage-card.stage-still {
+        border-left: 5px solid #10b981;
+        box-shadow: 0 4px 12px rgba(13, 168, 116, 0.2);
+      }
+
+      .stage-card.stage-4k {
+        border-left: 5px solid #dd8f08;
+        box-shadow: 0 4px 12px rgba(212, 138, 10, 0.2);
+      }
+
+      .stage-card.stage-50k {
+        border-left: 5px solid #da2b2b;
+        box-shadow: 0 4px 12px rgba(233, 48, 48, 0.2);
+      }
+
+      /* Cabecera del canal */
+      .stage-title {
+        margin: 0;
+        padding: 34px 24px;
+        border-bottom: none;
+        background-color: white;
+        box-shadow: none;
+        border-radius: 0;
+      }
+
+      .stage-title h2 {
+        margin: 0;
+        font-size: 1.8rem;
+        font-weight: 700;
+      }
+
+      /* Contenido abierto */
+      .stage-body {
+        margin: 0;
+        margin-bottom: 0;
+        padding: 24px;
+        display: flex;
+        flex-direction: row;
+        gap: 20px;
+        align-items: flex-start;
+        overflow: hidden;
+        max-height: 1000px;
+        transition:
+          max-height 0.3s ease-in-out,
+          padding 0.3s ease-in-out;
+      }
+
+      /* Contenido cerrado */
+      .stage-body.collapsed {
+        max-height: 0 !important;
+        padding-top: 0;
+        padding-bottom: 0;
+        margin-bottom: 0;
+      }
+
+      /* Evita que row-container deje margen residual */
+      .stage-card .row-container {
+        margin-bottom: 0;
+      }
+      /* Remove
       .stage-mxc,
       .stage-still,
       .stage-4k,
@@ -547,7 +630,7 @@
       .stage-50k {
         border-left: 5px solid #da2b2b;
         box-shadow: 0 4px 12px rgba(233, 48, 48, 0.2);
-      }
+      } */
       .current-stage-value {
         width: 120px;
         margin-left: 30px;
@@ -802,10 +885,6 @@
         font-size: 12px;
       }
 
-      .channel-dropdown-menu .control-row {
-        gap: 10px;
-      }
-
       .status-indicator-circle {
         width: 20px;
         height: 20px;
@@ -826,29 +905,6 @@
         box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
       }
 
-      .channel-dropdown-menu {
-        position: absolute;
-        z-index: 101;
-        top: 100%;
-        left: 0;
-        margin-top: 4px;
-        padding: 8px 12px;
-        background-color: #fff;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
-        /* CAMBIO: De 170px a 240px para que quepa todo en una línea */
-        min-width: 240px;
-      }
-
-      .channel-dropdown-menu .control-row {
-        display: flex;
-        align-items: center;
-        justify-content: flex-start;
-        padding: 6px 0;
-        width: 100%; /* Asegura que ocupe todo el ancho del menú */
-      }
-
       /* Ajuste fino del círculo para que no mueva el texto */
       .channel-dropdown-menu .status-indicator-circle {
         width: 10px !important;
@@ -857,24 +913,219 @@
         flex-shrink: 0;
         margin-left: 6px; /* Separación del texto "Ch X" */
       }
+
+      .top-header {
+        align-items: center;
+        gap: 14px;
+        margin-bottom: 30px;
+      }
+
+      .sctlab-logo {
+        width: 110px;
+        height: 50px;
+        object-fit: contain;
+        flex: 0 0 auto;
+      }
+
+      .top-header .tab-menu {
+        flex: 1;
+        margin-bottom: 0;
+        gap: 10px;
+        max-width: none;
+      }
+
+      .top-header .tab-button {
+        flex: 1 1 0;
+        min-width: 0;
+        padding: 13px 16px;
+        margin-top: 0;
+      }
+
+      .stage-title-mxc {
+        display: grid;
+
+        grid-template-columns: minmax(250px, 1fr) minmax(750px, 3fr) auto;
+
+        column-gap: 20px;
+        row-gap: 0;
+        align-items: center;
+
+        min-height: 0;
+        padding: 14px 24px 8px 24px;
+
+        cursor: default;
+      }
+
+      .stage-title-mxc h2 {
+        grid-column: 1;
+        margin: 0;
+        white-space: nowrap;
+        cursor: pointer;
+      }
+
+      .stage-title-mxc::after {
+        grid-column: 3;
+        justify-self: end;
+        align-self: center;
+        margin-left: 0;
+        cursor: pointer;
+      }
+
+      .mxc-title-controls {
+        grid-column: 2;
+        width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+
+        padding: 12px 14px;
+        margin-left: 0;
+
+        background-color: white;
+        border-radius: 8px;
+        border: 1px solid #e5e7eb;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+
+        cursor: default;
+      }
+
+      .mxc-header-row {
+        display: grid;
+        align-items: center;
+        column-gap: 16px;
+        row-gap: 8px;
+      }
+
+      .mxc-header-row-top {
+        grid-template-columns: auto auto minmax(260px, 1fr);
+      }
+
+      .mxc-header-row-bottom {
+        grid-template-columns: auto minmax(260px, 1fr) auto auto;
+      }
+
+      .mxc-header-button {
+        margin-top: 0;
+        min-width: 145px;
+        padding: 8px 12px;
+        white-space: nowrap;
+      }
+
+      .mxc-header-field {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .mxc-header-field label {
+        width: auto;
+        margin: 0;
+        font-size: 14px;
+        white-space: nowrap;
+      }
+
+      .mxc-header-field input {
+        width: 64px;
+        height: 32px;
+        padding: 4px 6px;
+      }
+
+      .mxc-header-field select {
+        height: 32px;
+        margin-left: 0;
+        padding: 4px 8px;
+      }
+
+      #mxcTitleControls #sensorModeMXC {
+        width: 105px;
+      }
+
+      #mxcTitleControls #sensorRangeMXC {
+        width: 190px;
+      }
+
+      #mxcTitleControls #curveMXCSelect {
+        width: 230px;
+      }
+
+      #mxcTitleControls #dwellMXC,
+      #mxcTitleControls #pauseMXC {
+        width: 64px;
+      }
+      .mxc-title-mini-chart {
+        display: none;
+        flex: 1;
+        height: 70px;
+        min-width: 420px;
+        margin-left: 20px;
+      }
+
+      .mxc-title-mini-chart canvas {
+        width: 100% !important;
+        height: 70px !important;
+      }
+
+      .stage-title-mxc.collapsed .mxc-title-controls {
+        display: none;
+      }
+
+      .stage-title-mxc.collapsed .mxc-title-mini-chart {
+        display: block;
+      }
+
+      .mxc-plot-toolbar {
+        margin-bottom: 15px;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 18px;
+      }
+
+      .mxc-plot-toolbar label {
+        width: auto;
+        margin: 0;
+      }
+
+      .mxc-plot-toolbar #timeRangeMXC {
+        width: 150px;
+        margin-left: 0;
+      }
+
+      .mxc-plot-toolbar .current-stage-value {
+        width: 120px;
+        margin-left: 10px;
+      }
+
+      .stage-card.stage-mxc .stage-body {
+        padding-top: 8px;
+      }
+
     </style>
   </head>
 
   <body>
     <canvas id="particles-canvas" class="particles-canvas"></canvas>
-    <div class="container">
-      <div class="tab-menu">
-        <button class="tab-button active" data-target="lakeshore-tab">
-          Fridge Control
-        </button>
-        <button class="tab-button" data-target="blackbody-tab">
-          Black Body Control
-        </button>
-        <button class="tab-button" data-target="relation-tab">
-          Resistance vs. TMXC
-        </button>
-      </div>
+   <div class="container top-header">
+    <img
+      src="/SCTLab_logo.png"
+      alt="SCTLab logo"
+      class="sctlab-logo"
+    />
+
+    <div class="tab-menu">
+      <button class="tab-button active" data-target="lakeshore-tab">
+        Fridge Control
+      </button>
+      <button class="tab-button" data-target="blackbody-tab">
+        Black Body Control
+      </button>
+      <button class="tab-button" data-target="relation-tab">
+        Resistance vs. TMXC
+      </button>
     </div>
+  </div>
 
     <div id="lakeshore-tab" class="tab-content active">
       <div class="container lakeshore-container">
@@ -1028,304 +1279,268 @@
             └── MXC Stage -->
 
         <!-- System Log for Fridge Tab -->
-        <div class="section-title log-section-title">
-          <div style="display: flex; align-items: center; gap: 10px">
-            <span class="icon">📜</span>
-            SYSTEM LOG
+        <div class="log-card">
+          <div class="section-title log-section-title">
+            <div style="display: flex; align-items: center; gap: 10px">
+              <span class="icon">📜</span>
+              SYSTEM LOG
+            </div>
           </div>
-        </div>
-        <div class="section-content row-container log-section">
-          <div class="lakeshore-control-panel">
+
+          <div class="section-content log-section">
             <div class="log-box" id="logBoxLS"></div>
           </div>
         </div>
         <!-- ------------------------- -->
 
-        <div class="section-title stage-mxc"><h2>MXC Stage</h2></div>
-        <div class="section-content row-container stage-mxc">
-          <div class="lakeshore-control-panel">
-            <div class="control-group">
-              <!-- Temperature control -->
-              <div style="margin-top: 15px">
-                <!-- SOLO Controles del PID + Heater Range -->
-                <div id="control-settings-mxc">
-                  <div class="control-row" style="margin-bottom: 10px">
-                    <label style="width: 120px">Heater output:</label>
-                    <span id="heaterOutputMXC" class="current-value">- %</span>
-                  </div>
-                  <div class="control-row" style="margin-bottom: 10px">
-                    <label for="temperatureSetpointMXC" style="width: 120px"
-                      >Setpoint (mK):</label
-                    >
-                    <input
-                      type="number"
-                      id="temperatureSetpointMXC"
-                      class="control-input"
-                      style="width: 80px"
-                      min="0"
-                      max="500"
-                      step="1"
-                    />
-                  </div>
+        <div class="stage-card stage-mxc">
+          <div class="section-title stage-title stage-title-mxc">
+            <h2>MXC Stage</h2>
 
-                  <div class="control-row" style="margin-bottom: 10px">
-                    <label for="proportionalGainMXC" style="width: 120px"
-                      >P Gain:</label
-                    >
-                    <input
-                      type="number"
-                      id="proportionalGainMXC"
-                      class="control-input"
-                      style="width: 80px"
-                      min="0"
-                      max="100"
-                      step="0.1"
-                    />
-                  </div>
-
-                  <div class="control-row" style="margin-bottom: 10px">
-                    <label for="integralGainMXC" style="width: 120px"
-                      >I Gain:</label
-                    >
-                    <input
-                      type="number"
-                      id="integralGainMXC"
-                      class="control-input"
-                      style="width: 80px"
-                      min="0"
-                      max="100"
-                      step="0.1"
-                    />
-                  </div>
-
-                  <div class="control-row" style="margin-bottom: 10px">
-                    <label for="derivativeGainMXC" style="width: 120px"
-                      >D Gain:</label
-                    >
-                    <input
-                      type="number"
-                      id="derivativeGainMXC"
-                      class="control-input"
-                      style="width: 80px"
-                      min="0"
-                      max="100"
-                      step="0.1"
-                    />
-                  </div>
-
-                  <div class="control-row" style="margin-bottom: 10px">
-                    <label for="heaterRangeMXC" style="width: 120px"
-                      >Heater Range:</label
-                    >
-                    <select
-                      id="heaterRangeMXC"
-                      class="control-input"
-                      style="width: 120px"
-                    >
-                      <option value="0">Off</option>
-                      <option value="1">31.6 µA</option>
-                      <option value="2">100 µA</option>
-                      <option value="3">316 µA</option>
-                      <option value="4">1 mA</option>
-                      <option value="5">3.16 mA</option>
-                      <option value="6">10.0 mA</option>
-                      <option value="7">31.6 mA</option>
-                      <option value="8">100 mA</option>
-                    </select>
-                  </div>
-
-                  <div class="control-row" style="margin-top: 10px">
-                    <button onclick="writeControlSettingsMXC()">
-                      Write Control Settings
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Barra de progreso -->
-              <div
-                id="progressContainerMXC"
-                style="display: none; margin-top: 10px"
-          <div class="relation-plot-panel">
-                <div style="width: 100%; background-color: #ddd">
-                  <div
-                    id="progressBarMXC"
-                    style="width: 0%; height: 20px; background-color: #4caf50"
-                  ></div>
-                </div>
-                <div
-                  id="progressTextMXC"
-                  style="font-size: 12px; margin-top: 5px"
+            <div id="mxcTitleControls" class="mxc-title-controls">
+              <div class="mxc-header-row mxc-header-row-top">
+                <button
+                  class="inline-button mxc-header-button"
+                  onclick="writeSensorSettingsMXC()"
                 >
-                  Processing...
+                  Write Sensor Settings
+                </button>
+
+                <button
+                  class="inline-button mxc-header-button"
+                  onclick="resetDefaultsMXC()"
+                >
+                  Reset to default
+                </button>
+
+                <div class="mxc-header-field mxc-header-field-curve">
+                  <label for="curveMXCSelect">Curve:</label>
+                  <select id="curveMXCSelect" class="control-input">
+                    <option value="1">PT-100-20K (PT1011)</option>
+                    <option value="2">CX-1050-CD-BF1 (X64005)</option>
+                    <option value="3">CX-1010-CD-BF0 (X63593)</option>
+                    <option value="4">RU-1000-BF0.007 (U03308)</option>
+                  </select>
                 </div>
               </div>
+
+              <div class="mxc-header-row mxc-header-row-bottom">
+                <div class="mxc-header-field">
+                  <label for="sensorModeMXC">Mode:</label>
+                  <select id="sensorModeMXC" class="control-input">
+                    <option value="0">Voltage</option>
+                    <option value="1">Current</option>
+                  </select>
+                </div>
+
+                <div class="mxc-header-field mxc-header-field-excitation">
+                  <label for="sensorRangeMXC">Excitation:</label>
+                  <select id="sensorRangeMXC" class="control-input">
+                    <option value="1">2.00 uV and 1.00 pA</option>
+                    <option value="2">6.32 uV and 3.16 pA</option>
+                    <option value="3">20.0 uV and 10.0 pA</option>
+                    <option value="4">63.2 uV and 31.6 pA</option>
+                    <option value="5">200 uV and 100 pA</option>
+                    <option value="6">632 uV and 316 pA</option>
+                    <option value="7">2.00 mV and 1.00 nA</option>
+                    <option value="8">6.32 mV and 3.16 nA</option>
+                  </select>
+                </div>
+
+                <div class="mxc-header-field">
+                  <label for="dwellMXC">Dwell:</label>
+                  <input
+                    type="number"
+                    class="control-input"
+                    id="dwellMXC"
+                    min="0"
+                    max="10"
+                    step="0.1"
+                  />
+                </div>
+
+                <div class="mxc-header-field">
+                  <label for="pauseMXC">Pause:</label>
+                  <input
+                    type="number"
+                    class="control-input"
+                    id="pauseMXC"
+                    min="0"
+                    max="10"
+                    step="0.1"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div id="mxcMiniChartBox" class="mxc-title-mini-chart">
+              <canvas id="temperatureChartMXCMini"></canvas>
             </div>
           </div>
-          <div
-            class="lakeshore-plot-panel"
-            style="
-              flex: 3;
-              min-width: 750px;
-              display: flex;
-              flex-direction: column;
-            "
-          >
-            <!-- Fila superior: Write Sensor, reset, time range, autorange, valor actual -->
-            <div
-              class="control-row"
-              style="
-                margin-bottom: 15px;
-                align-items: center;
-                padding-left: 0px;
-              "
-            >
-              <button
-                class="inline-button"
-                style="
-                  margin-left: 0;
-                  margin-right: 25px;
-                  padding: 8px 18px;
-                  min-width: 160px;
-                "
-                onclick="writeSensorSettingsMXC()"
-              >
-                Write Sensor Settings
-              </button>
+          <div class="section-content row-container stage-body">
+            <div class="lakeshore-control-panel">
+              <div class="control-group">
+                <!-- Temperature control -->
+                <div style="margin-top: 15px">
+                  <!-- SOLO Controles del PID + Heater Range -->
+                  <div id="control-settings-mxc">
+                    <div class="control-row" style="margin-bottom: 10px">
+                      <label style="width: 120px">Heater output:</label>
+                      <span id="heaterOutputMXC" class="current-value">- %</span>
+                    </div>
+                    <div class="control-row" style="margin-bottom: 10px">
+                      <label for="temperatureSetpointMXC" style="width: 120px"
+                        >Setpoint (mK):</label
+                      >
+                      <input
+                        type="number"
+                        id="temperatureSetpointMXC"
+                        class="control-input"
+                        style="width: 80px"
+                        min="0"
+                        max="500"
+                        step="1"
+                      />
+                    </div>
 
-              <button
-                class="inline-button"
-                style="margin-right: 25px; padding: 8px 18px; min-width: 160px"
-                onclick="resetDefaultsMXC()"
-              >
-                Reset to default
-              </button>
+                    <div class="control-row" style="margin-bottom: 10px">
+                      <label for="proportionalGainMXC" style="width: 120px"
+                        >P Gain:</label
+                      >
+                      <input
+                        type="number"
+                        id="proportionalGainMXC"
+                        class="control-input"
+                        style="width: 80px"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                      />
+                    </div>
 
-              <div style="display: flex; align-items: center;">
-                <label
-                  for="timeRangeMXC"
-                  style="margin: 0 10px 0 25px;"
-                >
-                  Time Range:
-                </label>
+                    <div class="control-row" style="margin-bottom: 10px">
+                      <label for="integralGainMXC" style="width: 120px"
+                        >I Gain:</label
+                      >
+                      <input
+                        type="number"
+                        id="integralGainMXC"
+                        class="control-input"
+                        style="width: 80px"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                      />
+                    </div>
 
-                <select
-                  id="timeRangeMXC"
-                  style="margin-right: 50px;"
-                  onchange="updateTimeRange()"
-                >
-                  <option value="21600">6 Hours</option>
-                  <option value="3600">1 Hour</option>
-                  <option value="1800">30 Minutes</option>
-                  <option value="900">15 Minutes</option>
-                  <option value="300">5 Minutes</option>
-                  <option value="60" selected>1 Minute</option>
-                </select>
+                    <div class="control-row" style="margin-bottom: 10px">
+                      <label for="derivativeGainMXC" style="width: 120px"
+                        >D Gain:</label
+                      >
+                      <input
+                        type="number"
+                        id="derivativeGainMXC"
+                        class="control-input"
+                        style="width: 80px"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                      />
+                    </div>
 
-                <div id="statusCircleCH6" class="status-indicator-circle"></div>
+                    <div class="control-row" style="margin-bottom: 10px">
+                      <label for="heaterRangeMXC"
+                        >Heater Range:</label
+                      >
+                      <select
+                        id="heaterRangeMXC"
+                        class="control-input"
+                        style="width: 120px"
+                      >
+                        <option value="0">Off</option>
+                        <option value="1">31.6 µA</option>
+                        <option value="2">100 µA</option>
+                        <option value="3">316 µA</option>
+                        <option value="4">1 mA</option>
+                        <option value="5">3.16 mA</option>
+                        <option value="6">10.0 mA</option>
+                        <option value="7">31.6 mA</option>
+                        <option value="8">100 mA</option>
+                      </select>
+                    </div>
 
-                <select id="currentMXCValue" class="current-stage-value">
-                  <option value="temperature">- mK</option>
-                  <option value="resistance">- Ω</option>
-                  <option value="power">- W</option>
-                </select>
+                    <div class="control-row" style="margin-top: 10px">
+                      <button onclick="writeControlSettingsMXC()">
+                        Write Control Settings
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Barra de progreso -->
+                <div id="progressContainerMXC" style="display: none; margin-top: 10px">
+                  <div style="width: 100%; background-color: #ddd">
+                    <div id="progressBarMXC" style="width: 0%; height: 20px; background-color: #4caf50">
+                    </div>
+                  </div>
+                  <div id="progressTextMXC" style="font-size: 12px; margin-top: 5px">
+                    Processing...
+                  </div>
+                </div>
               </div>
             </div>
-
-            <!-- Gráfica -->
-            <canvas id="temperatureChartMXC" width="800" height="200"></canvas>
-
-            <!-- Fila inferior: Dwell, Pause, Excitation, Mode -->
             <div
-              class="control-row"
+              class="lakeshore-plot-panel"
               style="
-                margin-top: 10px;
+                flex: 3;
+                min-width: 750px;
                 display: flex;
-                flex-wrap: wrap;
-                gap: 20px 40px;
-                align-items: center;
-                justify-content: flex-start;
+                flex-direction: column;
               "
             >
-              <div style="display: flex; align-items: center; gap: 4px">
-                <label for="dwellMXC" style="width: auto; margin-right: 0"
-                  >Dwell Time:</label
-                >
-                <input
-                  type="number"
-                  class="control-input"
-                  style="width: 60px"
-                  id="dwellMXC"
-                  min="0"
-                  max="10"
-                  step="0.1"
-                />
+              <!-- Fila superior: Time range, autorange, valor actual -->
+              <div
+                class="control-row"
+                style="
+                  margin-bottom: 15px;
+                  align-items: center;
+                  padding-left: 0px;
+                "
+              >
+                <div style="display: flex; align-items: center;">
+                  <label
+                    for="timeRangeMXC"
+                    style="margin: 0 10px 0 25px;"
+                  >
+                    Time Range:
+                  </label>
+
+                  <select
+                    id="timeRangeMXC"
+                    style="margin-right: 50px;"
+                    onchange="updateTimeRange()"
+                  >
+                    <option value="21600">6 Hours</option>
+                    <option value="3600">1 Hour</option>
+                    <option value="1800">30 Minutes</option>
+                    <option value="900">15 Minutes</option>
+                    <option value="300">5 Minutes</option>
+                    <option value="60" selected>1 Minute</option>
+                  </select>
+
+                  <div id="statusCircleCH6" class="status-indicator-circle"></div>
+
+                  <select id="currentMXCValue" class="current-stage-value">
+                    <option value="temperature">- mK</option>
+                    <option value="resistance">- Ω</option>
+                    <option value="power">- W</option>
+                  </select>
+                </div>
               </div>
 
-              <div style="display: flex; align-items: center; gap: 6px">
-                <label for="pauseMXC" style="width: auto; margin-right: 0"
-                  >Pause Time:</label
-                >
-                <input
-                  type="number"
-                  class="control-input"
-                  style="width: 60px"
-                  id="pauseMXC"
-                  min="0"
-                  max="10"
-                  step="0.1"
-                />
-              </div>
+              <!-- Gráfica -->
+              <canvas id="temperatureChartMXC" width="800" height="250"></canvas>
 
-              <div style="display: flex; align-items: center; gap: 6px">
-                <label for="sensorRangeMXC" style="width: auto; margin-right: 0"
-                  >Excitation:</label
-                >
-                <select
-                  id="sensorRangeMXC"
-                  class="control-input"
-                  style="width: 200px; margin-left: 0"
-                >
-                  <option value="1">2.00 uV and 1.00 pA</option>
-                  <option value="2">6.32 uV and 3.16 pA</option>
-                  <option value="3">20.0 uV and 10.0 pA</option>
-                  <option value="4">63.2 uV and 31.6 pA</option>
-                  <option value="5">200 uV and 100 pA</option>
-                  <option value="6">632 uV and 316 pA</option>
-                  <option value="7">2.00 mV and 1.00 nA</option>
-                  <option value="8">6.32 mV and 3.16 nA</option>
-                </select>
-              </div>
-
-              <div style="display: flex; align-items: center; gap: 6px">
-                <label for="sensorModeMXC" style="width: auto; margin-right: 0"
-                  >Mode:</label
-                >
-                <select
-                  id="sensorModeMXC"
-                  class="control-input"
-                  style="width: 120px; margin-left: 0"
-                >
-                  <option value="0">Voltage</option>
-                  <option value="1">Current</option>
-                </select>
-              </div>
-
-              <div style="display: flex; align-items: center; gap: 6px">
-                <label for="curveMXCSelect" style="width: auto; margin-right: 0"
-                  >Curve:</label
-                >
-                <select
-                  id="curveMXCSelect"
-                  class="control-input"
-                  style="width: 220px; margin-left: 0"
-                >
-                  <option value="1">PT-100-20K (PT1011)</option>
-                  <option value="2">CX-1050-CD-BF1 (X64005)</option>
-                  <option value="3">CX-1010-CD-BF0 (X63593)</option>
-                  <option value="4">RU-1000-BF0.007 (U03308)</option>
-                </select>
-              </div>
             </div>
           </div>
         </div>
@@ -1384,7 +1599,7 @@
                   <option value="1">Current</option>
                 </select>
               </div>
-              <div class="control-row" style="margin-bottom: 10px">
+              <div class="control-row mxc-plot-toolbar">
                 <label for="curveSTILLSelect" style="width: 120px"
                   >Curve:</label
                 >
@@ -2537,6 +2752,51 @@
                 </div>
               </div>
             </div>
+            <div class="control-row" style="margin-top: 10px; align-items: center">
+              <label style="width: 120px">MXC control:</label>
+
+              <select
+                id="relationModeSelect"
+                class="styled-select"
+                style="width: 120px"
+              >
+                <option value="MANUAL">Manual</option>
+                <option value="RAMP">Ramp</option>
+              </select>
+            </div>
+
+            <div id="relationRampControls" style="display: none">
+              <div class="control-row" style="margin-top: 10px; align-items: center">
+                <label style="width: 120px">Target:</label>
+
+                <input
+                  id="relationTargetInput"
+                  type="number"
+                  value="100"
+                  min="0.001"
+                  step="0.1"
+                  style="width: 90px; height: 32px"
+                />
+
+                <span style="margin-left: 6px">mK</span>
+              </div>
+
+              <div class="control-row" style="margin-top: 10px; align-items: center">
+                <label style="width: 120px">Ramp rate:</label>
+
+                <input
+                  id="relationRateInput"
+                  type="number"
+                  value="10"
+                  min="0.001"
+                  step="0.1"
+                  style="width: 90px; height: 32px"
+                />
+
+                <span style="margin-left: 6px">mK/min</span>
+              </div>
+            </div>
+
             <div
               class="control-row"
               style="margin-top: 10px; align-items: center"
@@ -2649,24 +2909,60 @@
       const pendingSampleToggle = {};
 
       async function initRelationStateFromServer() {
+        const startButton = document.getElementById(
+          "relationStartButton",
+        );
+        const stopButton = document.getElementById(
+          "relationStopButton",
+        );
+        const channelSelect = document.getElementById(
+          "relationChannelSelect",
+        );
+        const labelInput = document.getElementById(
+          "relationLabelInput",
+        );
+        const modeSelect = document.getElementById(
+          "relationModeSelect",
+        );
+        const targetInput = document.getElementById(
+          "relationTargetInput",
+        );
+        const rateInput = document.getElementById(
+          "relationRateInput",
+        );
+
+        function setRelationUiIdle() {
+          relationRunning = false;
+
+          startButton.disabled = false;
+          stopButton.disabled = true;
+          channelSelect.disabled = false;
+          labelInput.disabled = false;
+          modeSelect.disabled = false;
+
+          updateRelationLabelVisibility();
+          updateRelationRampControls();
+        }
+
         try {
-          const raw = await sendCommandToServer("get_relation_status");
+          const raw = await sendCommandToServer(
+            "get_relation_status",
+          );
 
           let response = (raw ?? "").toString().trim();
           const prefix = "Command received - ";
+
           if (response.startsWith(prefix)) {
-            response = response.slice(prefix.length).trim();
+            response = response
+              .slice(prefix.length)
+              .trim();
           }
 
           const marker = "RELATION_STATUS:";
           const idx = response.indexOf(marker);
+
           if (idx === -1) {
-            relationRunning = false;
-            document.getElementById("relationStartButton").disabled = false;
-            document.getElementById("relationStopButton").disabled = true;
-            document.getElementById("relationChannelSelect").disabled = false;
-            document.getElementById("relationLabelInput").disabled = false;
-            updateRelationLabelVisibility();
+            setRelationUiIdle();
 
             addLogEntry(
               `❌ get_relation_status: no RELATION_STATUS en "${raw}"`,
@@ -2675,22 +2971,51 @@
             return;
           }
 
-          const payload = response.slice(idx).trim(); // ahora empieza por RELATION_STATUS:...
+          const payload = response.slice(idx).trim();
 
-          // Formatos esperados (según tu código actual):
-          // ACTIVE: RELATION_STATUS:ACTIVE:<relation_run_id>:<ch>:<label_enc>:<n>
-          // IDLE:   RELATION_STATUS:IDLE
-          if (payload.startsWith("RELATION_STATUS:ACTIVE:")) {
+          if (
+            payload.startsWith(
+              "RELATION_STATUS:ACTIVE:",
+            )
+          ) {
             const parts = payload.split(":");
 
-            // parts = ["RELATION_STATUS","ACTIVE", relation_run_id, chNum, labelEnc, n]
             const relationRunId = parts[2] || null;
             const chNum = parts[3] || null;
             const labelEnc = parts[4] || "";
             const n = parts[5] || "0";
 
-            // Validación mínima (evita petadas si viene mal)
+            /*
+            * Los campos 6–8 son los añadidos para
+            * restaurar el control de la rampa.
+            *
+            * Si se recibe el formato antiguo,
+            * se interpreta como MANUAL.
+            */
+            const relationMode =
+              parts[6] === "RAMP"
+                ? "RAMP"
+                : "MANUAL";
+
+            const targetMk = parts[7] ?? "";
+            const rateMkPerMin = parts[8] ?? "";
+
             if (!chNum) {
+              /*
+              * El servidor indica ACTIVE, pero no podemos
+              * reconstruir la relación. Bloqueamos Start
+              * para evitar iniciar otra relación encima.
+              */
+              relationRunning = true;
+
+              startButton.disabled = true;
+              stopButton.disabled = false;
+              channelSelect.disabled = true;
+              labelInput.disabled = true;
+              modeSelect.disabled = true;
+
+              updateRelationRampControls();
+
               addLogEntry(
                 `❌ RELATION_STATUS ACTIVE malformado: "${payload}"`,
                 "received",
@@ -2698,45 +3023,61 @@
               return;
             }
 
-            relationRunning = true;
-
-            // UI: stop habilitado, start deshabilitado
-            document.getElementById("relationStartButton").disabled = true;
-            document.getElementById("relationStopButton").disabled = false;
-            document.getElementById("relationChannelSelect").disabled = true;
-            document.getElementById("relationLabelInput").disabled = true;
-
-            // Reflejar canal/label (y sincronizar variable interna usada por la gráfica)
             const chStr = `CH${chNum}`;
-            document.getElementById("relationChannelSelect").value = chStr;
 
             let decodedLabel = "";
-            try {
-              decodedLabel = decodeURIComponent(labelEnc);
-            } catch {
-              decodedLabel = labelEnc; // por si viene ya decodificado o con % mal
-            }
-            document.getElementById("relationLabelInput").value = decodedLabel;
 
-            currentRelationChannel = chStr; // IMPORTANTE para tu plotting
-            updateRelationLabelVisibility(); // IMPORTANTE para mostrar/ocultar label
+            try {
+              decodedLabel = decodeURIComponent(
+                labelEnc,
+              );
+            } catch {
+              decodedLabel = labelEnc;
+            }
+
+            channelSelect.value = chStr;
+            labelInput.value = decodedLabel;
+            modeSelect.value = relationMode;
+
+            if (relationMode === "RAMP") {
+              targetInput.value = targetMk;
+              rateInput.value = rateMkPerMin;
+            }
+
+            currentRelationChannel = chStr;
+            relationRunning = true;
+
+            startButton.disabled = true;
+            stopButton.disabled = false;
+            channelSelect.disabled = true;
+            labelInput.disabled = true;
+            modeSelect.disabled = true;
+
+            updateRelationLabelVisibility();
+            updateRelationRampControls();
+
+            const modeDetails =
+              relationMode === "RAMP"
+                ? `, target=${targetMk} mK, rate=${rateMkPerMin} mK/min`
+                : "";
 
             addLogEntry(
-              `🔁 Relation activa recuperada: relation_run_id=${relationRunId ?? "?"} (CH${chNum}, n=${n})`,
+              `🔁 Relation activa recuperada: `
+                + `relation_run_id=${relationRunId ?? "?"} `
+                + `(CH${chNum}, n=${n}, mode=${relationMode}`
+                + `${modeDetails})`,
               "status",
             );
+
             return;
           }
 
-          // Cualquier otra cosa => idle seguro
-          relationRunning = false;
-          document.getElementById("relationStartButton").disabled = false;
-          document.getElementById("relationStopButton").disabled = true;
-          document.getElementById("relationChannelSelect").disabled = false;
-          document.getElementById("relationLabelInput").disabled = false;
-          updateRelationLabelVisibility();
-        } catch (e) {
-          addLogEntry(`❌ Error get_relation_status: ${e.message}`, "received");
+          setRelationUiIdle();
+        } catch (error) {
+          addLogEntry(
+            `❌ Error get_relation_status: ${error.message}`,
+            "received",
+          );
         }
       }
 
@@ -2760,42 +3101,196 @@
 
       updateRelationLabelVisibility();
 
+      function updateRelationRampControls() {
+        const modeSelect = document.getElementById(
+          "relationModeSelect",
+        );
+        const rampControls = document.getElementById(
+          "relationRampControls",
+        );
+        const targetInput = document.getElementById(
+          "relationTargetInput",
+        );
+        const rateInput = document.getElementById(
+          "relationRateInput",
+        );
+
+        const isRamp = modeSelect.value === "RAMP";
+
+        rampControls.style.display = isRamp
+          ? "block"
+          : "none";
+
+        targetInput.disabled =
+          !isRamp || relationRunning;
+        rateInput.disabled =
+          !isRamp || relationRunning;
+      }
+
+      document
+        .getElementById("relationModeSelect")
+        .addEventListener(
+          "change",
+          updateRelationRampControls,
+        );
+
+      updateRelationRampControls();
+
       document
         .getElementById("relationStartButton")
         .addEventListener("click", async () => {
           if (relationRunning) return;
 
-          const ch = document.getElementById("relationChannelSelect").value; // "CH9".."CH15"
-          const chNum = ch.replace("CH", ""); // "9".."15"
-          const label =
-            document.getElementById("relationLabelInput").value || "NA";
+          const startButton = document.getElementById(
+            "relationStartButton",
+          );
+          const stopButton = document.getElementById(
+            "relationStopButton",
+          );
+          const channelSelect = document.getElementById(
+            "relationChannelSelect",
+          );
+          const labelInput = document.getElementById(
+            "relationLabelInput",
+          );
+          const modeSelect = document.getElementById(
+            "relationModeSelect",
+          );
 
-          // 1) AHORA el select_measure_channel se hace al darle al play (▶)
-          const selectCmd = `select_measure_channel:${chNum}`;
-          addLogEntry(`Sending: ${selectCmd}`, "sent");
+          const ch = channelSelect.value;
+          const chNum = ch.replace("CH", "");
+          const label = labelInput.value || "NA";
+          const mode = modeSelect.value;
+
+          let startCmd;
+          let successMarker;
+
+          if (mode === "RAMP") {
+            const targetMk = Number(
+              document.getElementById(
+                "relationTargetInput",
+              ).value,
+            );
+            const rateMkPerMin = Number(
+              document.getElementById(
+                "relationRateInput",
+              ).value,
+            );
+
+            if (!Number.isFinite(targetMk) || targetMk <= 0) {
+              addLogEntry(
+                "❌ Target must be a positive number.",
+                "received",
+              );
+              return;
+            }
+
+            if (
+              !Number.isFinite(rateMkPerMin)
+              || rateMkPerMin <= 0
+            ) {
+              addLogEntry(
+                "❌ Ramp rate must be a positive number.",
+                "received",
+              );
+              return;
+            }
+
+            startCmd =
+              `start_relation_ramp:${chNum}:`
+              + `${targetMk}:${rateMkPerMin}:`
+              + encodeURIComponent(label);
+
+            successMarker = "RELATION_RAMP_STARTED:";
+          } else {
+            startCmd =
+              `start_relation:${chNum}:`
+              + encodeURIComponent(label);
+
+            successMarker = "RELATION_STARTED:";
+          }
+
+          startButton.disabled = true;
 
           try {
-            const respSel = await sendCommandToServer(selectCmd);
-            addLogEntry(`Server response: ${respSel}`, "received");
+            const selectCmd =
+              `select_measure_channel:${chNum}`;
 
-            // deja que el backend aplique ON/OFF y sincroniza toggles 9..15 con el estado real
+            addLogEntry(
+              `Sending: ${selectCmd}`,
+              "sent",
+            );
+
+            const respSel = await sendCommandToServer(
+              selectCmd,
+            );
+
+            addLogEntry(
+              `Server response: ${respSel}`,
+              "received",
+            );
+
+            if (
+              (respSel ?? "")
+                .toString()
+                .includes("❌")
+            ) {
+              throw new Error(respSel);
+            }
+
             clearPendingExtraChannelsForSampleChannels();
-            await new Promise((r) => setTimeout(r, 300));
+
+            await new Promise(
+              (resolve) => setTimeout(resolve, 300),
+            );
+
             await fetchSensorData(true);
 
-            // 2) Luego ya arrancas la relation
-            const startCmd = `start_relation:${chNum}:${encodeURIComponent(label)}`;
-            addLogEntry(`Sending command: ${startCmd}`, "sent");
+            addLogEntry(
+              `Sending command: ${startCmd}`,
+              "sent",
+            );
 
-            const response = await sendCommandToServer(startCmd);
-            addLogEntry(`Server response: ${response}`, "received");
+            const response = await sendCommandToServer(
+              startCmd,
+            );
+
+            addLogEntry(
+              `Server response: ${response}`,
+              "received",
+            );
+
+            const responseText = (response ?? "")
+              .toString()
+              .trim();
+
+            if (!responseText.includes(successMarker)) {
+              throw new Error(
+                responseText
+                || "Empty response from TCP server",
+              );
+            }
 
             relationRunning = true;
-            document.getElementById("relationStartButton").disabled = true;
-            document.getElementById("relationStopButton").disabled = false;
-            document.getElementById("relationChannelSelect").disabled = true;
-            document.getElementById("relationLabelInput").disabled = true;
+
+            startButton.disabled = true;
+            stopButton.disabled = false;
+            channelSelect.disabled = true;
+            labelInput.disabled = true;
+            modeSelect.disabled = true;
+
+            updateRelationRampControls();
           } catch (error) {
+            relationRunning = false;
+
+            startButton.disabled = false;
+            stopButton.disabled = true;
+            channelSelect.disabled = false;
+            labelInput.disabled = false;
+            modeSelect.disabled = false;
+
+            updateRelationRampControls();
+
             addLogEntry(
               `Error starting relation: ${error.message}`,
               "received",
@@ -2808,21 +3303,82 @@
         .addEventListener("click", async () => {
           if (!relationRunning) return;
 
+          const startButton = document.getElementById(
+            "relationStartButton",
+          );
+          const stopButton = document.getElementById(
+            "relationStopButton",
+          );
+          const channelSelect = document.getElementById(
+            "relationChannelSelect",
+          );
+          const labelInput = document.getElementById(
+            "relationLabelInput",
+          );
+          const modeSelect = document.getElementById(
+            "relationModeSelect",
+          );
+
           const command = "stop_relation";
-          addLogEntry(`Sending command: ${command}`, "sent");
+
+          stopButton.disabled = true;
+
+          addLogEntry(
+            `Sending command: ${command}`,
+            "sent",
+          );
 
           try {
-            const response = await sendCommandToServer(command);
-            addLogEntry(`Server response: ${response}`, "received");
+            const response = await sendCommandToServer(
+              command,
+            );
+
+            addLogEntry(
+              `Server response: ${response}`,
+              "received",
+            );
+
+            const responseText = (response ?? "")
+              .toString()
+              .trim();
+
+            if (
+              !responseText.includes(
+                "RELATION_STOPPED:",
+              )
+            ) {
+              throw new Error(
+                responseText
+                || "Empty response from TCP server",
+              );
+            }
 
             relationRunning = false;
-            document.getElementById("relationStartButton").disabled = false;
-            document.getElementById("relationStopButton").disabled = true;
-            document.getElementById("relationChannelSelect").disabled = false;
-            document.getElementById("relationLabelInput").disabled = false;
+
+            startButton.disabled = false;
+            stopButton.disabled = true;
+            channelSelect.disabled = false;
+            labelInput.disabled = false;
+            modeSelect.disabled = false;
+
+            updateRelationRampControls();
           } catch (error) {
+            /*
+            * Si la parada no ha sido confirmada,
+            * consideramos que la relación continúa activa.
+            */
+            relationRunning = true;
+
+            startButton.disabled = true;
+            stopButton.disabled = false;
+            channelSelect.disabled = true;
+            labelInput.disabled = true;
+            modeSelect.disabled = true;
+
+            updateRelationRampControls();
+
             addLogEntry(
-              `Error sending stop_relation: ${error.message}`,
+              `Error stopping relation: ${error.message}`,
               "received",
             );
           }
@@ -3153,9 +3709,18 @@
 
           try {
             const response = await sendCommandToServer(command);
+            const startedMatch = /✅ Run (\d+) started$/.exec(response.trim());
             addLogEntry(`Server response: ${response}`, "received");
-            currentActiveRunId = runId;
-            updateRunUI();
+            if(
+              startedMatch &&
+              parseInt(startedMatch[1], 10) === runID
+            ){
+              currentActiveRunId = runId;
+              expectedNextRunId
+              updateRunUI();
+            } else {
+              addLogEntry("❌ Run not started; local state won't change", "received");
+            }
           } catch (error) {
             addLogEntry(
               `Error sending start_run: ${error.message}`,
@@ -3171,13 +3736,21 @@
 
           try {
             const response = await sendCommandToServer(command);
+            const startedMatch = /✅ Run (\d+) started$/.exec(response.trim());
             addLogEntry(`Server response: ${response}`, "received");
 
             const ended = parseInt(runIdInput.value, 10);
-            currentActiveRunId = null;
-            expectedNextRunId = ended + 1;
-            runIdInput.value = expectedNextRunId;
-            updateRunUI();
+            if(
+              startedMatch &&
+              parseInt(startedMatch[1], 10) === runID
+            ){
+              currentActiveRunId = null;
+              expectedNextRunId = ended + 1;
+              runIdInput.value = expectedNextRunId;
+              updateRunUI();
+            } else {
+              addLogEntry("❌ Run not ended; local state won't change", "received");
+            }
           } catch (error) {
             addLogEntry(`Error sending end_run: ${error.message}`, "received");
           }
@@ -3348,10 +3921,31 @@
 
       // Store chart data for each stage
       const chartDataStore = {
-        "50K": { labels: [], data: [] },
-        "4K": { labels: [], data: [] },
-        STILL: { labels: [], data: [] },
-        MXC: { labels: [], data: [], setpoint: [] },
+        "50K": {
+          labels: [],
+          data: [],
+          startTime: null,
+          lastTimestamp: null,
+        },
+        "4K": {
+          labels: [],
+          data: [],
+          startTime: null,
+          lastTimestamp: null,
+        },
+        STILL: {
+          labels: [],
+          data: [],
+          startTime: null,
+          lastTimestamp: null,
+        },
+        MXC: {
+          labels: [],
+          data: [],
+          setpoint: [],
+          startTime: null,
+          lastTimestamp: null,
+        },
         BB: { labels: [], data: [], setpoint: [] },
       };
 
@@ -3391,6 +3985,7 @@
 
         sectionTitles.forEach((title) => {
           const content = title.nextElementSibling;
+          if (!content) return;
 
           // Ensure initial state matches class
           if (title.classList.contains("collapsed")) {
@@ -3403,8 +3998,28 @@
 
           // Prevent duplicate listeners
           if (!title.dataset.listenerAttached) {
-            title.addEventListener("click", function () {
+            title.addEventListener("click", function (event) {
+              // In MXC, do not collapse when clicking buttons, inputs or selects
+              if (this.classList.contains("stage-title-mxc")) {
+                const clickedControls = event.target.closest("#mxcTitleControls");
+
+                if (clickedControls) {
+                  return;
+                }
+
+                const clickedTitle = event.target.closest("h2");
+
+                const rect = this.getBoundingClientRect();
+                const clickedArrowZone = event.clientX > rect.right - 55;
+
+                // MXC only collapses from the title text or the triangle area
+                if (!clickedTitle && !clickedArrowZone) {
+                  return;
+                }
+              }
+
               this.classList.toggle("collapsed");
+
               if (this.classList.contains("collapsed")) {
                 content.classList.add("collapsed");
                 content.style.maxHeight = "0";
@@ -3413,11 +4028,11 @@
                 content.style.maxHeight = content.scrollHeight + "px";
               }
             });
+
             title.dataset.listenerAttached = true;
           }
         });
       }
-
       function clearPendingExtraChannelsForSampleChannels() {
         [9, 10, 11, 12, 13, 14, 15].forEach((ch) => {
           if (pendingExtraChannels && pendingExtraChannels[ch] !== undefined) {
@@ -4038,8 +4653,21 @@
       }
 
       // Function to update any temperature chart with new data
-      function updateTemperatureChart(chartId, temperature, setpoint = null) {
-        const now = Date.now();
+      function updateTemperatureChart(
+        chartId,
+        temperature,
+        setpoint = null,
+        timestampMs = Date.now(),
+      ) {
+        const now = Number(timestampMs);
+        const numericTemperature = Number(temperature);
+
+        if (
+          !Number.isFinite(now) ||
+          !Number.isFinite(numericTemperature)
+        ) {
+          return;
+        }
 
         // Ensure chart and store exist
         if (!charts[chartId]) {
@@ -4055,10 +4683,20 @@
             data: [],
             setpoint: [],
             startTime: null,
+            lastTimestamp: null,
           };
         }
 
         const store = chartDataStore[chartId];
+
+        // /get-data is requested every second, but the Lake Shore
+        // may keep returning the same acquisition for several requests.
+        if (
+          store.lastTimestamp !== null &&
+          now <= store.lastTimestamp
+        ) {
+          return;
+        }
 
         // Initialize startTime the first time this runs
         if (!store.startTime) {
@@ -4070,10 +4708,13 @@
 
         // Push new data
         store.labels.push(relTime);
-        store.data.push(temperature);
+        store.data.push(numericTemperature);
+
         if (setpoint !== null) {
           store.setpoint.push(setpoint);
         }
+
+        store.lastTimestamp = now;
 
         if (chartId === "MXC") {
           updateTimeRangeOptions();
@@ -4319,6 +4960,135 @@
         chart.options.scales.x.min = 0;
         chart.options.scales.x.max = currentRange;
         chart.update("none");
+      }
+
+      async function loadTemperatureBuffer() {
+        try {
+          const response = await fetch("/get-buffer", {
+            cache: "no-store",
+          });
+
+          if (!response.ok) {
+            throw new Error(
+              `/get-buffer returned HTTP ${response.status}`,
+            );
+          }
+
+          const payload = await response.json();
+          const channels = payload.channels || {};
+          const loadedSamples = {};
+
+          for (const chartId of ["50K", "4K", "STILL", "MXC"]) {
+            const source = channels[chartId];
+            const store = chartDataStore[chartId];
+
+            if (!source || !store) {
+              continue;
+            }
+
+            const timestamps = Array.isArray(source.timestamps_ms)
+              ? source.timestamps_ms
+              : [];
+
+            const temperatures = Array.isArray(source.temperature_k)
+              ? source.temperature_k
+              : [];
+
+            const setpoints =
+              chartId === "MXC" && Array.isArray(source.setpoint_k)
+                ? source.setpoint_k
+                : [];
+
+            const sampleCount = Math.min(
+              timestamps.length,
+              temperatures.length,
+            );
+
+            store.labels.length = 0;
+            store.data.length = 0;
+            store.startTime = null;
+            store.lastTimestamp = null;
+
+            if (Array.isArray(store.setpoint)) {
+              store.setpoint.length = 0;
+            }
+
+            for (let i = 0; i < sampleCount; i++) {
+              const timestamp = Number(timestamps[i]);
+              const temperature = Number(temperatures[i]);
+
+              if (
+                !Number.isFinite(timestamp) ||
+                !Number.isFinite(temperature)
+              ) {
+                continue;
+              }
+
+              if (
+                store.lastTimestamp !== null &&
+                timestamp <= store.lastTimestamp
+              ) {
+                continue;
+              }
+
+              if (store.startTime === null) {
+                store.startTime = timestamp;
+              }
+
+              store.labels.push(
+                (timestamp - store.startTime) / 1000,
+              );
+
+              store.data.push(temperature);
+              store.lastTimestamp = timestamp;
+
+              if (chartId === "MXC") {
+                const rawSetpoint = setpoints[i];
+
+                if (
+                  rawSetpoint === null ||
+                  rawSetpoint === undefined
+                ) {
+                  store.setpoint.push(null);
+                } else {
+                  const numericSetpoint = Number(rawSetpoint);
+
+                  store.setpoint.push(
+                    Number.isFinite(numericSetpoint)
+                      ? numericSetpoint
+                      : null,
+                  );
+                }
+              }
+            }
+
+            loadedSamples[chartId] = store.data.length;
+
+            if (store.startTime !== null) {
+              if (chartId === "MXC") {
+                updateTimeRangeOptions();
+              } else if (chartId === "50K") {
+                updateTimeRangeOptions50K();
+              } else if (chartId === "4K") {
+                updateTimeRangeOptions4K();
+              } else if (chartId === "STILL") {
+                updateTimeRangeOptionsSTILL();
+              }
+
+              redrawFromStore(chartId);
+            }
+          }
+
+          console.log(
+            "✅ Temperature buffer loaded:",
+            loadedSamples,
+          );
+        } catch (error) {
+          console.error(
+            "Error loading temperature buffer:",
+            error,
+          );
+        }
       }
 
       // Function to add a log entry to the log box
@@ -4595,6 +5365,8 @@
           const data = await response.json();
           console.log("✅ Received data from server:", data);
 
+          const sampleTimestamp = Number(data.sampleTime);
+
           // Update parameters if they changed
           if (data["50K"] !== undefined) {
             currentParameters["50K"] = parseFloat(data["50K"]);
@@ -4839,7 +5611,12 @@
 
           // Update the 50k chart with the new temperature
           if (currentParameters["50K"] !== null) {
-            updateTemperatureChart("50K", currentParameters["50K"]);
+            updateTemperatureChart(
+              "50K",
+              currentParameters["50K"],
+              null,
+              sampleTimestamp,
+            );
             update50KValues(
               currentParameters["50K"],
               currentParameters.R50K,
@@ -4849,7 +5626,12 @@
 
           //Update the 4k chart with the new temperature
           if (currentParameters["4K"] !== null) {
-            updateTemperatureChart("4K", currentParameters["4K"]);
+            updateTemperatureChart(
+              "4K",
+              currentParameters["4K"],
+              null,
+              sampleTimestamp,
+            );
             update4KValues(
               currentParameters["4K"],
               currentParameters.R4K,
@@ -4863,7 +5645,12 @@
               currentParameters.STILL,
             );
 
-            updateTemperatureChart("STILL", currentParameters.STILL);
+            updateTemperatureChart(
+              "STILL",
+              currentParameters.STILL,
+              null,
+              sampleTimestamp,
+            );
             updateSTILLValues(
               currentParameters.STILL,
               currentParameters.RSTILL,
@@ -4883,6 +5670,7 @@
               "MXC",
               currentParameters.MXC,
               currentParameters.temperatureSetpoint,
+              sampleTimestamp,
             );
 
             updateMXCValues(
@@ -5126,7 +5914,9 @@
           }
         });
 
-        // Initial data fetch
+        // Restore the shared temperature history before adding
+        // the latest acquisition from /get-data.
+        await loadTemperatureBuffer();
         await fetchSensorData();
         await refreshRecentRuns();
         await refreshRelationFiles();

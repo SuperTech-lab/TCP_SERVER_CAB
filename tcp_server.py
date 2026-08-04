@@ -17,8 +17,6 @@ from datetime import datetime, timezone
 
 ls = LakeShore370()
 
-
-
 # Configuration
 HOST = '0.0.0.0' # Listen on all network interfaces
 PORT = 65432  # Port to listen on
@@ -26,11 +24,11 @@ PORT = 65432  # Port to listen on
 # Mutex to protect the heater power level
 heater_mutex = threading.Lock() 
 
-#DB conection params
-db_delay = DB_INSERT_INTERVAL
+# DataBase conection params
+db_delay          = DB_INSERT_INTERVAL
 last_db_insert_ts = None
-DB_POOL = None
-CURRENT_RUN_ID = None
+DB_POOL           = None
+CURRENT_RUN_ID    = None
 
 last_sensorValues = None
 last_controlParams = None
@@ -41,6 +39,9 @@ RELATION_RUN_ID = None
 RELATION_CHANNEL = None   
 RELATION_LABEL = None     
 RELATION_BUFFER = []
+RELATION_RAMP_CONTROLLED = False
+RELATION_RAMP_TARGET_MK = None
+RELATION_RAMP_RATE_MK_PER_MIN = None
 
 
 def init_db_pool():
@@ -55,8 +56,7 @@ def init_db_pool():
             user="lakeshore_app",  
             password="Ricardo",
         )
-        print("✅ DB connection pool inicializado")
-
+        print("✅ DB connection pool initialized")
 
 
 def close_db_pool():
@@ -64,7 +64,7 @@ def close_db_pool():
     if DB_POOL is not None:
         DB_POOL.closeall()
         DB_POOL = None
-        print("🔻 DB connection pool cerrado")
+        print("🔻 DB connection pool closed")
 
 
 @contextmanager
@@ -73,11 +73,14 @@ def get_db_conn():
     Maneja el pool de conexiones de la bd
     """
     if DB_POOL is None:
-        raise RuntimeError("DB_POOL no inicializado. Llama a init_db_pool() al arrancar.")
+        raise RuntimeError("DB_POOL not initialized.")
 
     conn = DB_POOL.getconn()
     try:
         yield conn
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         DB_POOL.putconn(conn)
 
@@ -85,14 +88,17 @@ def start_run(global_run_id: int, description: str | None = None):
     global CURRENT_RUN_ID, last_db_insert_ts
 
     if CURRENT_RUN_ID is not None:
-        print(f"⚠ Ya hay un RUN en curso (RUN_ID = {CURRENT_RUN_ID}). Ciérralo antes con end_run.")
-        return
+        print(
+            f"⚠ There's already a running RUN "
+            f"(RUN_ID = {CURRENT_RUN_ID}). Close it with end_run()"
+        )
+        return False
 
     try:
         global_run_id = int(global_run_id)
     except (ValueError, TypeError):
         print("❌ RUN_ID must be an integer")
-        return
+        return False
 
     if description is not None:
         description = description.strip()
@@ -102,6 +108,41 @@ def start_run(global_run_id: int, description: str | None = None):
     with get_db_conn() as conn:
         with conn.cursor() as cur:
             try:
+                # PostgreSQL is the source of truth. Do not create a new RUN
+                # if an unfinished RUN already exists.
+                cur.execute(
+                    """
+                    SELECT run_id
+                    FROM runs
+                    WHERE ended_at IS NULL
+                    ORDER BY started_at DESC
+                    LIMIT 2;
+                    """
+                )
+                open_rows = cur.fetchall()
+
+                if open_rows:
+                    conn.rollback()
+                    last_db_insert_ts = None
+
+                    if len(open_rows) == 1:
+                        CURRENT_RUN_ID = int(open_rows[0][0])
+                        print(
+                            "⚠ An active RUN already exists in DB "
+                            f"(RUN_ID = {CURRENT_RUN_ID}); new RUN not created"
+                        )
+                    else:
+                        run_ids = ", ".join(
+                            str(row[0]) for row in open_rows
+                        )
+                        CURRENT_RUN_ID = None
+                        print(
+                            "❌ Multiple active RUNs found in DB "
+                            f"({run_ids}); new RUN not created"
+                        )
+
+                    return False
+
                 cur.execute(
                     """
                     INSERT INTO runs (run_id, started_at, description)
@@ -110,36 +151,125 @@ def start_run(global_run_id: int, description: str | None = None):
                     """,
                     (global_run_id, description),
                 )
-                CURRENT_RUN_ID = cur.fetchone()[0]
+
+                CURRENT_RUN_ID = int(cur.fetchone()[0])
                 conn.commit()
+
                 last_db_insert_ts = None
-                print(f"🏁 RUN {CURRENT_RUN_ID} iniciado")
+                print(f"🏁 RUN {CURRENT_RUN_ID} started")
+                return True
+
             except psycopg2.Error as e:
                 conn.rollback()
-                print(f"❌ Error iniciando RUN {global_run_id}: {e}")
                 CURRENT_RUN_ID = None
-
-
+                last_db_insert_ts = None
+                print(f"❌ Error during RUN {global_run_id} initiation: {e}")
+                return False
 
 def end_run():
-
-    global CURRENT_RUN_ID
+    global CURRENT_RUN_ID, last_db_insert_ts
 
     if CURRENT_RUN_ID is None:
-        print("⚠ No hay RUN en curso")
-        return
+        print("⚠ No hay un RUN activo inequívoco")
+        return None
+
+    ended_run_id = CURRENT_RUN_ID
 
     with get_db_conn() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "UPDATE runs SET ended_at = now() WHERE run_id = %s;",
-                (CURRENT_RUN_ID,),
+                """
+                UPDATE runs
+                SET ended_at = now()
+                WHERE run_id = %s
+                  AND ended_at IS NULL
+                RETURNING run_id;
+                """,
+                (ended_run_id,),
             )
+            row = cur.fetchone()
+
+        if row is None:
+            conn.rollback()
+            print(f"❌ RUN {ended_run_id} was not open in DB")
+            return None
+
         conn.commit()
 
-    print(f"🏁 RUN {CURRENT_RUN_ID} finalizado")
     CURRENT_RUN_ID = None
+    last_db_insert_ts = None
+    print(f"🏁 RUN {ended_run_id} finalizado")
+    return ended_run_id
 
+def resume_active_run_from_db():
+    """
+    Synchronize CURRENT_RUN_ID with PostgreSQL.
+
+    A RUN with ended_at IS NULL remains active across a restart of
+    tcp_server.py. If no RUN is open, the server starts without one.
+    """
+
+    global CURRENT_RUN_ID, last_db_insert_ts
+
+    try:
+        with get_db_conn() as conn:
+            with conn.cursor() as cur:
+                print("📡 Checking active RUN state in DB")
+
+                cur.execute(
+                    """
+                    SELECT run_id
+                    FROM runs
+                    WHERE ended_at IS NULL
+                    ORDER BY started_at DESC
+                    LIMIT 2;
+                    """
+                )
+                rows = cur.fetchall()
+
+            # End the read-only transaction before returning the
+            # connection to the pool.
+            conn.rollback()
+
+        if not rows:
+            CURRENT_RUN_ID = None
+            last_db_insert_ts = None
+            print(
+                "🛈 No active RUN found in DB; "
+                "server starts without an active RUN"
+            )
+            return None
+
+        if len(rows) > 1:
+            run_ids = ", ".join(str(row[0]) for row in rows)
+            CURRENT_RUN_ID = None
+            last_db_insert_ts = None
+            print(
+                "❌ Multiple active RUNs found in DB "
+                f"({run_ids}); refusing to choose one automatically"
+            )
+            return None
+
+        CURRENT_RUN_ID = int(rows[0][0])
+        last_db_insert_ts = None
+
+        print(
+            f"♻ Active RUN resumed from DB: "
+            f"RUN_ID = {CURRENT_RUN_ID}"
+        )
+        return CURRENT_RUN_ID
+
+    except Exception as e:
+        print(f"❌ Error resuming active RUN from DB: {e}")
+        CURRENT_RUN_ID = None
+        last_db_insert_ts = None
+        return None
+
+def _as_db_bool(value) -> bool:
+    if value is None: return False
+    if isinstance(value, bool): return value
+    if isinstance(value, (int, float)): return value != 0
+    return str(value).strip().lower() in {"1", "true", "on", "yes"}
 
 def _safe_label(label: str | None) -> str:
     if not label:
@@ -169,8 +299,40 @@ def _build_relation_dat(channel_number: int, label: str | None, buf_points: list
     return ("\n".join(lines) + "\n").encode("utf-8")
 
 
-def start_relation(channel_number: int, label: str | None = None):
-    global RELATION_ACTIVE, RELATION_RUN_ID, RELATION_CHANNEL, RELATION_LABEL, RELATION_BUFFER
+def _reset_relation_state():
+
+    global RELATION_ACTIVE
+    global RELATION_RUN_ID
+    global RELATION_CHANNEL
+    global RELATION_LABEL
+    global RELATION_BUFFER
+    global RELATION_RAMP_CONTROLLED
+    global RELATION_RAMP_TARGET_MK
+    global RELATION_RAMP_RATE_MK_PER_MIN
+
+    RELATION_ACTIVE = False
+    RELATION_RUN_ID = None
+    RELATION_CHANNEL = None
+    RELATION_LABEL = None
+    RELATION_BUFFER = []
+
+    RELATION_RAMP_CONTROLLED = False
+    RELATION_RAMP_TARGET_MK = None
+    RELATION_RAMP_RATE_MK_PER_MIN = None
+
+
+def _start_relation_common(
+    channel_number: int,
+    label: str | None = None,
+):
+    global RELATION_ACTIVE
+    global RELATION_RUN_ID
+    global RELATION_CHANNEL
+    global RELATION_LABEL
+    global RELATION_BUFFER
+    global RELATION_RAMP_CONTROLLED
+    global RELATION_RAMP_TARGET_MK
+    global RELATION_RAMP_RATE_MK_PER_MIN
 
     if RELATION_ACTIVE:
         print("⚠ Ya hay una relation en curso.")
@@ -182,6 +344,13 @@ def start_relation(channel_number: int, label: str | None = None):
         print("❌ channel_number must be an integer")
         return None
 
+    if channel_number not in SAMPLE_CHANNELS:
+        print(
+            f"❌ Invalid relation channel: {channel_number}. "
+            f"Valid channels are: {SAMPLE_CHANNELS}"
+        )
+        return None
+
     if label is not None:
         label = label.strip() or None
 
@@ -189,15 +358,118 @@ def start_relation(channel_number: int, label: str | None = None):
     RELATION_CHANNEL = channel_number
     RELATION_LABEL = label
     RELATION_BUFFER = []
-
     RELATION_RUN_ID = _make_relation_filename(label)
 
-    print(f"▶ RELATION iniciada file={RELATION_RUN_ID} (CH{RELATION_CHANNEL}, label={RELATION_LABEL})")
+    # A normal relation does not own a Lake Shore ramp.
+    RELATION_RAMP_CONTROLLED = False
+    RELATION_RAMP_TARGET_MK = None
+    RELATION_RAMP_RATE_MK_PER_MIN = None
+
+    print(
+        "▶ RELATION iniciada "
+        f"file={RELATION_RUN_ID} "
+        f"(CH{RELATION_CHANNEL}, label={RELATION_LABEL})"
+    )
     return RELATION_RUN_ID
 
 
+def start_relation(
+    channel_number: int,
+    label: str | None = None,
+):
+    return _start_relation_common(
+        channel_number=channel_number,
+        label=label,
+    )
+
+def start_relation_ramp(
+    channel_number: int,
+    target_mk: float,
+    rate_mk_per_min: float,
+    label: str | None = None,
+):
+    global RELATION_RAMP_CONTROLLED
+    global RELATION_RAMP_TARGET_MK
+    global RELATION_RAMP_RATE_MK_PER_MIN
+
+    try:
+        target_mk = float(target_mk)
+        rate_mk_per_min = float(rate_mk_per_min)
+    except (ValueError, TypeError):
+        return None, (
+            "Ramp target and rate must be numeric."
+        )
+
+    relation_id = _start_relation_common(
+        channel_number=channel_number,
+        label=label,
+    )
+
+    if relation_id is None:
+        return None, (
+            "Could not start the relation acquisition."
+        )
+
+    try:
+        with heater_mutex:
+            ramp_result = ls.start_ramp(
+                target_mk=target_mk,
+                rate_mk_per_min=rate_mk_per_min,
+            )
+
+    except Exception as e:
+        _reset_relation_state()
+
+        print(
+            "❌ Error starting relation ramp."
+            f"\nReason: {e}"
+        )
+        return None, str(e)
+
+    if not isinstance(ramp_result, dict):
+        _reset_relation_state()
+
+        return None, (
+            "Lake Shore returned an invalid ramp result."
+        )
+
+    if not ramp_result.get("ok"):
+        error = ramp_result.get(
+            "error",
+            "Unknown ramp start error.",
+        )
+
+        # Cancel the acquisition state if the ramp
+        # could not be started and verified.
+        _reset_relation_state()
+
+        print(
+            "❌ RELATION cancelled because the "
+            f"MXC ramp failed: {error}"
+        )
+        return None, error
+
+    RELATION_RAMP_CONTROLLED = True
+    RELATION_RAMP_TARGET_MK = target_mk
+    RELATION_RAMP_RATE_MK_PER_MIN = (
+        rate_mk_per_min
+    )
+
+    print(
+        "↗ MXC ramp associated with RELATION "
+        f"file={relation_id}, "
+        f"target={target_mk:g} mK, "
+        f"rate={rate_mk_per_min:g} mK/min"
+    )
+
+    return relation_id, None
+
 def stop_relation():
-    global RELATION_ACTIVE, RELATION_RUN_ID, RELATION_CHANNEL, RELATION_LABEL, RELATION_BUFFER
+    global RELATION_ACTIVE
+    global RELATION_RUN_ID
+    global RELATION_CHANNEL
+    global RELATION_LABEL
+    global RELATION_BUFFER
 
     if not RELATION_ACTIVE or RELATION_RUN_ID is None:
         print("⚠ No hay relation en curso")
@@ -208,14 +480,61 @@ def stop_relation():
     channel_number = RELATION_CHANNEL
     label = RELATION_LABEL
 
-    dat_bytes = _build_relation_dat(channel_number, label, RELATION_BUFFER)
+    # Debe conservarse antes de reiniciar el estado.
+    ramp_controlled = RELATION_RAMP_CONTROLLED
+    ramp_stop_error = None
+
+    dat_bytes = _build_relation_dat(
+        channel_number,
+        label,
+        RELATION_BUFFER,
+    )
+
+    # Solo una relación que inició la rampa puede detenerla.
+    if ramp_controlled:
+        try:
+            with heater_mutex:
+                ramp_result = ls.stop_ramp()
+
+            if not isinstance(ramp_result, dict):
+                ramp_stop_error = (
+                    "Lake Shore returned an invalid "
+                    "ramp stop result."
+                )
+
+            elif not ramp_result.get("ok"):
+                ramp_stop_error = ramp_result.get(
+                    "error",
+                    "Unknown ramp stop error.",
+                )
+
+        except Exception as e:
+            ramp_stop_error = str(e)
+
+        if ramp_stop_error is None:
+            print(
+                "↘ MXC ramp stopped by RELATION "
+                f"file={file_name}"
+            )
+        else:
+            print(
+                "❌ RELATION stopped, but the MXC ramp "
+                "could not be stopped."
+                f"\nReason: {ramp_stop_error}"
+            )
 
     with get_db_conn() as conn:
         with conn.cursor() as cur:
             try:
                 cur.execute(
                     """
-                    INSERT INTO relation_files (file_name, channel_number, label, n_points, data)
+                    INSERT INTO relation_files (
+                        file_name,
+                        channel_number,
+                        label,
+                        n_points,
+                        data
+                    )
                     VALUES (%s, %s, %s, %s, %s)
                     ON CONFLICT (file_name) DO UPDATE SET
                         created_at = now(),
@@ -224,24 +543,31 @@ def stop_relation():
                         n_points = EXCLUDED.n_points,
                         data = EXCLUDED.data;
                     """,
-                    (file_name, channel_number, label, n_points, psycopg2.Binary(dat_bytes)),
+                    (
+                        file_name,
+                        channel_number,
+                        label,
+                        n_points,
+                        psycopg2.Binary(dat_bytes),
+                    ),
                 )
                 conn.commit()
+
             except psycopg2.Error as e:
                 conn.rollback()
-                print(f"❌ Error guardando relation file {file_name}: {e}")
-                # aunque falle DB, paramos captura para no quedar colgados
+                print(
+                    "❌ Error guardando relation file "
+                    f"{file_name}: {e}"
+                )
+                # Aunque falle la DB, se cierra la captura.
 
-    RELATION_ACTIVE = False
-    RELATION_RUN_ID = None
-    RELATION_CHANNEL = None
-    RELATION_LABEL = None
-    RELATION_BUFFER = []
+    _reset_relation_state()
 
-    print(f"⏹ RELATION finalizada. file={file_name} puntos={n_points}")
+    print(
+        "⏹ RELATION finalizada. "
+        f"file={file_name} puntos={n_points}"
+    )
     return file_name, n_points
-
-
 
 
 def apply_default_channel_timing(channel: int) -> bool:
@@ -454,6 +780,9 @@ def handle_command(command):
     global current_derivative_gain
     global extra_excitation
 
+    global CURRENT_RUN_ID
+    global last_db_insert_ts
+
     cmd = command.strip()
 
     CONTROL_COMMAND_PREFIXES = (
@@ -486,17 +815,69 @@ def handle_command(command):
             enabled = 0
 
         if enabled == 1:
-            print("⚠️ Autoscan is ON — disabling automatically before applying control settings")
-            with heater_mutex:
-                ls.set_autoscan("off")
-            time.sleep(0.1)
-            print("✅ Autoscan disabled")
+            print("⚠️ Autoscan is ON — disable autoscan before applying control settings")
 
+    if (
+        cmd == "start_relation_ramp"
+        or cmd.startswith("start_relation_ramp:")
+    ):
+        parts = cmd.split(":", 4)
 
-    if cmd.startswith("start_relation"):
+        if len(parts) < 4:
+            return (
+                "❌ Syntax: "
+                "start_relation_ramp:"
+                "<CHANNEL_NUMBER>:"
+                "<TARGET_MK>:"
+                "<RATE_MK_PER_MIN>"
+                "[:<LABEL>]"
+            )
+
+        try:
+            ch = int(parts[1])
+        except (ValueError, TypeError):
+            return "❌ CHANNEL_NUMBER must be an integer"
+
+        try:
+            target_mk = float(parts[2])
+        except (ValueError, TypeError):
+            return "❌ TARGET_MK must be numeric"
+
+        try:
+            rate_mk_per_min = float(parts[3])
+        except (ValueError, TypeError):
+            return "❌ RATE_MK_PER_MIN must be numeric"
+
+        label = None
+        if len(parts) == 5:
+            label = urllib.parse.unquote(parts[4])
+
+        relation_id, error = start_relation_ramp(
+            channel_number=ch,
+            target_mk=target_mk,
+            rate_mk_per_min=rate_mk_per_min,
+            label=label,
+        )
+
+        if relation_id is None:
+            return (
+                "❌ Failed to start relation ramp: "
+                f"{error}"
+            )
+
+        return f"RELATION_RAMP_STARTED:{relation_id}"
+
+    elif (
+        cmd == "start_relation"
+        or cmd.startswith("start_relation:")
+    ):
         parts = cmd.split(":", 2)
+
         if len(parts) < 2:
-            return "❌ Syntax: start_relation:<CHANNEL_NUMBER>[:<LABEL>]"
+            return (
+                "❌ Syntax: "
+                "start_relation:<CHANNEL_NUMBER>[:<LABEL>]"
+            )
 
         try:
             ch = int(parts[1])
@@ -508,6 +889,7 @@ def handle_command(command):
             label = urllib.parse.unquote(parts[2])
 
         relation_id = start_relation(ch, label)
+
         if relation_id is None:
             return "❌ Failed to start relation"
 
@@ -521,15 +903,47 @@ def handle_command(command):
     
     elif cmd == "get_relation_status":
         if RELATION_ACTIVE and RELATION_RUN_ID is not None:
-            label = RELATION_LABEL if RELATION_LABEL is not None else ""
-            ch = RELATION_CHANNEL if RELATION_CHANNEL is not None else -1
+            label = (
+                RELATION_LABEL
+                if RELATION_LABEL is not None
+                else ""
+            )
+            ch = (
+                RELATION_CHANNEL
+                if RELATION_CHANNEL is not None
+                else -1
+            )
             n = len(RELATION_BUFFER)
+
+            if RELATION_RAMP_CONTROLLED:
+                relation_mode = "RAMP"
+                target_mk = (
+                    ""
+                    if RELATION_RAMP_TARGET_MK is None
+                    else f"{RELATION_RAMP_TARGET_MK:g}"
+                )
+                rate_mk_per_min = (
+                    ""
+                    if RELATION_RAMP_RATE_MK_PER_MIN is None
+                    else f"{RELATION_RAMP_RATE_MK_PER_MIN:g}"
+                )
+            else:
+                relation_mode = "MANUAL"
+                target_mk = ""
+                rate_mk_per_min = ""
+
             return (
                 "RELATION_STATUS:ACTIVE:"
-                f"{RELATION_RUN_ID}:{ch}:{urllib.parse.quote(label)}:{n}"
+                f"{RELATION_RUN_ID}:"
+                f"{ch}:"
+                f"{urllib.parse.quote(label)}:"
+                f"{n}:"
+                f"{relation_mode}:"
+                f"{target_mk}:"
+                f"{rate_mk_per_min}"
             )
-        else:
-            return "RELATION_STATUS:IDLE"
+
+        return "RELATION_STATUS:IDLE"
     
 
     elif cmd == "get_recent_relations":
@@ -641,9 +1055,9 @@ def handle_command(command):
         if len(parts) == 3:
             desc = urllib.parse.unquote(parts[2])   #the description
 
-        start_run(global_run_id, desc)
+        started = start_run(global_run_id, desc)
 
-        if CURRENT_RUN_ID is not None:
+        if started:
             message = f"✅ Run {CURRENT_RUN_ID} started"
         else:
             message = "❌ Failed to start run"
@@ -669,30 +1083,63 @@ def handle_command(command):
             return f"ERROR:get_recent_runs:{e}"
 
     elif cmd == "end_run":
-        end_run()
-        return "✅ Run ended"
+        ended_run_id =end_run()
+
+        if ended_run_id is None:
+            return "❌ No active run was endeded"
+
+        return f"✅ Run {ended_run_id} ended"
     
     elif cmd == "get_last_run":
         try:
             with get_db_conn() as conn:
                 with conn.cursor() as cur:
-                    cur.execute("""
+                    cur.execute(
+                        """
                         SELECT run_id
                         FROM runs
                         WHERE ended_at IS NULL
                         ORDER BY started_at DESC
-                        LIMIT 1;
-                    """)
-                    row = cur.fetchone()
+                        LIMIT 2;
+                        """
+                    )
+                    rows = cur.fetchall()
 
-                    if row:
-                        active = row[0]
-                        message = f"ACTIVE_RUN:{active}"
-                        print(f"📡 get_last_run -> {message}")
-                        return message
+                    last_run = None
 
-                    cur.execute("SELECT COALESCE(MAX(run_id), 0) FROM runs;")
-                    last_run = cur.fetchone()[0]
+                    if not rows:
+                        cur.execute(
+                            "SELECT COALESCE(MAX(run_id), 0) FROM runs;"
+                        )
+                        last_run = int(cur.fetchone()[0])
+
+                conn.rollback()
+
+            if len(rows) > 1:
+                run_ids = ", ".join(str(row[0]) for row in rows)
+                CURRENT_RUN_ID = None
+                last_db_insert_ts = None
+
+                message = (
+                    "ERROR:get_last_run:multiple active RUNs "
+                    f"found ({run_ids})"
+                )
+                print(message)
+                return message
+
+            if rows:
+                active = int(rows[0][0])
+
+                if CURRENT_RUN_ID != active:
+                    CURRENT_RUN_ID = active
+                    last_db_insert_ts = None
+
+                message = f"ACTIVE_RUN:{active}"
+                print(f"📡 get_last_run -> {message}")
+                return message
+
+            CURRENT_RUN_ID = None
+            last_db_insert_ts = None
 
             message = f"LAST_RUN:{last_run}"
             print(f"📡 get_last_run -> {message}")
@@ -2300,12 +2747,33 @@ def handle_command(command):
         except Exception as e:
             return f"❌ Error setting sensor mode for extra channel: {e}"
 
-    
+    elif cmd == "recover_scan":
+        try:
+            # Prevent the measurement thread from using the instrument
+            # during the complete recovery sequence.
+            with heater_mutex:
+                success = ls.recover_scan()
+
+            if success:
+                message = (
+                    "✅ Lake Shore scan recovered: "
+                    "autoscan ON from channel 1"
+                )
+            else:
+                message = "❌ Lake Shore scan recovery failed"
+
+            print(message)
+            return message
+
+        except Exception as e:
+            message = f"❌ Error recovering Lake Shore scan: {e}"
+            print(message)
+            return message
+
     else:
         print("Unknown command")
  
             
-
 def start_server():
 
     try:
@@ -2406,11 +2874,15 @@ def lakeshore_temperature_sensor():
             with heater_mutex: 
                 channel_enabled_MXC   = int(ls.get_channel_status(6))  # MXC is channel 6
                 channel_enabled_50K   = int(ls.get_channel_status(1))
+                channel_enabled_4K    = int(ls.get_channel_status(2))
                 channel_enabled_STILL = int(ls.get_channel_status(5))
 
         except Exception as e:
             print(f"Error reading MXC channel status\nReason: {e}")
-            channel_enabled_MXC = 0
+            channel_enabled_MXC   = 0
+            channel_enabled_50K   = 0
+            channel_enabled_4K    = 0
+            channel_enabled_STILL = 0
         
         try:
             with heater_mutex: 
@@ -2552,6 +3024,9 @@ def lakeshore_temperature_sensor():
             'pause_times'       : pause_times,
             'autoscan'          : autoscan,
             'enabledMXC'        : channel_enabled_MXC,
+            'enabled50K'        : channel_enabled_50K,
+            'enabled4K'         : channel_enabled_4K,
+            'enabledSTILL'      : channel_enabled_STILL,
             'curve_MXC'         : current_curves[6],
             'curve_50K'         : current_curves[1],
             'curve_4K'          : current_curves[2],
@@ -2575,7 +3050,10 @@ def lakeshore_temperature_sensor():
         except Exception as e:
             print(f"Error broadcasting temperature data: {e}")
 
-        maybe_insert_measurements()
+        try:
+            maybe_insert_measurements()
+        except Exception as e:
+            print(f"❌ Database insertion error: {e}")
         
         time.sleep(1)
 
@@ -2615,11 +3093,36 @@ def broadcast_temperature(sensorValues, controlParams, sensorParams):
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()), "Broadcasting temperatures:")
 
     for index, channel in enumerate(DEFAULT_CHANNELS):
-        if temperatures[DEFAULT_CHANNELS_ID[index]] != "OFF":
-            channel_temperature = temperatures[DEFAULT_CHANNELS_ID[index]]
-            formated_temperature = f"{channel_temperature if channel_temperature > 1.0 else channel_temperature * 1000}"
-            formated_units = "K" if channel_temperature > 1.0 else "mK"
-            print(f"Channel {DEFAULT_CHANNELS_ID[index]} Temperature: {formated_temperature} {formated_units}")
+        channel_name = DEFAULT_CHANNELS_ID[index]
+        channel_temperature = temperatures.get(channel_name)
+
+        if channel_temperature == "OFF":
+            continue
+
+        if channel_temperature is None:
+            print(f"Channel {channel_name} Temperature: INVALID")
+            continue
+
+        try:
+            channel_temperature = float(channel_temperature)
+        except (TypeError, ValueError):
+            print(
+                f"Channel {channel_name} Temperature: "
+                f"INVALID ({channel_temperature!r})"
+            )
+            continue
+
+        if channel_temperature > 1.0:
+            formatted_temperature = channel_temperature
+            formatted_units = "K"
+        else:
+            formatted_temperature = channel_temperature * 1000
+            formatted_units = "mK"
+
+        print(
+            f"Channel {channel_name} Temperature: "
+            f"{formatted_temperature} {formatted_units}"
+        )
 
     for index, channel in enumerate(list(extra_resistances.keys())):
         if extra_resistances[channel] != "OFF":
@@ -2831,7 +3334,7 @@ def maybe_insert_measurements():
             last_sensorParams["sensor_mode_STILL"],
             last_sensorParams["sensor_range_STILL"],
             None,
-            bool(ls.get_channel_status(5)),          
+            last_sensorParams.get("enabledSTILL"),
 
             None, None, None, None, None,
             CURVES_BY_NAME["STILL"],          
@@ -2846,7 +3349,7 @@ def maybe_insert_measurements():
             last_sensorParams["sensor_mode_4K"],
             last_sensorParams["sensor_range_4K"],
             None,
-            bool(ls.get_channel_status(2)),         
+            last_sensorParams.get("enabled4K"),
 
             None, None, None, None, None,
             CURVES_BY_NAME["4K"],
@@ -2861,7 +3364,7 @@ def maybe_insert_measurements():
             last_sensorParams["sensor_mode_50K"],
             last_sensorParams["sensor_range_50K"],
             None,
-            bool(ls.get_channel_status(1)),         
+            last_sensorParams.get("enabled50K"),
 
             None, None, None, None, None,
             CURVES_BY_NAME["50K"],
@@ -2879,7 +3382,25 @@ def maybe_insert_measurements():
                 curve_id
             ) in per_channel:
 
+                enabled = _as_db_bool(enabled)
                 if not enabled:
+                    continue
+
+                # Do not store a row when the temperature reading is invalid.
+                if temp_k is None or temp_k == "OFF":
+                    print(
+                        f"Skipping DB insert for channel {name}: "
+                        f"invalid temperature ({temp_k!r})"
+                    )
+                    continue
+
+                try:
+                    temp_k = float(temp_k)
+                except (TypeError, ValueError):
+                    print(
+                        f"Skipping DB insert for channel {name}: "
+                        f"invalid temperature ({temp_k!r})"
+                    )
                     continue
 
                 channel_id = CHANNEL_IDS[name]
@@ -2938,6 +3459,7 @@ def maybe_insert_measurements():
 if __name__ == "__main__":
     try:
         init_db_pool()
+        resume_active_run_from_db()
         start_server()
     finally:
         close_db_pool()

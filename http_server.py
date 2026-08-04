@@ -1,8 +1,11 @@
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from collections import deque
 import json
+import math
 import socket
 import threading
 import time
+import uuid
 import io
 import base64
 from datetime import datetime
@@ -13,6 +16,33 @@ import matplotlib.pyplot as plt
 # Configuration for the TCP socket server
 TCP_HOST = '192.168.38.3'      #Replace with the Raspberry Pi's IP address: 192.168.38.3
 TCP_PORT = 65432 
+
+# Shared plot history is stored in memory while http_server.py is running.
+# This history survives when browser reloads, but is lost when http_server.py is restarted.
+BUFFER_RETENTION_SECONDS = 6 * 60 * 60
+BUFFER_RETENTION_MS      = BUFFER_RETENTION_SECONDS * 1000
+BUFFER_CHANNELS = ("50K", "4K", "STILL", "MXC")
+
+# A new identifier is generated whenever http_server.py restarts
+SERVER_INSTANCE_ID = uuid.uuid4().hex
+
+# One independent buffer per channel
+temperature_buffer_lock = threading.Lock()
+temperature_buffers = {
+    channel: deque()
+    for channel in BUFFER_CHANNELS
+}
+
+# Used later to tell the browswers that a channel buffer was cleared
+temperature_buffer_versions = {
+    channel: 0
+    for channel in BUFFER_CHANNELS
+}
+
+temperature_channel_enabled_state = {
+    channel: None
+    for channel in BUFFER_CHANNELS
+}
 
 # Global variables to store the latest temperature data
 current_50K = None
@@ -90,6 +120,111 @@ current_modeCH12 = current_rangeCH12 = None
 current_modeCH13 = current_rangeCH13 = None
 current_modeCH14 = current_rangeCH14 = None
 current_modeCH15 = current_rangeCH15 = None
+current_sample_timestamp_ms = None
+
+def _is_finit_number(value):
+    return (isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value))
+
+def _update_temperature_buffers(timestamp_ms):
+    """Store one real TCP acquisition in each enabled channel buffer"""
+
+    values = {
+        "50K": current_50K,
+        "4K": current_4K,
+        "STILL": current_STILL,
+        "MXC": current_MXC
+    }
+
+    enabled = {
+        "50K": current_enabled_50K,
+        "4K": current_enabled_4K,
+        "STILL": current_enabled_STILL,
+        "MXC": current_enabled_MXC
+    }
+
+    cutoff_ms = timestamp_ms - BUFFER_RETENTION_MS
+
+    with temperature_buffer_lock:
+        for channel in BUFFER_CHANNELS:
+            # For now, disabled channels are simply ignored.
+            # Their buffer will be cleared in a later setp.
+
+            if not bool(enabled[channel]): continue
+
+            value = values[channel]
+
+            if not _is_finit_number(value):
+                continue
+
+            channel_buffer = temperature_buffers[channel]
+
+            # Avoid duplicate or out-of-order timestamps
+            if channel_buffer and timestamp_ms <= channel_buffer[-1][0]:
+                continue
+
+            setpoint = None
+
+            if (channel == "MXC" and _is_finit_number(current_temperature_setpoint)):
+                setpoint = current_temperature_setpoint
+
+            first_sample = not channel_buffer
+            channel_buffer.append((timestamp_ms, value, setpoint))
+
+            # Remove samples older than six hours.
+            while (channel_buffer and channel_buffer[0][0] < cutoff_ms):
+                channel_buffer.popleft() # removes the oldest sample in the buffer
+
+            if first_sample:
+                print(f"[BUFFER] First {channel} sample: {value} K at {timestamp_ms}", flush=True)
+
+def _temperature_buffer_payload():
+    """Return a JSON-serialisable snapshot of the six-hour buffer."""
+
+    now_ms = int(time.time() * 1000)
+    cutoff_ms = now_ms - BUFFER_RETENTION_MS
+    channels = {}
+
+    with temperature_buffer_lock:
+        for channel in BUFFER_CHANNELS:
+            channel_buffer = temperature_buffers[channel]
+
+            # Also enforce the six-hour limit when the buffer is requested.
+            while (
+                channel_buffer
+                and channel_buffer[0][0] < cutoff_ms
+            ):
+                channel_buffer.popleft()
+
+            points = list(channel_buffer)
+
+            channel_payload = {
+                "timestamps_ms": [
+                    point[0]
+                    for point in points
+                ],
+                "temperature_k": [
+                    point[1]
+                    for point in points
+                ],
+            }
+
+            if channel == "MXC":
+                channel_payload["setpoint_k"] = [
+                    point[2]
+                    for point in points
+                ]
+
+            channels[channel] = channel_payload
+
+        buffer_versions = dict(temperature_buffer_versions)
+
+    return {
+        "retention_seconds": BUFFER_RETENTION_SECONDS,
+        "server_time_ms": now_ms,
+        "bufferInstance": SERVER_INSTANCE_ID,
+        "bufferVersions": buffer_versions,
+        "channels": channels,
+    }
 
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
 
@@ -99,16 +234,14 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         query = parse_qs(parsed.query)
 
         if path == '/':
-            self.send_response(200)
-            self.send_header('Content-type', 'text/html')
-            self.end_headers()
-            with open('/home/SuperTech/TCP_SERVER_CAB/index.html', 'rb') as file:       #C:\CuartoInformatica\Practicas_CAB\TCP_SERVER\index.html
-                self.wfile.write(file.read())
+            with open('/home/SuperTech/TCP_SERVER_CAB/index.html', 'rb') as file:
+                _respond_browser(self, 'text/html; charset=utf-8', file.read())
+
+        elif path == '/SCTLab_logo.png':
+            with open('/home/SuperTech/TCP_SERVER_CAB/SCTLab_logo.png', 'rb') as file:
+                _respond_browser(self, 'image/png', file.read())
 
         elif path == '/get-data':
-            self.send_response(200)
-            self.send_header('Content-type', 'application/json')
-            self.end_headers()
             response = json.dumps({"50K"               : current_50K,
                                    "4K"                : current_4K,
                                    "STILL"             : current_STILL,
@@ -188,10 +321,20 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
                                    "rangeCH14"         : current_rangeCH14,
                                    "modeCH15"          : current_modeCH15,
                                    "rangeCH15"         : current_rangeCH15,
+                                   "sampleTime"        : current_sample_timestamp_ms,
                                 })
                                    
+            _respond_browser(self, 'application/json; charset=utf-8', response)
 
-            self.wfile.write(response.encode('utf-8'))
+        elif path == '/get-buffer':
+            response = json.dumps(
+                _temperature_buffer_payload()
+            )
+            _respond_browser(
+                self,
+                'application/json; charset=utf-8',
+                response
+            )
 
         elif path == '/plot_run':
             run_vals = query.get("run_id")
@@ -211,12 +354,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
                 return
 
             html = self.render_run_plot_html(run_payload)
-
-            self.send_response(200)
-            self.send_header('Content-Type', 'text/html; charset=utf-8')
-            self.end_headers()
-            self.wfile.write(html.encode('utf-8'))
-
+            _respond_browser(self, 'text/html; charset=utf-8', html)
 
         elif path == '/plot_relation':
             file_vals = query.get("file_name")
@@ -232,28 +370,26 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
                 return
 
             html = self.render_relation_plot_html(relation_payload)
-
-            self.send_response(200)
-            self.send_header('Content-Type', 'text/html; charset=utf-8')
-            self.end_headers()
-            self.wfile.write(html.encode('utf-8'))
+            _respond_browser(self, 'text/html; charset=utf-8', html)
 
         else:
             self.send_error(404)
 
     def do_POST(self):
         if self.path == '/send-command':
+
             content_length = int(self.headers['Content-Length'])
             post_data = self.rfile.read(content_length)
             data = json.loads(post_data.decode('utf-8'))
             command = data.get('command')
             print(command)
+
             # Forward the command to the TCP socket server
             response = self.send_command_to_tcp_server(command)
-            self.send_response(200)
-            self.send_header('Content-type', 'application/json')
-            self.end_headers()
-            self.wfile.write(json.dumps({"status": response}).encode('utf-8'))
+
+            # Forward TCP socket server response to browser
+            json_response = json.dumps({"status": response})
+            _respond_browser(self, 'application/json; charset=utf-8', json_response)
         else:
             self.send_error(404)
 
@@ -358,11 +494,12 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
                 len(ch["timestamps"]) == 0):
 
                 ax.set_title(ch_name)
-                ax.set_xlabel("Tiempo (s)")
-                ax.set_ylabel("Temperatura (K)")
+                ax.tick_params(direction = 'in', which = 'both')
+                ax.set_xlabel("Time (s)")
+                ax.set_ylabel("Temperature (K)")
                 ax.set_xlim(0, 1)
                 ax.set_ylim(0, 1)
-                ax.grid(True, alpha=0.3)
+                ax.grid(True, alpha=0.2)
 
             else:
                 ts_list = ch["timestamps"]
@@ -374,14 +511,17 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
                 ax.plot(t_rel, temps, label="T")
 
                 if ch_name == "MXC":
+                    ax.set_ylim(0, 100.0)
                     sp_vals = ch.get("mxc_setpoint_mk")
                     if isinstance(sp_vals, list) and len(sp_vals) == len(t_rel):
                         sp_k = [float(v) if v is not None else None for v in sp_vals]
                         ax.plot(t_rel, sp_k, linestyle="--", color="red", linewidth=1.5, label="Setpoint")
 
+                ax.tick_params(direction = 'in', which = 'both')
                 ax.set_title(ch_name)
-                ax.set_xlabel("Tiempo (s)")
-                ax.set_ylabel("Temperatura (K)")
+                ax.set_xlabel("Time (s)")
+                ax.set_ylabel("Temperature (K)")
+                ax.grid(alpha=0.2)
                 ax.legend(loc="best")
 
             buf = io.BytesIO()
@@ -777,9 +917,7 @@ def receive_sensor_data(tcp_socket):
     global current_modeCH13, current_rangeCH13
     global current_modeCH14, current_rangeCH14
     global current_modeCH15, current_rangeCH15
-
-
-
+    global current_sample_timestamp_ms
 
     buf = b""
     while True:
@@ -995,6 +1133,9 @@ def receive_sensor_data(tcp_socket):
                 except Exception as e:
                     print(f"Error parsing extra excitation settings CH9..15: {e}")
 
+                current_sample_timestamp_ms = int(time.time() * 1000)
+                _update_temperature_buffers(current_sample_timestamp_ms)
+
         except socket.timeout:
             continue
 
@@ -1031,6 +1172,32 @@ def run(server_class=HTTPServer, handler_class=SimpleHTTPRequestHandler,
     httpd.serve_forever()
 
 # ---- Helper functions ----
+
+def _respond_browser(handler, content_type: str, content, status_code: int = 200):
+
+    """
+    Send an HTTP response to the browser.
+
+    handler      : usually `self` inside do_GET or do_POST.
+    content_type : MIME type, e.g. 'text/html', 'image/png', 'application/json'.
+    content      : bytes or string to send to the browser.
+    status_code  : HTTP status code. Default is 200 OK.
+    """
+
+    try:
+        if isinstance(content, str):
+            # I do byte encoding here in order to simplify sintax during call
+            content = content.encode("utf-8")
+
+        handler.send_response(status_code)
+        handler.send_header("Content-Type", content_type)
+        handler.send_header("Content-Length", str(len(content)))
+        handler.end_headers()
+        handler.wfile.write(content)
+
+    except Exception as e:
+        raise RuntimeError("Error occurred when answering request from browser") from e
+
 def _organize_temperature_data(params):
 
     current_50K = params[0].split(':')[-1].strip()
