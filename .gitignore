@@ -1,2 +1,25 @@
-tcp_server.log
-http_server.log
+# Python-generated files
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+.venv/
+venv/
+
+# Runtime files
+*.log
+nohup.out
+
+# Local backups
+backups/
+*.bak
+*.bak_*
+*.save
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+
+# Operating-system files
+.DS_Store
