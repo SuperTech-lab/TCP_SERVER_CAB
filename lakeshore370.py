@@ -14,6 +14,8 @@ MIN_COMMUNICATION_INTERVAL_S = 0.055
 # Ramp implementation for temperature control min and max rate values in Kelvin/min
 MIN_RAMP_RATE_K_PER_MIN = 0.001
 MAX_RAMP_RATE_K_PER_MIN = 10.0
+MIN_TARGET_TEMPERATURE_MK = 10.0
+MAX_TARGET_TEMPERATURE_MK = 900.0
 
 # These reading status flags are used to identify the LakeShore 370 channel status and act accordingly
 # The flags are represented as bit masks.
@@ -122,7 +124,7 @@ class LakeShore370:
     """
     #! -- Initialization -- #
     def __init__(self,
-                 addr = 'ASRL/dev/ttyUSB0::INSTR',
+                 addr = 'ASRL/dev/ttyUSB1::INSTR',
                  baud_rate = 9600,
                  timeout = 2000):
 
@@ -873,10 +875,11 @@ class LakeShore370:
         except (TypeError, ValueError):
             print("Ramp rate must be numeric.")
             return False
-
+        
+        print('Rate:', rate_k_per_min)
         if not (
             MIN_RAMP_RATE_K_PER_MIN
-            <= rate_k_per_min
+            <= rate_k_per_min * 1000
             <= MAX_RAMP_RATE_K_PER_MIN
         ):
             print(
@@ -926,7 +929,7 @@ class LakeShore370:
     def start_ramp(
         self,
         target_mk: float,
-        rate_mk_per_min: float,
+        rate_k_per_min: float,
         channel: int = 6,
     ) -> dict:
         """
@@ -937,7 +940,7 @@ class LakeShore370:
         """
         try:
             target_mk = float(target_mk)
-            rate_mk_per_min = float(rate_mk_per_min)
+            rate_k_per_min = float(rate_k_per_min)
 
         except (TypeError, ValueError) as e:
             return {
@@ -951,17 +954,18 @@ class LakeShore370:
                 "error": "The controlled MXC channel must be 6.",
             }
 
-        if not 10.0 <= target_mk <= 500.0:
+        if not (MIN_TARGET_TEMPERATURE_MK <= 
+                target_mk <= 
+                MAX_TARGET_TEMPERATURE_MK):
             return {
                 "ok": False,
                 "error": (
                     "Target temperature must be between "
-                    "10 and 500 mK."
+                    f"{MIN_TARGET_TEMPERATURE_MK} and "
+                    f"{MAX_TARGET_TEMPERATURE_MK} mK."
                 ),
             }
-
-        rate_k_per_min = rate_mk_per_min / 1000.0
-
+        print('Rate:', rate_k_per_min)
         if not (
             MIN_RAMP_RATE_K_PER_MIN
             <= rate_k_per_min
@@ -971,7 +975,8 @@ class LakeShore370:
                 "ok": False,
                 "error": (
                     "Ramp rate must be between "
-                    "1 and 10000 mK/min."
+                    f"{MIN_RAMP_RATE_K_PER_MIN} and "
+                    f"{MAX_RAMP_RATE_K_PER_MIN} mK/min."
                 ),
             }
 
@@ -1069,6 +1074,38 @@ class LakeShore370:
                     self.get_temperature_setpoint()
                 )
                 ramp_active = self.get_ramp_status()
+                
+                print(
+                    "Ramp start verification:"
+                    f"\n  Initial SETP: {initial_setpoint_k:.6f} K"
+                    f"\n  Current SETP: {current_setpoint_k} K"
+                    f"\n  Target SETP:  {target_k:.6f} K"
+                    f"\n  RAMPST?:      {ramp_active}"
+                )
+
+                if current_setpoint_k is None:
+                    return {
+                        "ok": False,
+                        "error": "Could not verify SETP? after ramp start.",
+                    }
+
+                if ramp_active is None:
+                    return {
+                        "ok": False,
+                        "error": "Could not read RAMPST? after ramp start.",
+                    }
+
+                if (
+                    abs(target_k - initial_setpoint_k) > 1e-6
+                    and not ramp_active
+                ):
+                    return {
+                        "ok": False,
+                        "error": (
+                            "Lake Shore accepted the RAMP configuration "
+                            "but RAMPST? reports that the setpoint is not ramping."
+                        ),
+                    }
 
             if (
                 current_setpoint_k is None

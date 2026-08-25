@@ -17,6 +17,7 @@ from typing import Any
 
 import pyvisa as visa
 
+from default_config import BBCON_NAME
 
 class BBCON:
     """Driver for the Cryo-con Model 32 black-body controller."""
@@ -315,13 +316,31 @@ class BBCON:
         return self.query("LOOP 1:RANGE?").upper()
 
     def set_range(self, control_range: str) -> None:
-        self.command(f"LOOP 1:RANGE {self._normalise_range(control_range)}")
-
+        try:
+            self.command(f"LOOP 1:RANGE {self._normalise_range(control_range)}")
+            return True
+        except Exception as e:
+            print(f"❌Error occurred while setting heater range for {BBCON_NAME}\nReason: {e}")
+            return False
+        
     def query_setpoint(self) -> float:
         return _parse_float(self.query("LOOP 1:SETPT?"))
 
-    def set_setpoint(self, temperature: float) -> None:
-        self.command(f"LOOP 1:SETPT {float(temperature)}")
+    def set_setpoint(self, temperature: float, verbose: bool = True) -> bool:
+        """ Temperature must be in Kelvin."""
+        try:
+            value = float(temperature)
+        except Exception as e:
+            print(f"❌Invalid temperature setpoint for {BBCON_NAME}: {temperature}\nReason: {e}")
+            return False
+        
+        try:
+            self.command(f"LOOP 1:SETPT {value}")
+            if verbose: print(f"Set temperature setpoint for {BBCON_NAME} to {value} K.")
+            return True
+        except Exception as e:
+            print(f"❌Setting temperature setpoint for {BBCON_NAME} failed\nReason: {e}")
+            return False
 
     def start_control(self) -> None:
         self.command("CONTROL")

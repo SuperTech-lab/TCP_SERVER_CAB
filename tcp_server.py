@@ -3,26 +3,40 @@ import random
 import time
 import json
 import threading
-from lakeshore370 import LakeShore370
-from psycopg2.pool import ThreadedConnectionPool
+import urllib.parse
+import re
 import psycopg2
+
+from psycopg2.pool import ThreadedConnectionPool
 from contextlib import contextmanager
+from datetime import datetime, timezone
+
 from default_config import (DEFAULT_PID, CURRENT_RANGE_LIST, DEFAULT_MXC_RESISTANCE_RANGE_SETTINGS, SENSOR_RESISTANCE_RANGE_LIST, DEFAULT_CHANNELS, DEFAULT_EXTRA_CHANNELS, 
                             DEFAULT_CHANNELS_ID, DEFAULT_SETTINGS, DEFAULT_MXC_SETPOINT_MK, DEFAULT_MXC_HEATER_RANGE, DEFAULT_SENSOR_RESISTANCE_SETTINGS, DB_INSERT_INTERVAL, 
                             DEFAULT_CURVES, CURVE_NAMES, SAMPLE_CHANNELS
                             )
-import urllib.parse
-import re
-from datetime import datetime, timezone
+from default_config import (
+    BBCON_NAME, MAX_BBCON_SETPOINT, ATTEMPTS
+)
+
+from lakeshore370 import LakeShore370
+try:
+    from bbcon import BBCON
+except ImportError as e:
+    print(f"❌ Failed importing Cryo-con driver\nReason: {e}")
 
 ls = LakeShore370()
+bb = BBCON()
 
 # Configuration
 HOST = '0.0.0.0' # Listen on all network interfaces
 PORT = 65432  # Port to listen on
 
 # Mutex to protect the heater power level
-heater_mutex = threading.Lock() 
+# Define separated mutex to avoid that slow communications with Cryo-con
+# bottleneck the communications with LakeShore or viceversa.
+heater_mutex = threading.Lock()
+bbcon_mutex  = threading.RLock()
 
 # DataBase conection params
 db_delay          = DB_INSERT_INTERVAL
@@ -385,7 +399,7 @@ def start_relation(
 def start_relation_ramp(
     channel_number: int,
     target_mk: float,
-    rate_mk_per_min: float,
+    rate_k_per_min: float,
     label: str | None = None,
 ):
     global RELATION_RAMP_CONTROLLED
@@ -394,7 +408,7 @@ def start_relation_ramp(
 
     try:
         target_mk = float(target_mk)
-        rate_mk_per_min = float(rate_mk_per_min)
+        rate_k_per_min = float(rate_k_per_min)
     except (ValueError, TypeError):
         return None, (
             "Ramp target and rate must be numeric."
@@ -414,7 +428,7 @@ def start_relation_ramp(
         with heater_mutex:
             ramp_result = ls.start_ramp(
                 target_mk=target_mk,
-                rate_mk_per_min=rate_mk_per_min,
+                rate_k_per_min=rate_k_per_min,
             )
 
     except Exception as e:
@@ -452,14 +466,14 @@ def start_relation_ramp(
     RELATION_RAMP_CONTROLLED = True
     RELATION_RAMP_TARGET_MK = target_mk
     RELATION_RAMP_RATE_MK_PER_MIN = (
-        rate_mk_per_min
+        rate_k_per_min * 1000
     )
 
     print(
         "↗ MXC ramp associated with RELATION "
         f"file={relation_id}, "
         f"target={target_mk:g} mK, "
-        f"rate={rate_mk_per_min:g} mK/min"
+        f"rate={rate_k_per_min * 1000:g} mK/min"
     )
 
     return relation_id, None
@@ -801,6 +815,99 @@ def handle_command(command):
         "set_timeout",
     )
 
+    BBCON_COMMAND_PREFIXES = (
+        "start_bbcon_control",
+        "set_bbcon_setpoint",
+        "set_bbcon_heater_range",
+
+    )
+
+    if cmd.startswith(BBCON_COMMAND_PREFIXES):
+        print('command', cmd)
+        if cmd.startswith("start_bbcon_control"):
+            try:
+                with bbcon_mutex:
+                    bb.start_control()
+                message = f"✅ Control started for {BBCON_NAME}"
+                print(message)
+                return message    
+
+            except Exception as e:
+                print(f"❌ Error occurred while starting control for {BBCON_NAME}\nReason: {e}")
+
+        elif cmd.startswith("set_bbcon_setpoint"):
+            print('hola')
+            try:
+                new_bbcon_setpoint = float(cmd.split(":")[-1])
+                if 0.0 <= new_bbcon_setpoint <= MAX_BBCON_SETPOINT:
+                    with bbcon_mutex:
+                        success = bb.set_setpoint(new_bbcon_setpoint)
+
+                    if success:
+                        actual_setpoint = None
+                        for attempt in range(ATTEMPTS):
+                            time.sleep(0.2)
+                            with bbcon_mutex:
+                                actual_setpoint = bb.query_setpoint()
+                            if actual_setpoint is not None:
+                                break
+                            
+                        if actual_setpoint is None:
+                            message = f"❌ Failed to read back {BBCON_NAME} setpoint after {attempts} attempts."
+                            print(message)
+                            return message
+
+                        if abs(actual_setpoint - new_bbcon_setpoint) < 1e-2:
+                            message = f"✅ Setpoint for {BBCON_NAME} successfully set to {new_bbcon_setpoint} K"
+                        else:
+                            message = (
+                                        f"⚠️ Mismatch: Tried to set {BBCON_NAME} setpoint to {new_bbcon_setpoint:.2f} K, "+
+                                        f"but the device reports {actual_setpoint:.2f} K"
+                                    )
+                    else:
+                        message = f"❌ Failed to set temperature setpoint for {BBCON_NAME}"
+                else:
+                    message = f"❌ Temperature setpoint for {BBCON_NAME} must be between 0.0 K and {MAX_BBCON_SETPOINT} K"
+
+                print(message)
+                return message
+            
+            except Exception as e:
+                print(f"❌ Error ocurred while setting setpoint for {BBCON_NAME}\nReason: {e}")
+
+        elif cmd.startswith("set_bbcon_heater_range"):
+            try:
+                new_range = cmd.split(":")[-1].strip().upper()
+                if new_range in ["LOW", "MID", "HIGH", "HI", "OFF"]:
+                    with bbcon_mutex:
+                        success = bb.set_range(new_range)
+
+                    if success:
+                        for attempt in range(ATTEMPTS):
+                            time.sleep(0.2)
+                            with bbcon_mutex:
+                                actual_range = bb.query_range()
+                            if actual_range is not None:
+                                break
+
+                        if actual_range is None:
+                            message = f"❌ Failed to read back {BBCON_NAME} heater range after {attempts} attempts."
+                            print(message)
+                            return message
+
+                        message = f"✅ Heater range for {BBCON_NAME} successfully set to {new_range}"
+                        
+                    else:
+                        message = f"❌ Failed to set heater range for {BBCON_NAME}"
+                else:
+                    message = f"❌ Invalid heater range for {BBCON_NAME}. Valid options are: LOW, MID, HIGH, HI"
+
+                print(message)
+                return message
+
+            except Exception as e:
+                print(f"❌ Error ocurred while setting heater range for {BBCON_NAME}\nReason: {e}")
+
     if cmd.startswith(CONTROL_COMMAND_PREFIXES):
         try:
             with heater_mutex:
@@ -844,7 +951,7 @@ def handle_command(command):
             return "❌ TARGET_MK must be numeric"
 
         try:
-            rate_mk_per_min = float(parts[3])
+            rate_k_per_min = float(parts[3])/1000
         except (ValueError, TypeError):
             return "❌ RATE_MK_PER_MIN must be numeric"
 
@@ -855,7 +962,7 @@ def handle_command(command):
         relation_id, error = start_relation_ramp(
             channel_number=ch,
             target_mk=target_mk,
-            rate_mk_per_min=rate_mk_per_min,
+            rate_k_per_min=rate_k_per_min,
             label=label,
         )
 
@@ -2908,6 +3015,11 @@ def lakeshore_temperature_sensor():
             proportionalMXC = integralMXC = derivativeMXC = None
 
         try:
+            with heater_mutex: rampON = ls.get_ramp_status()
+        except Exception as e:
+            print(f"Error reading ramp status from LakesShore\nReason: {e}")
+            rampON = None
+        try:
             with heater_mutex: resistance_mxc_settings = ls.get_sensor_resistance_settings(channel=6, return_dict=True)  # Channel 6 is MXC
             modeMXC = resistance_mxc_settings['excitation_mode']
             excitationMXC = resistance_mxc_settings['excitation_range']
@@ -3008,6 +3120,7 @@ def lakeshore_temperature_sensor():
             'D'               : derivativeMXC,
             'HR'              : heaterRangeMXC,
             'heaterOutputMXC' : heaterOutputMXC,
+            'rampON'          : rampON,
         }
 
         sensorParams = {
@@ -3074,6 +3187,7 @@ def broadcast_temperature(sensorValues, controlParams, sensorParams):
     global current_integralMXC
     global current_derivativeMXC
     global current_ls_heater_range
+    global current_ls_control_mode
 
     global current_mxc_resistance_mode
     global current_mxc_resistance_range
@@ -3132,6 +3246,11 @@ def broadcast_temperature(sensorValues, controlParams, sensorParams):
     if CURRENT_RANGE_LIST[controlParams['HR']][0] != 0:
         print(f"MXC Temperature Setpoint: {controlParams['MXCSP']} K")
         print(f"Heater Range MXC: {controlParams['HR']} ({CURRENT_RANGE_LIST[controlParams['HR']][0]} {CURRENT_RANGE_LIST[controlParams['HR']][1]})")
+
+        if isinstance(controlParams['rampON'], bool):
+            if controlParams['rampON']: print(f"↗ Ramp Status MXC: ON")
+        elif isinstance(controlParams['rampOn'], None):
+            print(f"Ramp Status MXC: UNKNOWN")
 
     print("Autoscan is set " + ("ON" if str(sensorParams['autoscan'][1]) == '1' else "OFF"))
     if sensorParams['autoscan'][1] == '1': 

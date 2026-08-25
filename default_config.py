@@ -1,5 +1,9 @@
 import datetime
 
+# Number of attempts to connect to query to check
+# after sending a command to device
+ATTEMPTS = 5
+
 DEFAULT_SETTINGS = {
     1: ['010, 003, 01, 2'],  # 50 K stage
     2: ['010, 003, 02, 2'],  # 4 K stage
@@ -83,3 +87,6 @@ DEFAULT_SENSOR_RESISTANCE_SETTINGS = {
 DB_INSERT_INTERVAL = datetime.timedelta(seconds=1)
 
 SAMPLE_CHANNELS = [9, 10, 11, 12, 13, 14, 15]
+
+BBCON_NAME = "Cryo-con"
+MAX_BBCON_SETPOINT = 25.0
