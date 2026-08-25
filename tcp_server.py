@@ -817,26 +817,51 @@ def handle_command(command):
 
     BBCON_COMMAND_PREFIXES = (
         "start_bbcon_control",
+        "stop_bbcon_control",
+        "get_bbcon_temperature",
         "set_bbcon_setpoint",
         "set_bbcon_heater_range",
 
     )
 
     if cmd.startswith(BBCON_COMMAND_PREFIXES):
-        print('command', cmd)
         if cmd.startswith("start_bbcon_control"):
             try:
                 with bbcon_mutex:
                     bb.start_control()
-                message = f"✅ Control started for {BBCON_NAME}"
+                message = f"▶ Control started for {BBCON_NAME}"
                 print(message)
                 return message    
 
             except Exception as e:
                 print(f"❌ Error occurred while starting control for {BBCON_NAME}\nReason: {e}")
 
+        elif cmd.startswith("stop_bbcon_control"):
+            try:
+                with bbcon_mutex:
+                    bb.stop_control()
+                message = f"⏹ Control stopped for {BBCON_NAME}"
+                print(message)
+                return message    
+
+            except Exception as e:
+                print(f"❌ Error occurred while stopping control for {BBCON_NAME}\nReason: {e}")
+
+        elif cmd.startswith("get_bbcon_temperature"):
+            try:
+                with bbcon_mutex:
+                    temperature = bb.query_temperature()
+                if isinstance(temperature, float):
+                    return temperature
+                else:
+                    message = f"❌ Failed to read temperature from {BBCON_NAME}"
+                    print(message)
+                    return None
+            except Exception as e:
+                print(f"❌ Error occurred while reading temperature from {BBCON_NAME}\nReason: {e}")
+                return None
+
         elif cmd.startswith("set_bbcon_setpoint"):
-            print('hola')
             try:
                 new_bbcon_setpoint = float(cmd.split(":")[-1])
                 if 0.0 <= new_bbcon_setpoint <= MAX_BBCON_SETPOINT:
@@ -2882,7 +2907,6 @@ def handle_command(command):
  
             
 def start_server():
-
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
             server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -2892,7 +2916,6 @@ def start_server():
 
             # Start the fake temperature sensor in a separate thread
             threading.Thread(target=lakeshore_temperature_sensor, daemon=True).start()
-
                         
             while True:
                 conn, addr = server_socket.accept()
@@ -2942,14 +2965,18 @@ def client_handler(conn, addr):
     try:
         command = text
         message = handle_command(command)
+        if message is None:
+            message = f"❌ Command {command} executed but no response was returned"
+    
         # send a line-delimited response back to the client
-        conn.sendall(b"Command received - " + message.encode('utf-8') + b"\n")
+        conn.sendall(b"Command received - " + str(message).encode('utf-8') + b"\n")
     except Exception as e:
         print(f"Error handling command from {addr}: {e}")
         conn.sendall((b"Error handling command " + str(e).encode('utf-8') + b"\n"))
     finally:
         conn.close()
         print(f"Connection with {addr} closed")
+
 
 def lakeshore_temperature_sensor():
 
@@ -2961,7 +2988,6 @@ def lakeshore_temperature_sensor():
     resistances = {}
     powers = {}
     
-
     while True:
         try:
             for index, channel in enumerate(DEFAULT_CHANNELS):
