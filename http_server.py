@@ -122,6 +122,16 @@ current_modeCH14 = current_rangeCH14 = None
 current_modeCH15 = current_rangeCH15 = None
 current_sample_timestamp_ms = None
 
+# --- CryoCon Model 32 variables
+current_bbcon_temperature = None
+current_bbcon_setpoint = None
+current_bbcon_heater_range = None
+current_bbcon_resistance = None
+current_bbcon_power = None
+current_bbcon_P = None
+current_bbcon_I = None
+current_bbcon_D = None
+
 def _is_finit_number(value):
     return (isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value))
 
@@ -242,89 +252,191 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
                 _respond_browser(self, 'image/png', file.read())
 
         elif path == '/get-data':
-            response = json.dumps({"50K"               : current_50K,
-                                   "4K"                : current_4K,
-                                   "STILL"             : current_STILL,
-                                   "MXC"               : current_MXC,
-                                   "MXCSP"             : current_mxc_temperature_setpoint,
-                                   "MXCP"              : current_mxc_proportional_gain,
-                                   "MXCI"              : current_mxc_integral_gain,
-                                   "MXCD"              : current_mxc_derivative_gain,
-                                   "MXCHR"             : current_mxc_heater_range,
-                                   "dwellMXC"          : current_dwell_MXC,
-                                   "pauseMXC"          : current_pause_MXC,
-                                   "modeMXC"           : current_excitation_mode_MXC,
-                                   "rangeMXC"          : current_excitation_range_MXC,
-                                   "autorangeMXC"      : current_excitation_autorange_MXC,
-                                   "dwell50K"          : current_dwell_50K,
-                                   "dwell4K"           : current_dwell_4K,
-                                   "dwellSTILL"        : current_dwell_STILL,
-                                   "pause50K"          : current_pause_50K,
-                                   "pause4K"           : current_pause_4K,
-                                   "pauseSTILL"        : current_pause_STILL,
-                                   "setpoint"          : current_temperature_setpoint,
-                                   "heater_power"      : current_heater_power,
-                                   "heater_range"      : current_heater_range,
-                                   "temperature_limit" : current_temperature_limit,
-                                   "timeout"           : current_timeout,
-                                   "proportional_gain" : current_proportional_gain,
-                                   "integral_gain"     : current_integral_gain,
-                                   "derivative_gain"   : current_derivative_gain,
-                                   "R50K"              : current_R50K,
-                                   "R4K"               : current_R4K,
-                                   "RSTILL"            : current_RSTILL,
-                                   "RMXC"              : current_RMXC,
-                                   "PMXC"              : current_PMXC,
-                                   "enabledMXC"        : current_enabled_MXC,
-                                   "enabled50K"        : current_enabled_50K,
-                                   "enabled4K"         : current_enabled_4K,
-                                   "enabledSTILL"      : current_enabled_STILL,
-                                   "autoscan"          : current_autoscan,
-                                   "mode50K"           : current_excitation_mode_50K,
-                                   "range50K"          : current_excitation_range_50K,
-                                   "mode4K"            : current_excitation_mode_4K,
-                                   "range4K"           : current_excitation_range_4K,
-                                   "modeSTILL"         : current_excitation_mode_STILL,
-                                   "rangeSTILL"        : current_excitation_range_STILL,
-                                   "curveMXC"          : current_curve_MXC,
-                                   "curve50K"          : current_curve_50K,
-                                   "curve4K"           : current_curve_4K,
-                                   "curveSTILL"        : current_curve_STILL,      
-                                   "heaterOutputMXC"   : current_heater_output_MXC,    
-                                   "runID"             : current_RUNID,      
-                                   "RCH9"              : current_RCH9,
-                                   "RCH10"             : current_RCH10,
-                                   "RCH11"             : current_RCH11,
-                                   "RCH12"             : current_RCH12,
-                                   "RCH13"             : current_RCH13,
-                                   "RCH14"             : current_RCH14,
-                                   "RCH15"             : current_RCH15,
-                                   "enabledCH9"        : current_enabled_CH9,
-                                   "enabledCH10"       : current_enabled_CH10,
-                                   "enabledCH11"       : current_enabled_CH11,
-                                   "enabledCH12"       : current_enabled_CH12,
-                                   "enabledCH13"       : current_enabled_CH13,
-                                   "enabledCH14"       : current_enabled_CH14,
-                                   "enabledCH15"       : current_enabled_CH15,
-                                   "scanning_channel"  : current_scanning_channel,
-                                   "modeCH9"           : current_modeCH9,
-                                   "rangeCH9"          : current_rangeCH9,
-                                   "modeCH10"          : current_modeCH10,
-                                   "rangeCH10"         : current_rangeCH10,
-                                   "modeCH11"          : current_modeCH11,
-                                   "rangeCH11"         : current_rangeCH11,
-                                   "modeCH12"          : current_modeCH12,
-                                   "rangeCH12"         : current_rangeCH12,
-                                   "modeCH13"          : current_modeCH13,
-                                   "rangeCH13"         : current_rangeCH13,
-                                   "modeCH14"          : current_modeCH14,
-                                   "rangeCH14"         : current_rangeCH14,
-                                   "modeCH15"          : current_modeCH15,
-                                   "rangeCH15"         : current_rangeCH15,
-                                   "sampleTime"        : current_sample_timestamp_ms,
-                                })
-                                   
-            _respond_browser(self, 'application/json; charset=utf-8', response)
+
+            response = json.dumps({
+
+                # ==============================================================
+                # LakeShore - main temperatures
+                # ==============================================================
+
+                "50K"   : current_50K,
+                "4K"    : current_4K,
+                "STILL" : current_STILL,
+                "MXC"   : current_MXC,
+
+                # ==============================================================
+                # LakeShore - MXC control
+                # ==============================================================
+
+                "MXCSP" : current_mxc_temperature_setpoint,
+                "MXCP"  : current_mxc_proportional_gain,
+                "MXCI"  : current_mxc_integral_gain,
+                "MXCD"  : current_mxc_derivative_gain,
+                "MXCHR" : current_mxc_heater_range,
+
+                "heaterOutputMXC" : current_heater_output_MXC,
+
+                # ==============================================================
+                # LakeShore - MXC sensor configuration
+                # ==============================================================
+
+                "dwellMXC"     : current_dwell_MXC,
+                "pauseMXC"     : current_pause_MXC,
+                "modeMXC"      : current_excitation_mode_MXC,
+                "rangeMXC"     : current_excitation_range_MXC,
+                "autorangeMXC" : current_excitation_autorange_MXC,
+
+                # ==============================================================
+                # LakeShore - other main channels
+                # ==============================================================
+
+                "dwell50K"   : current_dwell_50K,
+                "dwell4K"    : current_dwell_4K,
+                "dwellSTILL" : current_dwell_STILL,
+
+                "pause50K"   : current_pause_50K,
+                "pause4K"    : current_pause_4K,
+                "pauseSTILL" : current_pause_STILL,
+
+                "mode50K"    : current_excitation_mode_50K,
+                "range50K"   : current_excitation_range_50K,
+
+                "mode4K"     : current_excitation_mode_4K,
+                "range4K"    : current_excitation_range_4K,
+
+                "modeSTILL"  : current_excitation_mode_STILL,
+                "rangeSTILL" : current_excitation_range_STILL,
+
+                # ==============================================================
+                # LakeShore - resistances
+                # ==============================================================
+
+                "R50K"   : current_R50K,
+                "R4K"    : current_R4K,
+                "RSTILL" : current_RSTILL,
+                "RMXC"   : current_RMXC,
+
+                # ==============================================================
+                # LakeShore - powers
+                # ==============================================================
+
+                "P50K"   : current_P50K,
+                "P4K"    : current_P4K,
+                "PSTILL" : current_PSTILL,
+                "PMXC"   : current_PMXC,
+
+                # ==============================================================
+                # LakeShore - channel enabled status
+                # ==============================================================
+
+                "enabledMXC"   : current_enabled_MXC,
+                "enabled50K"   : current_enabled_50K,
+                "enabled4K"    : current_enabled_4K,
+                "enabledSTILL" : current_enabled_STILL,
+
+                # ==============================================================
+                # LakeShore - autoscan
+                # ==============================================================
+
+                "autoscan"         : current_autoscan,
+                "scanning_channel" : current_scanning_channel,
+
+                # ==============================================================
+                # LakeShore - curves
+                # ==============================================================
+
+                "curveMXC"   : current_curve_MXC,
+                "curve50K"   : current_curve_50K,
+                "curve4K"    : current_curve_4K,
+                "curveSTILL" : current_curve_STILL,
+
+                # ==============================================================
+                # Generic control values
+                # ==============================================================
+
+                "setpoint"          : current_temperature_setpoint,
+                "heater_power"      : current_heater_power,
+                "heater_range"      : current_heater_range,
+                "temperature_limit" : current_temperature_limit,
+                "timeout"           : current_timeout,
+
+                "proportional_gain" : current_proportional_gain,
+                "integral_gain"     : current_integral_gain,
+                "derivative_gain"   : current_derivative_gain,
+
+                # ==============================================================
+                # Current run
+                # ==============================================================
+
+                "runID" : current_RUNID,
+
+                # ==============================================================
+                # LakeShore - sample channels CH9 - CH15
+                # ==============================================================
+
+                "RCH9"  : current_RCH9,
+                "RCH10" : current_RCH10,
+                "RCH11" : current_RCH11,
+                "RCH12" : current_RCH12,
+                "RCH13" : current_RCH13,
+                "RCH14" : current_RCH14,
+                "RCH15" : current_RCH15,
+
+                "enabledCH9"  : current_enabled_CH9,
+                "enabledCH10" : current_enabled_CH10,
+                "enabledCH11" : current_enabled_CH11,
+                "enabledCH12" : current_enabled_CH12,
+                "enabledCH13" : current_enabled_CH13,
+                "enabledCH14" : current_enabled_CH14,
+                "enabledCH15" : current_enabled_CH15,
+
+                "modeCH9"  : current_modeCH9,
+                "rangeCH9" : current_rangeCH9,
+
+                "modeCH10"  : current_modeCH10,
+                "rangeCH10" : current_rangeCH10,
+
+                "modeCH11"  : current_modeCH11,
+                "rangeCH11" : current_rangeCH11,
+
+                "modeCH12"  : current_modeCH12,
+                "rangeCH12" : current_rangeCH12,
+
+                "modeCH13"  : current_modeCH13,
+                "rangeCH13" : current_rangeCH13,
+
+                "modeCH14"  : current_modeCH14,
+                "rangeCH14" : current_rangeCH14,
+
+                "modeCH15"  : current_modeCH15,
+                "rangeCH15" : current_rangeCH15,
+
+                # ==============================================================
+                # Cryo-Con Model 32
+                # ==============================================================
+
+                "BBCON_TEMP"       : current_bbcon_temperature,
+                "BBCON_SP"         : current_bbcon_setpoint,
+                "BBCON_HRG"        : current_bbcon_heater_range,
+                "BBCON_RESISTANCE" : current_bbcon_resistance,
+                "BBCON_POWER"      : current_bbcon_power,
+
+                "BBCON_P" : current_bbcon_P,
+                "BBCON_I" : current_bbcon_I,
+                "BBCON_D" : current_bbcon_D,
+
+                # ==============================================================
+                # Telemetry timestamp
+                # ==============================================================
+
+                "sampleTime" : current_sample_timestamp_ms,
+            })
+
+            _respond_browser(
+                self,
+                'application/json; charset=utf-8',
+                response
+            )
 
         elif path == '/get-buffer':
             response = json.dumps(
@@ -836,7 +948,1059 @@ def connect_to_tcp_server():
         print(f"Error connecting to TCP server: {e}")
         time.sleep(5)
         return None
-    
+
+def receive_tcp_telemetry(tcp_socket):
+
+    """
+    Continuously receives newline-delimited JSON telemetry snapshots
+    from the TCP backend and updates the latest values used by the
+    HTTP server.
+
+    Expected TCP format:
+        {"50K": ..., "MXC": ..., "BBCON_TEMP": ..., ...}\n
+    """
+
+    # ------------------------------------------------------------------
+    # LakeShore temperatures
+    # ------------------------------------------------------------------
+
+    global current_50K
+    global current_4K
+    global current_STILL
+    global current_MXC
+
+    # ------------------------------------------------------------------
+    # LakeShore resistances
+    # ------------------------------------------------------------------
+
+    global current_R50K
+    global current_R4K
+    global current_RSTILL
+    global current_RMXC
+
+    # ------------------------------------------------------------------
+    # LakeShore powers
+    # ------------------------------------------------------------------
+
+    global current_P50K
+    global current_P4K
+    global current_PSTILL
+    global current_PMXC
+
+    # ------------------------------------------------------------------
+    # LakeShore channel status
+    # ------------------------------------------------------------------
+
+    global current_enabled_MXC
+    global current_enabled_50K
+    global current_enabled_4K
+    global current_enabled_STILL
+
+    global current_enabled_CH9
+    global current_enabled_CH10
+    global current_enabled_CH11
+    global current_enabled_CH12
+    global current_enabled_CH13
+    global current_enabled_CH14
+    global current_enabled_CH15
+
+    # ------------------------------------------------------------------
+    # MXC control
+    # ------------------------------------------------------------------
+
+    global current_mxc_temperature_setpoint
+    global current_mxc_proportional_gain
+    global current_mxc_integral_gain
+    global current_mxc_derivative_gain
+    global current_mxc_heater_range
+    global current_heater_output_MXC
+
+    # ------------------------------------------------------------------
+    # MXC sensor configuration
+    # ------------------------------------------------------------------
+
+    global current_dwell_MXC
+    global current_pause_MXC
+    global current_excitation_mode_MXC
+    global current_excitation_range_MXC
+    global current_excitation_autorange_MXC
+
+    # ------------------------------------------------------------------
+    # 50K / 4K / STILL configuration
+    # ------------------------------------------------------------------
+
+    global current_excitation_mode_50K
+    global current_excitation_range_50K
+
+    global current_excitation_mode_4K
+    global current_excitation_range_4K
+
+    global current_excitation_mode_STILL
+    global current_excitation_range_STILL
+
+    global current_dwell_50K
+    global current_dwell_4K
+    global current_dwell_STILL
+
+    global current_pause_50K
+    global current_pause_4K
+    global current_pause_STILL
+
+    # ------------------------------------------------------------------
+    # Generic control values
+    # ------------------------------------------------------------------
+
+    global current_temperature_setpoint
+    global current_heater_power
+    global current_heater_range
+    global current_temperature_limit
+    global current_timeout
+
+    global current_proportional_gain
+    global current_integral_gain
+    global current_derivative_gain
+
+    # ------------------------------------------------------------------
+    # Autoscan / curves / run
+    # ------------------------------------------------------------------
+
+    global current_autoscan
+    global current_scanning_channel
+
+    global current_curve_MXC
+    global current_curve_50K
+    global current_curve_4K
+    global current_curve_STILL
+
+    global current_RUNID
+
+    # ------------------------------------------------------------------
+    # Sample channels CH9 - CH15
+    # ------------------------------------------------------------------
+
+    global current_RCH9
+    global current_RCH10
+    global current_RCH11
+    global current_RCH12
+    global current_RCH13
+    global current_RCH14
+    global current_RCH15
+
+    global current_modeCH9
+    global current_rangeCH9
+
+    global current_modeCH10
+    global current_rangeCH10
+
+    global current_modeCH11
+    global current_rangeCH11
+
+    global current_modeCH12
+    global current_rangeCH12
+
+    global current_modeCH13
+    global current_rangeCH13
+
+    global current_modeCH14
+    global current_rangeCH14
+
+    global current_modeCH15
+    global current_rangeCH15
+
+    # ------------------------------------------------------------------
+    # Cryo-Con
+    # ------------------------------------------------------------------
+
+    global current_bbcon_temperature
+    global current_bbcon_setpoint
+    global current_bbcon_heater_range
+    global current_bbcon_resistance
+    global current_bbcon_power
+
+    global current_bbcon_P
+    global current_bbcon_I
+    global current_bbcon_D
+
+    # ------------------------------------------------------------------
+    # Timestamp
+    # ------------------------------------------------------------------
+
+    global current_sample_timestamp_ms
+
+    # ------------------------------------------------------------------
+    # Helper conversion functions
+    # ------------------------------------------------------------------
+
+    def _as_float(value):
+
+        """
+        Convert telemetry value to float.
+
+        Values such as None, "OFF", "NONE" and "NAN" become None.
+        """
+
+        if value is None:
+            return None
+
+        if isinstance(value, bool):
+            return None
+
+        if isinstance(value, str):
+
+            value = value.strip()
+
+            if value.upper() in ("", "NONE", "OFF", "NAN"):
+                return None
+
+        try:
+            value = float(value)
+
+            if not math.isfinite(value):
+                return None
+
+            return value
+
+        except (TypeError, ValueError):
+            return None
+
+
+    def _as_int(value):
+
+        """
+        Convert telemetry value to int.
+
+        Invalid or missing values become None.
+        """
+
+        if value is None:
+            return None
+
+        if isinstance(value, bool):
+            return int(value)
+
+        if isinstance(value, str):
+
+            value = value.strip()
+
+            if value.upper() in ("", "NONE", "OFF", "NAN"):
+                return None
+
+        try:
+            return int(value)
+
+        except (TypeError, ValueError):
+            return None
+
+
+    def _as_str(value):
+
+        """
+        Convert telemetry value to string while preserving None.
+        """
+
+        if value is None:
+            return None
+
+        return str(value).strip()
+
+
+    # ------------------------------------------------------------------
+    # TCP receive buffer
+    # ------------------------------------------------------------------
+
+    buf = b""
+
+    while True:
+
+        try:
+
+            # ----------------------------------------------------------
+            # Receive bytes from TCP stream
+            # ----------------------------------------------------------
+
+            chunk = tcp_socket.recv(4096)
+
+            if not chunk:
+                raise ConnectionError(
+                    "Telemetry socket closed by TCP server"
+                )
+
+            buf += chunk
+
+            # ----------------------------------------------------------
+            # Process complete newline-delimited JSON messages
+            # ----------------------------------------------------------
+
+            while b"\n" in buf:
+
+                line, buf = buf.split(b"\n", 1)
+
+                if not line.strip():
+                    continue
+
+                # ------------------------------------------------------
+                # Decode JSON
+                # ------------------------------------------------------
+
+                try:
+
+                    telemetry = json.loads(
+                        line.decode("utf-8")
+                    )
+
+                except (UnicodeDecodeError, json.JSONDecodeError) as e:
+
+                    print(
+                        f"❌ Error decoding TCP telemetry JSON: {e}"
+                    )
+
+                    print(
+                        f"Raw telemetry line: {line!r}"
+                    )
+
+                    continue
+
+                if not isinstance(telemetry, dict):
+
+                    print(
+                        "❌ Invalid TCP telemetry: "
+                        "JSON root object is not a dictionary"
+                    )
+
+                    continue
+
+                # ======================================================
+                # LakeShore main temperatures
+                # ======================================================
+
+                new_50K = _as_float(
+                    telemetry.get("50K")
+                )
+
+                new_4K = _as_float(
+                    telemetry.get("4K")
+                )
+
+                new_STILL = _as_float(
+                    telemetry.get("STILL")
+                )
+
+                new_MXC = _as_float(
+                    telemetry.get("MXC")
+                )
+
+                # ======================================================
+                # MXC control
+                # ======================================================
+
+                mxc_sp_k = _as_float(
+                    telemetry.get("MXCSP")
+                )
+
+                # Preserve the behaviour of the previous parser:
+                # the TCP backend sends MXCSP in K, while the HTTP
+                # server stores current_mxc_temperature_setpoint in mK.
+                new_mxc_temperature_setpoint = (
+                    mxc_sp_k * 1000
+                    if mxc_sp_k is not None
+                    else None
+                )
+
+                new_mxc_proportional_gain = _as_float(
+                    telemetry.get("MXCP")
+                )
+
+                new_mxc_integral_gain = _as_float(
+                    telemetry.get("MXCI")
+                )
+
+                new_mxc_derivative_gain = _as_float(
+                    telemetry.get("MXCD")
+                )
+
+                new_mxc_heater_range = _as_str(
+                    telemetry.get("MXCHR")
+                )
+
+                new_heater_output_MXC = _as_float(
+                    telemetry.get("heaterOutputMXC")
+                )
+
+                # ======================================================
+                # MXC sensor parameters
+                # ======================================================
+
+                new_dwell_MXC = _as_float(
+                    telemetry.get("dwellMXC")
+                )
+
+                new_pause_MXC = _as_float(
+                    telemetry.get("pauseMXC")
+                )
+
+                new_excitation_mode_MXC = _as_str(
+                    telemetry.get("modeMXC")
+                )
+
+                new_excitation_range_MXC = _as_str(
+                    telemetry.get("rangeMXC")
+                )
+
+                new_excitation_autorange_MXC = _as_str(
+                    telemetry.get("autorangeMXC")
+                )
+
+                # ======================================================
+                # 50K / 4K / STILL dwell and pause
+                # ======================================================
+
+                new_dwell_50K = _as_float(
+                    telemetry.get("dwell_50K")
+                )
+
+                new_dwell_4K = _as_float(
+                    telemetry.get("dwell_4K")
+                )
+
+                new_dwell_STILL = _as_float(
+                    telemetry.get("dwell_STILL")
+                )
+
+                new_pause_50K = _as_float(
+                    telemetry.get("pause_50K")
+                )
+
+                new_pause_4K = _as_float(
+                    telemetry.get("pause_4K")
+                )
+
+                new_pause_STILL = _as_float(
+                    telemetry.get("pause_STILL")
+                )
+
+                # ======================================================
+                # 50K / 4K / STILL excitation configuration
+                # ======================================================
+
+                new_excitation_mode_50K = _as_str(
+                    telemetry.get("mode50K")
+                )
+
+                new_excitation_range_50K = _as_str(
+                    telemetry.get("range50K")
+                )
+
+                new_excitation_mode_4K = _as_str(
+                    telemetry.get("mode4K")
+                )
+
+                new_excitation_range_4K = _as_str(
+                    telemetry.get("range4K")
+                )
+
+                new_excitation_mode_STILL = _as_str(
+                    telemetry.get("modeSTILL")
+                )
+
+                new_excitation_range_STILL = _as_str(
+                    telemetry.get("rangeSTILL")
+                )
+
+                # ======================================================
+                # Generic controller values
+                # ======================================================
+
+                new_temperature_setpoint = _as_float(
+                    telemetry.get("setpoint")
+                )
+
+                new_heater_power = _as_float(
+                    telemetry.get("heater_power")
+                )
+
+                new_heater_range = _as_str(
+                    telemetry.get("heater_range")
+                )
+
+                new_temperature_limit = _as_float(
+                    telemetry.get("temperature_limit")
+                )
+
+                new_timeout = _as_float(
+                    telemetry.get("timeout")
+                )
+
+                new_proportional_gain = _as_float(
+                    telemetry.get("proportional_gain")
+                )
+
+                new_integral_gain = _as_float(
+                    telemetry.get("integral_gain")
+                )
+
+                new_derivative_gain = _as_float(
+                    telemetry.get("derivative_gain")
+                )
+
+                # ======================================================
+                # LakeShore resistances
+                # ======================================================
+
+                new_R50K = _as_float(
+                    telemetry.get("R50K")
+                )
+
+                new_R4K = _as_float(
+                    telemetry.get("R4K")
+                )
+
+                new_RSTILL = _as_float(
+                    telemetry.get("RSTILL")
+                )
+
+                new_RMXC = _as_float(
+                    telemetry.get("RMXC")
+                )
+
+                # ======================================================
+                # LakeShore powers
+                # ======================================================
+
+                new_P50K = _as_float(
+                    telemetry.get("P50K")
+                )
+
+                new_P4K = _as_float(
+                    telemetry.get("P4K")
+                )
+
+                new_PSTILL = _as_float(
+                    telemetry.get("PSTILL")
+                )
+
+                new_PMXC = _as_float(
+                    telemetry.get("PMXC")
+                )
+
+                # ======================================================
+                # Main channel enabled status
+                # ======================================================
+
+                new_enabled_MXC = _as_int(
+                    telemetry.get("enabledMXC")
+                )
+
+                new_enabled_50K = _as_int(
+                    telemetry.get("enabled50K")
+                )
+
+                new_enabled_4K = _as_int(
+                    telemetry.get("enabled4K")
+                )
+
+                new_enabled_STILL = _as_int(
+                    telemetry.get("enabledSTILL")
+                )
+
+                # ======================================================
+                # Autoscan
+                # ======================================================
+
+                autoscan_raw = _as_int(
+                    telemetry.get("autoscan")
+                )
+
+                new_autoscan = (
+                    "on"
+                    if autoscan_raw == 1
+                    else "off"
+                )
+
+                new_scanning_channel = _as_int(
+                    telemetry.get("scanning_channel")
+                )
+
+                # ======================================================
+                # Temperature curves
+                # ======================================================
+
+                new_curve_MXC = _as_int(
+                    telemetry.get("curveMXC")
+                )
+
+                new_curve_50K = _as_int(
+                    telemetry.get("curve50K")
+                )
+
+                new_curve_4K = _as_int(
+                    telemetry.get("curve4K")
+                )
+
+                new_curve_STILL = _as_int(
+                    telemetry.get("curveSTILL")
+                )
+
+                # ======================================================
+                # RUN ID
+                # ======================================================
+
+                new_RUNID = _as_int(
+                    telemetry.get("RUNID")
+                )
+
+                # ======================================================
+                # Sample-channel resistances CH9 - CH15
+                # ======================================================
+
+                new_RCH9 = _as_float(
+                    telemetry.get("RCH9")
+                )
+
+                new_RCH10 = _as_float(
+                    telemetry.get("RCH10")
+                )
+
+                new_RCH11 = _as_float(
+                    telemetry.get("RCH11")
+                )
+
+                new_RCH12 = _as_float(
+                    telemetry.get("RCH12")
+                )
+
+                new_RCH13 = _as_float(
+                    telemetry.get("RCH13")
+                )
+
+                new_RCH14 = _as_float(
+                    telemetry.get("RCH14")
+                )
+
+                new_RCH15 = _as_float(
+                    telemetry.get("RCH15")
+                )
+
+                # ======================================================
+                # Sample-channel enabled status
+                # ======================================================
+
+                new_enabled_CH9 = _as_int(
+                    telemetry.get("enabledCH9")
+                )
+
+                new_enabled_CH10 = _as_int(
+                    telemetry.get("enabledCH10")
+                )
+
+                new_enabled_CH11 = _as_int(
+                    telemetry.get("enabledCH11")
+                )
+
+                new_enabled_CH12 = _as_int(
+                    telemetry.get("enabledCH12")
+                )
+
+                new_enabled_CH13 = _as_int(
+                    telemetry.get("enabledCH13")
+                )
+
+                new_enabled_CH14 = _as_int(
+                    telemetry.get("enabledCH14")
+                )
+
+                new_enabled_CH15 = _as_int(
+                    telemetry.get("enabledCH15")
+                )
+
+                # ======================================================
+                # Sample-channel excitation settings
+                # ======================================================
+
+                new_modeCH9 = _as_int(
+                    telemetry.get("modeCH9")
+                )
+
+                new_rangeCH9 = _as_int(
+                    telemetry.get("rangeCH9")
+                )
+
+                new_modeCH10 = _as_int(
+                    telemetry.get("modeCH10")
+                )
+
+                new_rangeCH10 = _as_int(
+                    telemetry.get("rangeCH10")
+                )
+
+                new_modeCH11 = _as_int(
+                    telemetry.get("modeCH11")
+                )
+
+                new_rangeCH11 = _as_int(
+                    telemetry.get("rangeCH11")
+                )
+
+                new_modeCH12 = _as_int(
+                    telemetry.get("modeCH12")
+                )
+
+                new_rangeCH12 = _as_int(
+                    telemetry.get("rangeCH12")
+                )
+
+                new_modeCH13 = _as_int(
+                    telemetry.get("modeCH13")
+                )
+
+                new_rangeCH13 = _as_int(
+                    telemetry.get("rangeCH13")
+                )
+
+                new_modeCH14 = _as_int(
+                    telemetry.get("modeCH14")
+                )
+
+                new_rangeCH14 = _as_int(
+                    telemetry.get("rangeCH14")
+                )
+
+                new_modeCH15 = _as_int(
+                    telemetry.get("modeCH15")
+                )
+
+                new_rangeCH15 = _as_int(
+                    telemetry.get("rangeCH15")
+                )
+
+                # ======================================================
+                # Cryo-Con Model 32
+                # ======================================================
+
+                new_bbcon_temperature = _as_float(
+                    telemetry.get("BBCON_TEMP")
+                )
+
+                new_bbcon_setpoint = _as_float(
+                    telemetry.get("BBCON_SP")
+                )
+
+                new_bbcon_heater_range = _as_str(
+                    telemetry.get("BBCON_HRG")
+                )
+
+                new_bbcon_resistance = _as_float(
+                    telemetry.get("BBCON_RESISTANCE")
+                )
+
+                new_bbcon_power = _as_float(
+                    telemetry.get("BBCON_POWER")
+                )
+
+                new_bbcon_P = _as_float(
+                    telemetry.get("BBCON_P")
+                )
+
+                new_bbcon_I = _as_float(
+                    telemetry.get("BBCON_I")
+                )
+
+                new_bbcon_D = _as_float(
+                    telemetry.get("BBCON_D")
+                )
+
+                # ======================================================
+                # Commit the complete snapshot
+                # ======================================================
+
+                current_50K = new_50K
+                current_4K = new_4K
+                current_STILL = new_STILL
+                current_MXC = new_MXC
+
+                current_mxc_temperature_setpoint = (
+                    new_mxc_temperature_setpoint
+                )
+
+                current_mxc_proportional_gain = (
+                    new_mxc_proportional_gain
+                )
+
+                current_mxc_integral_gain = (
+                    new_mxc_integral_gain
+                )
+
+                current_mxc_derivative_gain = (
+                    new_mxc_derivative_gain
+                )
+
+                current_mxc_heater_range = (
+                    new_mxc_heater_range
+                )
+
+                current_heater_output_MXC = (
+                    new_heater_output_MXC
+                )
+
+                current_dwell_MXC = new_dwell_MXC
+                current_pause_MXC = new_pause_MXC
+
+                current_excitation_mode_MXC = (
+                    new_excitation_mode_MXC
+                )
+
+                current_excitation_range_MXC = (
+                    new_excitation_range_MXC
+                )
+
+                current_excitation_autorange_MXC = (
+                    new_excitation_autorange_MXC
+                )
+
+                current_dwell_50K = new_dwell_50K
+                current_dwell_4K = new_dwell_4K
+                current_dwell_STILL = new_dwell_STILL
+
+                current_pause_50K = new_pause_50K
+                current_pause_4K = new_pause_4K
+                current_pause_STILL = new_pause_STILL
+
+                current_excitation_mode_50K = (
+                    new_excitation_mode_50K
+                )
+
+                current_excitation_range_50K = (
+                    new_excitation_range_50K
+                )
+
+                current_excitation_mode_4K = (
+                    new_excitation_mode_4K
+                )
+
+                current_excitation_range_4K = (
+                    new_excitation_range_4K
+                )
+
+                current_excitation_mode_STILL = (
+                    new_excitation_mode_STILL
+                )
+
+                current_excitation_range_STILL = (
+                    new_excitation_range_STILL
+                )
+
+                current_temperature_setpoint = (
+                    new_temperature_setpoint
+                )
+
+                current_heater_power = (
+                    new_heater_power
+                )
+
+                current_heater_range = (
+                    new_heater_range
+                )
+
+                current_temperature_limit = (
+                    new_temperature_limit
+                )
+
+                current_timeout = new_timeout
+
+                current_proportional_gain = (
+                    new_proportional_gain
+                )
+
+                current_integral_gain = (
+                    new_integral_gain
+                )
+
+                current_derivative_gain = (
+                    new_derivative_gain
+                )
+
+                current_R50K = new_R50K
+                current_R4K = new_R4K
+                current_RSTILL = new_RSTILL
+                current_RMXC = new_RMXC
+
+                current_P50K = new_P50K
+                current_P4K = new_P4K
+                current_PSTILL = new_PSTILL
+                current_PMXC = new_PMXC
+
+                current_enabled_MXC = (
+                    new_enabled_MXC
+                )
+
+                current_enabled_50K = (
+                    new_enabled_50K
+                )
+
+                current_enabled_4K = (
+                    new_enabled_4K
+                )
+
+                current_enabled_STILL = (
+                    new_enabled_STILL
+                )
+
+                current_autoscan = new_autoscan
+
+                current_scanning_channel = (
+                    new_scanning_channel
+                )
+
+                current_curve_MXC = new_curve_MXC
+                current_curve_50K = new_curve_50K
+                current_curve_4K = new_curve_4K
+                current_curve_STILL = new_curve_STILL
+
+                current_RUNID = new_RUNID
+
+                current_RCH9 = new_RCH9
+                current_RCH10 = new_RCH10
+                current_RCH11 = new_RCH11
+                current_RCH12 = new_RCH12
+                current_RCH13 = new_RCH13
+                current_RCH14 = new_RCH14
+                current_RCH15 = new_RCH15
+
+                current_enabled_CH9 = (
+                    new_enabled_CH9
+                )
+
+                current_enabled_CH10 = (
+                    new_enabled_CH10
+                )
+
+                current_enabled_CH11 = (
+                    new_enabled_CH11
+                )
+
+                current_enabled_CH12 = (
+                    new_enabled_CH12
+                )
+
+                current_enabled_CH13 = (
+                    new_enabled_CH13
+                )
+
+                current_enabled_CH14 = (
+                    new_enabled_CH14
+                )
+
+                current_enabled_CH15 = (
+                    new_enabled_CH15
+                )
+
+                current_modeCH9 = new_modeCH9
+                current_rangeCH9 = new_rangeCH9
+
+                current_modeCH10 = new_modeCH10
+                current_rangeCH10 = new_rangeCH10
+
+                current_modeCH11 = new_modeCH11
+                current_rangeCH11 = new_rangeCH11
+
+                current_modeCH12 = new_modeCH12
+                current_rangeCH12 = new_rangeCH12
+
+                current_modeCH13 = new_modeCH13
+                current_rangeCH13 = new_rangeCH13
+
+                current_modeCH14 = new_modeCH14
+                current_rangeCH14 = new_rangeCH14
+
+                current_modeCH15 = new_modeCH15
+                current_rangeCH15 = new_rangeCH15
+
+                current_bbcon_temperature = (
+                    new_bbcon_temperature
+                )
+
+                current_bbcon_setpoint = (
+                    new_bbcon_setpoint
+                )
+
+                current_bbcon_heater_range = (
+                    new_bbcon_heater_range
+                )
+
+                current_bbcon_resistance = (
+                    new_bbcon_resistance
+                )
+
+                current_bbcon_power = (
+                    new_bbcon_power
+                )
+
+                current_bbcon_P = new_bbcon_P
+                current_bbcon_I = new_bbcon_I
+                current_bbcon_D = new_bbcon_D
+
+                # ======================================================
+                # Timestamp + plot buffers
+                # ======================================================
+
+                current_sample_timestamp_ms = int(
+                    time.time() * 1000
+                )
+
+                _update_temperature_buffers(
+                    current_sample_timestamp_ms
+                )
+
+        # ------------------------------------------------------------------
+        # Socket timeout
+        # ------------------------------------------------------------------
+
+        except socket.timeout:
+            continue
+
+        # ------------------------------------------------------------------
+        # Lost TCP connection
+        # ------------------------------------------------------------------
+
+        except Exception as e:
+
+            print(
+                f"❌ Error receiving TCP telemetry: {e}"
+            )
+
+            try:
+                tcp_socket.close()
+            except Exception:
+                pass
+
+            # --------------------------------------------------------------
+            # Reconnect subscriber socket
+            # --------------------------------------------------------------
+
+            while True:
+
+                try:
+
+                    tcp_socket = connect_to_tcp_server()
+
+                    if tcp_socket is not None:
+
+                        buf = b""
+
+                        print(
+                            "✅ TCP telemetry subscriber reconnected."
+                        )
+
+                        break
+
+                except Exception as reconnect_error:
+
+                    print(
+                        "❌ Error reconnecting to TCP server: "
+                        f"{reconnect_error}"
+                    )
+
+                time.sleep(5)
+
 def receive_sensor_data(tcp_socket):
 
     # Continuously receive temperature data from the TCP server
@@ -1163,10 +2327,14 @@ def run(server_class=HTTPServer, handler_class=SimpleHTTPRequestHandler,
     httpd = server_class(server_address, handler_class)
     print(f"HTTP server running on port {port}")
 
-    # Start the temperature data receiver thread
-    temperature_thread = threading.Thread(target=receive_sensor_data,
-                         daemon=True, args=(tcp_socket,))
-    temperature_thread.start()
+    # Start the telemetry data receiver thread
+    telemetry_thread = threading.Thread(
+        target=receive_tcp_telemetry,
+        daemon=True,
+        args=(tcp_socket,)
+    )
+
+    telemetry_thread.start()
 
     # Start the HTTP server
     httpd.serve_forever()

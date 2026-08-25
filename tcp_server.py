@@ -19,6 +19,8 @@ from default_config import (
     BBCON_NAME, MAX_BBCON_SETPOINT, ATTEMPTS
 )
 
+from colors import RESET, BOLD, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, GRAY
+
 from lakeshore370 import LakeShore370
 try:
     from bbcon import BBCON
@@ -35,8 +37,9 @@ PORT = 65432  # Port to listen on
 # Mutex to protect the heater power level
 # Define separated mutex to avoid that slow communications with Cryo-con
 # bottleneck the communications with LakeShore or viceversa.
-heater_mutex = threading.Lock()
-bbcon_mutex  = threading.RLock()
+heater_mutex   = threading.Lock()
+bbcon_mutex    = threading.RLock()
+telemetry_lock = threading.Lock()
 
 # DataBase conection params
 db_delay          = DB_INSERT_INTERVAL
@@ -44,9 +47,21 @@ last_db_insert_ts = None
 DB_POOL           = None
 CURRENT_RUN_ID    = None
 
-last_sensorValues = None
+last_sensorValues  = None
 last_controlParams = None
-last_sensorParams = None
+last_sensorParams  = None
+
+# Global variable used to store bbcon telemetry data.
+last_bbcon_data = {
+    "BBCON_TEMP"       : None,
+    "BBCON_SP"         : None,
+    "BBCON_HRG"        : None,
+    "BBCON_RESISTANCE" : None,
+    "BBCON_POWER"      : None,
+    "BBCON_P"          : None,
+    "BBCON_I"          : None,
+    "BBCON_D"          : None,
+}
 
 RELATION_ACTIVE = False
 RELATION_RUN_ID = None
@@ -2914,8 +2929,21 @@ def start_server():
             server_socket.listen()
             print(f"Server listening on {HOST}:{PORT}")
 
-            # Start the fake temperature sensor in a separate thread
-            threading.Thread(target=lakeshore_temperature_sensor, daemon=True).start()
+            # Start different threads for LakeShore and CryoCon devices.
+            lakeshore_thread = threading.Thread(
+                target=lakeshore_temperature_sensor,
+                daemon=True,
+                name="LakeShoreTelemetry"
+            )
+
+            cryocon_thread = threading.Thread(
+                target=cryocon_temperature_sensor,
+                daemon=True,
+                name="CryoConTelemetry"
+            )
+
+            lakeshore_thread.start()
+            cryocon_thread.start()
                         
             while True:
                 conn, addr = server_socket.accept()
@@ -2977,7 +3005,66 @@ def client_handler(conn, addr):
         conn.close()
         print(f"Connection with {addr} closed")
 
+def cryocon_temperature_sensor():
 
+    """
+    This function continuously reads telemetry data from
+    the Cryo-Con Model 32 controller.
+    """
+
+    bbcon_data = {
+        "BBCON_TEMP"       : None,  # Instant sensor temperature [K]
+        "BBCON_SP"         : None,  # Temperature setpoint [K]
+        "BBCON_HRG"        : None,  # Heater range ('LOW', 'MID', 'HI')
+        "BBCON_RESISTANCE" : None,  # Heater resistance [Ohm]
+        "BBCON_POWER"      : None,  # Instant heater power [W]
+        "BBCON_P"          : None,  # Proportional gain
+        "BBCON_I"          : None,  # Integral gain
+        "BBCON_D"          : None,  # Derivative gain
+    }
+
+    print("🌡️ Cryo-Con telemetry thread started")
+
+    while True:
+        try:
+            with bbcon_mutex:
+                temperature  = bb.query_temperature()
+                setpoint     = bb.query_setpoint()
+                # resistance   = bb.query_resistance() ToDo: check problem with query_resistance()
+                heater_range = bb.query_range()
+                heater_power = bb.query_power()
+
+            bbcon_data.update({
+                "BBCON_TEMP"       : temperature,
+                "BBCON_SP"         : setpoint,
+                # "BBCON_RESISTANCE" : resistance,
+                "BBCON_HRG"        : heater_range,
+                "BBCON_POWER"      : heater_power,
+            })
+
+        except Exception as e:
+            print(f"❌ Error accessing {BBCON_NAME} telemetry.\nReason: {e}")
+
+        try:
+            with bbcon_mutex:
+                pid = bb.query_PID(verbose = 0)
+
+            bbcon_data.update({
+                "BBCON_P" : pid[0],
+                "BBCON_I" : pid[1],
+                "BBCON_D" : pid[2],
+            })
+
+        except Exception as e:
+            print(f"❌ Error accessing {BBCON_NAME} PID telemetry.\nReason: {e}")
+
+        global last_bbcon_data
+        with telemetry_lock: 
+            last_bbcon_data = bbcon_data.copy()
+
+        time.sleep(1)
+
+    
 def lakeshore_temperature_sensor():
 
     """
@@ -2987,11 +3074,16 @@ def lakeshore_temperature_sensor():
     temperatures = {}
     resistances = {}
     powers = {}
+
+    print("🌡️ LakeShore telemetry thread started")
     
     while True:
         try:
             for index, channel in enumerate(DEFAULT_CHANNELS):
-                if ls.get_channel_status(channel):
+                with heater_mutex:
+                    channel_status = ls.get_channel_status(channel)
+
+                if channel_status:
                     with heater_mutex: temperatures[DEFAULT_CHANNELS_ID[index]] = ls.get_temperature(channel)
                     with heater_mutex: resistances[DEFAULT_CHANNELS_ID[index]] = ls.get_resistance(channel)
                     with heater_mutex: powers[DEFAULT_CHANNELS_ID[index]] = ls.get_power(channel)
@@ -3117,16 +3209,32 @@ def lakeshore_temperature_sensor():
             autoscan = ('0', '0')
         
         extra_resistances = {}
+        sample_channel_status = {}
 
         for ch in SAMPLE_CHANNELS:
-            if ls.get_channel_status(ch):
-                try:
-                    with heater_mutex:
-                        extra_resistances[f"CH{ch}"] = ls.get_resistance(ch)
-                except Exception:
+            try:
+                with heater_mutex:
+                    channel_status = ls.get_channel_status(ch)
+
+                sample_channel_status[ch] = channel_status
+
+                if channel_status == 1:
+                    try:
+                        with heater_mutex:
+                            extra_resistances[f"CH{ch}"] = ls.get_resistance(ch)
+                    except Exception:
+                        extra_resistances[f"CH{ch}"] = None
+
+                elif channel_status == 0:
+                    extra_resistances[f"CH{ch}"] = "OFF"
+
+                else:
                     extra_resistances[f"CH{ch}"] = None
-            else:
-                extra_resistances[f"CH{ch}"] = "OFF"
+
+            except Exception as e:
+                print(f"Error reading CH{ch} status\nReason: {e}")
+                sample_channel_status[ch] = None
+                extra_resistances[f"CH{ch}"] = None
 
         if RELATION_ACTIVE and RELATION_RUN_ID is not None and RELATION_CHANNEL is not None:
             try:
@@ -3169,7 +3277,8 @@ def lakeshore_temperature_sensor():
             'curve_MXC'         : current_curves[6],
             'curve_50K'         : current_curves[1],
             'curve_4K'          : current_curves[2],
-            'curve_STILL'       : current_curves[5]
+            'curve_STILL'       : current_curves[5],
+            'sample_channel_status': sample_channel_status,
         }
 
         sensorValues = {
@@ -3185,7 +3294,8 @@ def lakeshore_temperature_sensor():
         last_sensorParams = sensorParams
 
         try:
-            broadcast_temperature(sensorValues, controlParams, sensorParams)
+            # broadcast_temperature(sensorValues, controlParams, sensorParams)
+            broadcast_telemetry(sensorValues, controlParams, sensorParams)
         except Exception as e:
             print(f"Error broadcasting temperature data: {e}")
 
@@ -3401,7 +3511,466 @@ def broadcast_temperature(sensorValues, controlParams, sensorParams):
                 except Exception:
                     pass
 
+def broadcast_telemetry(sensorValues, controlParams, sensorParams):
 
+    """
+    Broadcasts the latest telemetry snapshot from the LakeShore 370
+    and Cryo-Con Model 32 to all connected TCP subscribers.
+
+    The telemetry is serialized as a newline-delimited JSON object.
+
+    LakeShore telemetry is provided directly by
+    lakeshore_temperature_sensor().
+
+    Cryo-Con telemetry is obtained from the latest shared snapshot
+    stored in last_bbcon_data.
+    """
+
+    # ------------------------------------------------------------------
+    # LakeShore telemetry
+    # ------------------------------------------------------------------
+
+    temperatures      = sensorValues["temperatures"]
+    resistances       = sensorValues["resistances"]
+    powers            = sensorValues["powers"]
+    extra_resistances = sensorValues["extra_resistances"]
+
+    dwell_times = sensorParams["dwell_times"]
+    pause_times = sensorParams["pause_times"]
+
+    sample_channel_status = sensorParams["sample_channel_status"]
+
+    # ------------------------------------------------------------------
+    # Cryo-Con telemetry
+    # ------------------------------------------------------------------
+
+    with telemetry_lock:
+        bbcon_data = last_bbcon_data.copy()
+
+    # ------------------------------------------------------------------
+    # Normalize autoscan information
+    # ------------------------------------------------------------------
+
+    try:
+        autoscan_channel = int(sensorParams["autoscan"][0])
+        autoscan_status  = int(sensorParams["autoscan"][1])
+
+    except (TypeError, ValueError, IndexError, KeyError):
+        autoscan_channel = 0
+        autoscan_status  = 0
+
+    scanning_channel = autoscan_channel if autoscan_status == 1 else 0
+
+    # ------------------------------------------------------------------
+    # Console telemetry information
+    # ------------------------------------------------------------------
+
+    print(
+        f"{BOLD}"
+        f"{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())} "
+        f"Broadcasting telemetry:"
+        f"{RESET}"
+    )
+
+    print(f"{BLUE}{BOLD}[LakeShore]{RESET}")
+
+    # ---------------- LakeShore temperatures ----------------
+
+    for index, channel in enumerate(DEFAULT_CHANNELS):
+
+        channel_name = DEFAULT_CHANNELS_ID[index]
+        channel_temperature = temperatures.get(channel_name)
+
+        if channel_temperature == "OFF":
+            continue
+
+        if channel_temperature is None:
+            print(f"{BLUE}Channel {channel_name} Temperature:{RED} INVALID{RESET}")
+            continue
+
+        try:
+            channel_temperature = float(channel_temperature)
+
+        except (TypeError, ValueError):
+            print(
+                f"{BLUE}Channel {channel_name} Temperature: "
+                f"INVALID ({channel_temperature!r}){RESET}"
+            )
+            continue
+
+        if channel_temperature > 1.0:
+            formatted_temperature = channel_temperature
+            formatted_units = "K"
+
+        else:
+            formatted_temperature = channel_temperature * 1000
+            formatted_units = "mK"
+
+        print(
+            f"{BLUE}Channel {channel_name} Temperature: "
+            f"{formatted_temperature:.3f} {formatted_units}{RESET}"
+        )
+
+    # ---------------- Sample-channel resistances ----------------
+
+    for channel, resistance in extra_resistances.items():
+
+        if resistance != "OFF":
+            print(
+                f"{BLUE}Channel {channel} Resistance: "
+                f"{resistance} Ohms{RESET}"
+            )
+
+    # ---------------- LakeShore heater/control ----------------
+
+    heater_range = controlParams.get("HR")
+
+    try:
+        heater_range_description = CURRENT_RANGE_LIST[heater_range]
+
+        if heater_range_description[0] != 0:
+
+            print(
+                f"{BLUE}MXC Temperature Setpoint: "
+                f"{controlParams.get('MXCSP')} K{RESET}"
+            )
+
+            print(
+                f"{BLUE}Heater Range MXC: {heater_range} "
+                f"({heater_range_description[0]} "
+                f"{heater_range_description[1]}){RESET}"
+            )
+
+    except (KeyError, TypeError):
+        print(f"{BLUE}Heater Range MXC: {RED}UNKNOWN ({heater_range}){RESET}")
+
+    # ---------------- Ramp ----------------
+
+    ramp_status = controlParams.get("rampON")
+
+    if isinstance(ramp_status, bool):
+
+        if ramp_status:
+            print(f"{BLUE}↗ Ramp Status MXC: ON{RESET}")
+
+    elif ramp_status is None:
+        print(f"{BLUE}Ramp Status MXC: {RED}UNKNOWN{RESET}")
+
+    # ---------------- Autoscan ----------------
+
+    print(
+        f"{BLUE}Autoscan is set "
+        + ("ON" if autoscan_status == 1 else "OFF")
+        + f"{RESET}"
+    )
+
+    if autoscan_status == 1:
+        print(f"{BLUE}Scanning channel {scanning_channel}{RESET}")
+
+    # ---------------- MXC sensor mode ----------------
+
+    try:
+        mode_mxc  = int(sensorParams["sensor_mode"])
+        range_mxc = sensorParams["sensor_range"]
+
+        if not mode_mxc:
+
+            print(
+                f"{BLUE}Sensor Mode MXC: voltage "
+                f"({SENSOR_RESISTANCE_RANGE_LIST[range_mxc][0]} "
+                f"{SENSOR_RESISTANCE_RANGE_LIST[range_mxc][1]}){RESET}"
+            )
+
+        else:
+
+            print(
+                f"{BLUE}Sensor Mode MXC: current "
+                f"({SENSOR_RESISTANCE_RANGE_LIST[range_mxc][2]} "
+                f"{SENSOR_RESISTANCE_RANGE_LIST[range_mxc][3]}){RESET}"
+            )
+
+    except (KeyError, TypeError, ValueError):
+        print(f"{BLUE}Sensor Mode MXC: {RED}UNKNOWN{RESET}")
+
+    # ---------------- Cryo-Con telemetry ----------------
+
+    print(f"{MAGENTA}{BOLD}[Cryo-Con]{RESET}")
+    bbcon_temperature = bbcon_data.get("BBCON_TEMP")
+
+    if bbcon_temperature is None:
+
+        print(f"{MAGENTA}{BBCON_NAME} Temperature: {RED}INVALID{RESET}")
+
+    else:
+
+        try:
+            print(
+                f"{MAGENTA}{BBCON_NAME} Temperature: "
+                f"{float(bbcon_temperature):.3f} K{RESET}"
+            )
+
+        except (TypeError, ValueError):
+            print(
+                f"{MAGENTA}{BBCON_NAME} Temperature: "
+                f"INVALID ({bbcon_temperature!r}){RESET}"
+            )
+
+    if bbcon_data.get("BBCON_SP") is not None:
+        print(
+            f"{MAGENTA}{BBCON_NAME} Temperature Setpoint: "
+            f"{bbcon_data['BBCON_SP']} K{RESET}"
+        )
+
+    if bbcon_data.get("BBCON_HRG") is not None:
+        print(
+            f"{MAGENTA}{BBCON_NAME} Heater Range: "
+            f"{bbcon_data['BBCON_HRG']}{RESET}"
+        )
+
+    if bbcon_data.get("BBCON_POWER") is not None:
+        print(
+            f"{MAGENTA}{BBCON_NAME} Heater Power: "
+            f"{bbcon_data['BBCON_POWER']} W{RESET}"
+        )
+
+    # ------------------------------------------------------------------
+    # Build telemetry dictionary
+    # ------------------------------------------------------------------
+
+    telemetry = {
+
+        # ==============================================================
+        # LakeShore - main temperatures
+        # ==============================================================
+
+        "50K"   : temperatures.get("50K"),
+        "4K"    : temperatures.get("4K"),
+        "STILL" : temperatures.get("STILL"),
+        "MXC"   : temperatures.get("MXC"),
+
+        # ==============================================================
+        # LakeShore - MXC control
+        # ==============================================================
+
+        "MXCSP" : controlParams.get("MXCSP"),
+        "MXCP"  : controlParams.get("P"),
+        "MXCI"  : controlParams.get("I"),
+        "MXCD"  : controlParams.get("D"),
+        "MXCHR" : controlParams.get("HR"),
+
+        "heaterOutputMXC" : controlParams.get("heaterOutputMXC"),
+        "rampON"          : controlParams.get("rampON"),
+
+        # ==============================================================
+        # LakeShore - MXC sensor settings
+        # ==============================================================
+
+        "dwellMXC"     : dwell_times.get("MXC"),
+        "pauseMXC"     : pause_times.get("MXC"),
+        "modeMXC"      : sensorParams.get("sensor_mode"),
+        "rangeMXC"     : sensorParams.get("sensor_range"),
+        "autorangeMXC" : sensorParams.get("sensor_autorange"),
+
+        # ==============================================================
+        # LakeShore - other main channels
+        # ==============================================================
+
+        "dwell_50K"   : dwell_times.get("50K"),
+        "dwell_4K"    : dwell_times.get("4K"),
+        "dwell_STILL" : dwell_times.get("STILL"),
+
+        "pause_50K"   : pause_times.get("50K"),
+        "pause_4K"    : pause_times.get("4K"),
+        "pause_STILL" : pause_times.get("STILL"),
+
+        "mode50K"     : sensorParams.get("sensor_mode_50K"),
+        "range50K"    : sensorParams.get("sensor_range_50K"),
+
+        "mode4K"      : sensorParams.get("sensor_mode_4K"),
+        "range4K"     : sensorParams.get("sensor_range_4K"),
+
+        "modeSTILL"   : sensorParams.get("sensor_mode_STILL"),
+        "rangeSTILL"  : sensorParams.get("sensor_range_STILL"),
+
+        # ==============================================================
+        # LakeShore - channel status
+        # ==============================================================
+
+        "enabledMXC"   : sensorParams.get("enabledMXC"),
+        "enabled50K"   : sensorParams.get("enabled50K"),
+        "enabled4K"    : sensorParams.get("enabled4K"),
+        "enabledSTILL" : sensorParams.get("enabledSTILL"),
+
+        # ==============================================================
+        # LakeShore - curves
+        # ==============================================================
+
+        "curveMXC"   : sensorParams.get("curve_MXC"),
+        "curve50K"   : sensorParams.get("curve_50K"),
+        "curve4K"    : sensorParams.get("curve_4K"),
+        "curveSTILL" : sensorParams.get("curve_STILL"),
+
+        # ==============================================================
+        # LakeShore - resistances
+        # ==============================================================
+
+        "R50K"   : resistances.get("50K"),
+        "R4K"    : resistances.get("4K"),
+        "RSTILL" : resistances.get("STILL"),
+        "RMXC"   : resistances.get("MXC"),
+
+        # ==============================================================
+        # LakeShore - powers
+        # ==============================================================
+
+        "P50K"   : powers.get("50K"),
+        "P4K"    : powers.get("4K"),
+        "PSTILL" : powers.get("STILL"),
+        "PMXC"   : powers.get("MXC"),
+
+        # ==============================================================
+        # Autoscan
+        # ==============================================================
+
+        "autoscan"         : autoscan_status,
+        "scanning_channel" : scanning_channel,
+
+        # ==============================================================
+        # Existing generic control values
+        # ==============================================================
+
+        "setpoint"          : current_temperature_setpoint,
+        "heater_power"      : current_heater_power,
+        "heater_range"      : current_heater_range,
+        "temperature_limit" : current_temperature_limit,
+        "timeout"           : current_timeout,
+
+        "proportional_gain" : current_proportional_gain,
+        "integral_gain"     : current_integral_gain,
+        "derivative_gain"   : current_derivative_gain,
+
+        # ==============================================================
+        # Current RUN
+        # ==============================================================
+
+        "RUNID" : (
+            str(CURRENT_RUN_ID)
+            if CURRENT_RUN_ID is not None
+            else None
+        ),
+
+        # ==============================================================
+        # Cryo-Con Model 32
+        # ==============================================================
+
+        "BBCON_TEMP"       : bbcon_data.get("BBCON_TEMP"),
+        "BBCON_SP"         : bbcon_data.get("BBCON_SP"),
+        "BBCON_HRG"        : bbcon_data.get("BBCON_HRG"),
+        "BBCON_RESISTANCE" : bbcon_data.get("BBCON_RESISTANCE"),
+        "BBCON_POWER"      : bbcon_data.get("BBCON_POWER"),
+        "BBCON_P"          : bbcon_data.get("BBCON_P"),
+        "BBCON_I"          : bbcon_data.get("BBCON_I"),
+        "BBCON_D"          : bbcon_data.get("BBCON_D"),
+    }
+
+    # ------------------------------------------------------------------
+    # Add LakeShore sample channels CH9 - CH15
+    # ------------------------------------------------------------------
+
+    for ch in SAMPLE_CHANNELS:
+
+        channel_key = f"CH{ch}"
+
+        telemetry[f"RCH{ch}"] = (
+            extra_resistances.get(channel_key)
+        )
+
+        telemetry[f"enabledCH{ch}"] = (
+            sample_channel_status.get(ch)
+        )
+
+        telemetry[f"modeCH{ch}"] = (
+            extra_excitation[ch].get("excitation_mode")
+        )
+
+        telemetry[f"rangeCH{ch}"] = (
+            extra_excitation[ch].get("excitation_range")
+        )
+        
+    # ------------------------------------------------------------------
+    # Serialize telemetry as newline-delimited JSON
+    # ------------------------------------------------------------------
+
+    try:
+        message = (
+            json.dumps(
+                telemetry,
+                separators=(",", ":"),
+                ensure_ascii=False
+            )
+            + "\n"
+        ).encode("utf-8")
+
+    except (TypeError, ValueError) as e:
+        print(f"❌ Error serializing telemetry to JSON: {e}")
+        return
+
+    # ------------------------------------------------------------------
+    # Clean up dead TCP clients before broadcasting
+    # ------------------------------------------------------------------
+
+    _prune_clients()
+
+    # ------------------------------------------------------------------
+    # Copy current client list
+    # ------------------------------------------------------------------
+
+    with clients_lock:
+        target_list = list(clients)
+
+    to_remove = []
+
+    # ------------------------------------------------------------------
+    # Broadcast JSON telemetry
+    # ------------------------------------------------------------------
+
+    for sock, addr in target_list:
+
+        try:
+            sock.sendall(message)
+
+        except Exception as e:
+
+            # Do not use getpeername() here because the socket may
+            # already be invalid.
+            print(
+                f"Error broadcasting telemetry "
+                f"to client {addr}: {e}"
+            )
+
+            to_remove.append((sock, addr))
+
+    # ------------------------------------------------------------------
+    # Remove dead clients
+    # ------------------------------------------------------------------
+
+    if to_remove:
+
+        with clients_lock:
+
+            for dead in to_remove:
+
+                try:
+                    clients.remove(dead)
+
+                except ValueError:
+                    pass
+
+                try:
+                    dead[0].close()
+
+                except Exception:
+                    pass
 
 def maybe_insert_measurements():
     global last_db_insert_ts

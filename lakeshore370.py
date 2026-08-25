@@ -816,44 +816,175 @@ class LakeShore370:
             )
             return False
     
-    def set_channel_setpoint(self, value: float, channel: int = 6, verbose = True, units: str = 'mK'):
-        
+    def set_channel_setpoint(
+        self,
+        value: float,
+        channel: int = 6,
+        verbose: bool = True,
+        units: str = "mK",
+    ) -> bool:
         """
-        Set the temperature setpoint for a specific channel.
-        Args:
-            value (float): The temperature setpoint in Kelvin.
-            channel (int): The channel number (1, 2, 5, or 6).
-        Returns:
-            bool: True if the operation was successful, False otherwise.
+        Set an immediate/manual MXC temperature setpoint.
+
+        A manual setpoint must never use a previously enabled native
+        Lake Shore ramp. Therefore, RAMP is explicitly disabled before
+        writing the new SETP value.
         """
 
         if channel != 6:
-            print(f"Channel {channel} is not valid for setting temperature setpoint \n. Valid channel is: 6 (MXC).")
+            print(
+                f"Channel {channel} is not valid for setting "
+                "temperature setpoint. Valid channel is 6 (MXC)."
+            )
             return False
 
-        if units not in ['K', 'mK']:
+        if units not in ("K", "mK"):
             print("Units must be 'K' or 'mK'.")
             return False
 
-        if value < 10 or value > 500:
-            print("Temperature setpoint must be between 10 mK and 500 mK.")
+        try:
+            value = float(value)
+        except (TypeError, ValueError):
+            print("Temperature setpoint must be numeric.")
             return False
 
-        if units == 'mK':
-            value = value / 1000 
-        elif units == 'K':
-            value = value
+        if units == "mK":
+            value_mk = value
+            value_k = value / 1000.0
+        else:
+            value_k = value
+            value_mk = value * 1000.0
+
+        if not (
+            MIN_TARGET_TEMPERATURE_MK
+            <= value_mk
+            <= 500.0
+        ):
+            print(
+                "Temperature setpoint must be between "
+                "10 mK and 500 mK."
+            )
+            return False
 
         try:
-            print(f"✏️ Setting temperature setpoint for channel {channel} to {value} K.")
             with _lakeshore_mutex:
-                self._write(f"SETP {value},{channel}")
-            if verbose: print(f"Set temperature setpoint for channel {channel} to {value} K.")
-            return True
-        except Exception as e:
-            print(f"❌Setting temperature setpoint for channel {channel} failed.\nReason: {e}")
-            return False
 
+                # ------------------------------------------------------
+                # A manual SETP must never inherit a previous RAMP state.
+                # ------------------------------------------------------
+
+                ramp_parameters = self.get_ramp_parameters()
+
+                if ramp_parameters is None:
+                    print(
+                        "Could not read ramp configuration before "
+                        "setting manual MXC setpoint."
+                    )
+                    return False
+
+                rate_k_per_min = float(
+                    ramp_parameters["rate_k_per_min"]
+                )
+
+                if ramp_parameters["enabled"]:
+
+                    print(
+                        "⚠️ Native ramp was enabled. "
+                        "Disabling it before manual setpoint."
+                    )
+
+                    self._write(
+                        f"RAMP 0,{rate_k_per_min:.6g}"
+                    )
+
+                    # Verify that RAMP is actually disabled.
+                    confirmed_ramp = self.get_ramp_parameters()
+
+                    if (
+                        confirmed_ramp is None
+                        or confirmed_ramp["enabled"]
+                    ):
+                        print(
+                            "❌ Could not disable native ramp "
+                            "before manual setpoint."
+                        )
+                        return False
+
+                # ------------------------------------------------------
+                # Apply immediate setpoint.
+                #
+                # SETP has no channel argument on the Model 370.
+                # ------------------------------------------------------
+
+                print(
+                    f"✏️ Setting temperature setpoint for "
+                    f"channel {channel} to {value_k} K."
+                )
+
+                self._write(
+                    f"SETP {value_k:.12g}"
+                )
+
+                # ------------------------------------------------------
+                # Verify SETP and make sure no ramp started.
+                # ------------------------------------------------------
+
+                confirmed_setpoint_k = (
+                    self.get_temperature_setpoint()
+                )
+
+                ramp_active = self.get_ramp_status()
+
+                confirmed_ramp = self.get_ramp_parameters()
+
+            if confirmed_setpoint_k is None:
+                print(
+                    "❌ Could not verify MXC setpoint."
+                )
+                return False
+
+            if abs(
+                float(confirmed_setpoint_k) - value_k
+            ) > 1e-6:
+                print(
+                    "❌ MXC setpoint verification failed: "
+                    f"requested {value_k} K, "
+                    f"reported {confirmed_setpoint_k} K."
+                )
+                return False
+
+            if ramp_active:
+                print(
+                    "❌ Unexpected ramp started after "
+                    "manual setpoint."
+                )
+                return False
+
+            if (
+                confirmed_ramp is None
+                or confirmed_ramp["enabled"]
+            ):
+                print(
+                    "❌ Native ramp remains enabled after "
+                    "manual setpoint."
+                )
+                return False
+
+            if verbose:
+                print(
+                    f"Set temperature setpoint for "
+                    f"channel {channel} to {value_k} K."
+                )
+
+            return True
+
+        except Exception as e:
+            print(
+                f"❌ Setting temperature setpoint for "
+                f"channel {channel} failed."
+                f"\nReason: {e}"
+            )
+            return False
     def set_ramp(
         self,
         enabled: bool,
@@ -1142,15 +1273,26 @@ class LakeShore370:
                 "error": str(e),
             }
 
-    def stop_ramp(self) -> dict:
+    def stop_ramp(
+        self,
+        channel: int = 6,
+    ) -> dict:
         """
-        Stop an active native ramp at its present setpoint.
+        Stop the native MXC ramp and disable the ramp feature.
 
-        The ramp configuration remains enabled, but the active
-        movement towards the previous target is cancelled.
+        If a ramp is active, the current measured MXC temperature is
+        used as the new hold setpoint before disabling RAMP. This avoids
+        leaving the previous ramp target as the active setpoint.
+
+        The function always leaves the Lake Shore ramp feature disabled.
         """
         try:
             with _lakeshore_mutex:
+
+                # ----------------------------------------------------------
+                # Read current ramp state and configuration
+                # ----------------------------------------------------------
+
                 ramp_active_before = self.get_ramp_status()
 
                 if ramp_active_before is None:
@@ -1162,47 +1304,94 @@ class LakeShore370:
                         ),
                     }
 
-                hold_setpoint_k = (
-                    self.get_temperature_setpoint()
-                )
+                ramp_parameters = self.get_ramp_parameters()
 
-                if hold_setpoint_k is None:
+                if ramp_parameters is None:
                     return {
                         "ok": False,
                         "error": (
                             "Could not read the current "
-                            "setpoint."
+                            "ramp parameters."
                         ),
                     }
 
-                hold_setpoint_k = float(hold_setpoint_k)
+                ramp_enabled_before = bool(
+                    ramp_parameters["enabled"]
+                )
 
-                if not ramp_active_before:
-                    return {
-                        "ok": True,
-                        "was_active": False,
-                        "hold_setpoint_k": hold_setpoint_k,
-                        "ramp_active": False,
-                    }
+                rate_k_per_min = float(
+                    ramp_parameters["rate_k_per_min"]
+                )
 
-                # Re-entering the present setpoint cancels
-                # the active ramp at its current value.
+                hold_setpoint_k = None
+
+                # ----------------------------------------------------------
+                # If actively ramping, replace the old target with the
+                # current measured MXC temperature.
+                # ----------------------------------------------------------
+
+                if ramp_active_before:
+
+                    current_temperature_k = self.get_temperature(
+                        channel
+                    )
+
+                    if current_temperature_k is None:
+                        return {
+                            "ok": False,
+                            "error": (
+                                "Could not read the current "
+                                "MXC temperature."
+                            ),
+                        }
+
+                    hold_setpoint_k = float(
+                        current_temperature_k
+                    )
+
+                    # The old SETP is the final ramp target.
+                    # Replace it with the current measured temperature
+                    # before disabling the ramp.
+                    self._write(
+                        f"SETP {hold_setpoint_k:.12g}"
+                    )
+
+                # ----------------------------------------------------------
+                # Disable the ramp feature completely.
+                #
+                # The rate value must still be supplied by the RAMP command.
+                # ----------------------------------------------------------
+
                 self._write(
-                    f"SETP {hold_setpoint_k:.12g}"
+                    f"RAMP 0,{rate_k_per_min:.6g}"
+                )
+
+                # ----------------------------------------------------------
+                # Verify final state
+                # ----------------------------------------------------------
+
+                confirmed_ramp_parameters = (
+                    self.get_ramp_parameters()
+                )
+
+                ramp_active_after = (
+                    self.get_ramp_status()
                 )
 
                 confirmed_setpoint_k = (
                     self.get_temperature_setpoint()
                 )
-                ramp_active_after = (
-                    self.get_ramp_status()
-                )
 
-            if confirmed_setpoint_k is None:
+            # --------------------------------------------------------------
+            # Validate verification queries
+            # --------------------------------------------------------------
+
+            if confirmed_ramp_parameters is None:
                 return {
                     "ok": False,
                     "error": (
-                        "Could not verify the hold setpoint."
+                        "Could not verify the final "
+                        "ramp configuration."
                     ),
                 }
 
@@ -1215,24 +1404,71 @@ class LakeShore370:
                     ),
                 }
 
+            if confirmed_setpoint_k is None:
+                return {
+                    "ok": False,
+                    "error": (
+                        "Could not verify the final "
+                        "MXC setpoint."
+                    ),
+                }
+
+            # RAMP? must report disabled.
+            if confirmed_ramp_parameters["enabled"]:
+                return {
+                    "ok": False,
+                    "error": (
+                        "The ramp feature remains enabled "
+                        "after the stop command."
+                    ),
+                }
+
+            # RAMPST? must report no active ramp.
             if ramp_active_after:
                 return {
                     "ok": False,
                     "error": (
-                        "The ramp remains active after "
-                        "the stop command."
+                        "The setpoint is still actively "
+                        "ramping after the stop command."
+                    ),
+                }
+
+            # --------------------------------------------------------------
+            # If there was an active ramp, verify that SETP ended close to
+            # the temperature used as the hold value.
+            # --------------------------------------------------------------
+
+            if (
+                hold_setpoint_k is not None
+                and abs(
+                    float(confirmed_setpoint_k)
+                    - hold_setpoint_k
+                ) > 1e-4
+            ):
+                return {
+                    "ok": False,
+                    "error": (
+                        "Ramp stopped, but the final "
+                        "setpoint does not match the "
+                        "requested hold temperature."
                     ),
                     "hold_setpoint_k": hold_setpoint_k,
+                    "confirmed_setpoint_k": float(
+                        confirmed_setpoint_k
+                    ),
                 }
 
             return {
                 "ok": True,
-                "was_active": True,
+                "was_active": bool(ramp_active_before),
+                "ramp_enabled_before": ramp_enabled_before,
                 "hold_setpoint_k": hold_setpoint_k,
                 "confirmed_setpoint_k": float(
                     confirmed_setpoint_k
                 ),
+                "ramp_enabled": False,
                 "ramp_active": False,
+                "rate_k_per_min": rate_k_per_min,
             }
 
         except Exception as e:
@@ -1240,6 +1476,7 @@ class LakeShore370:
                 "Stopping MXC ramp failed."
                 f"\nReason: {e}"
             )
+
             return {
                 "ok": False,
                 "error": str(e),
