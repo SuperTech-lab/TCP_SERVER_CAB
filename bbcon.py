@@ -28,14 +28,14 @@ class BBCON:
 
     def __init__(
         self,
-        addr: str | None = None,
-        verbose: int = 1,
+        addr                   : str | None = None,
+        verbose                : int = 1,
         *,
-        resource_manager: Any | None = None,
-        visa_backend: str = "@py",
-        timeout_ms: int = 10_000,
-        query_delay_s: float = 0.2,
-        min_command_interval_s: float = 0.1,
+        resource_manager       : Any | None = None,
+        visa_backend           : str = "@py",
+        timeout_ms             : int = 10_000,
+        query_delay_s          : float = 0.2,
+        min_command_interval_s : float = 0.1,
     ) -> None:
         """
         
@@ -283,14 +283,24 @@ class BBCON:
         if PID is None:
             return
         if not isinstance(PID, tuple) or len(PID) != 3:
-            raise ValueError("PID must be a three-element tuple: (P, I, D)")
+            print("PID must be a three-element tuple: (P, I, D)")
+            return False
+        try:
+            p_gain, i_gain, d_gain = (float(value) for value in PID)
+        except Exception as e:
+            print("PID values must be numerical\nReason: {e}")
+            return False
 
-        p_gain, i_gain, d_gain = (float(value) for value in PID)
-        self.command(f"LOOP 1:PGAIN {p_gain}")
-        self.command(f"LOOP 1:IGAIN {i_gain}")
-        self.command(f"LOOP 1:DGAIN {d_gain}")
+        try:
+            self.command(f"LOOP 1:PGAIN {p_gain}")
+            self.command(f"LOOP 1:IGAIN {i_gain}")
+            self.command(f"LOOP 1:DGAIN {d_gain}")
+            return True
+        except Exception as e:
+            print(f"PID did not reach the device\nReason: {e}")
+            return False
 
-    def query_PID(self, verbose: int = 1) -> tuple[str, str, str]:
+    def query_PID(self, verbose: int = 1, color: str = '\x1b[1;32m', header: str = 'PID values:') -> tuple[str, str, str]:
         """Return loop 1 PID gains as controller reply strings."""
 
         p_gain = self.query("LOOP 1:PGAIN?")
@@ -298,7 +308,8 @@ class BBCON:
         d_gain = self.query("LOOP 1:DGAIN?")
 
         if verbose >= 1:
-            print(f"\x1b[1;32mPID values:\x1b[0m {p_gain} {i_gain} {d_gain}")
+            print(f"{color}{header}\x1b[0m {p_gain} {i_gain} {d_gain}")
+
         return p_gain, i_gain, d_gain
 
     @classmethod
@@ -326,6 +337,9 @@ class BBCON:
     def query_setpoint(self) -> float:
         return _parse_float(self.query("LOOP 1:SETPT?"))
 
+    def query_maxsetpoint(self) -> float:
+        return _parse_float(self.query("LOOP 1:MAXSET?"))
+
     def set_setpoint(self, temperature: float, verbose: bool = True) -> bool:
         """ Temperature must be in Kelvin."""
         try:
@@ -341,7 +355,24 @@ class BBCON:
         except Exception as e:
             print(f"❌Setting temperature setpoint for {BBCON_NAME} failed\nReason: {e}")
             return False
+        
+    def set_maxsetpoint(self, temperature: float, verbose: bool = True) -> bool:
+        try:
+            value = float(temperature)
+        except Exception as e:
+            print(f"❌Invalid maximum setpoint for {BBCON_NAME}: {temperature}\nReason: {e}")
+            return False
 
+        try:
+            self.command(f"LOOP 1:MAXSET {value}")
+            if verbose: print(f"Set maximum setpoint for {BBCON_NAME} to {value} K.")
+            return True
+        except Exception as e:
+            print(f"❌Setting maximum setpoint for {BBCON_NAME} failed\nReason: {e}")
+            return False
+
+    
+        
     def start_control(self) -> None:
         self.command("CONTROL")
 

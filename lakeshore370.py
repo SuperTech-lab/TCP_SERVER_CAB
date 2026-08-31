@@ -1,6 +1,9 @@
+import sys
 import pyvisa
 import threading
 import time
+
+from typing import Any
 
 # Shared mutex lock for safe device access
 # Changed Lock for RLock (Reentrant Lock) to allow the same thread to acquire the lock multiple times if needed
@@ -12,7 +15,7 @@ _lakeshore_mutex = threading.RLock()
 MIN_COMMUNICATION_INTERVAL_S = 0.055
 
 # Ramp implementation for temperature control min and max rate values in Kelvin/min
-MIN_RAMP_RATE_K_PER_MIN = 0.001
+MIN_RAMP_RATE_K_PER_MIN = 0.0001
 MAX_RAMP_RATE_K_PER_MIN = 10.0
 MIN_TARGET_TEMPERATURE_MK = 10.0
 MAX_TARGET_TEMPERATURE_MK = 900.0
@@ -121,24 +124,77 @@ class LakeShore370:
         addr (str): The VISA address of the device.
         baud_rate (int): The baud rate for serial communication.
         timeout (int): The timeout for device communication in milliseconds.
-    """
-    #! -- Initialization -- #
-    def __init__(self,
-                 addr = 'ASRL/dev/ttyUSB1::INSTR',
-                 baud_rate = 9600,
-                 timeout = 2000):
 
-        self.rm = pyvisa.ResourceManager()
-        self.device = self.rm.open_resource(addr)
-        self.device.baud_rate = baud_rate
-        self.device.data_bits = 7
-        self.device.stop_bits = pyvisa.constants.StopBits.one
-        self.device.parity = pyvisa.constants.Parity.odd
-        self.device.write_termination = '\r\n'
-        self.device.read_termination = '\r\n'
-        self.device.timeout = timeout  # milliseconds
+
+    __init__() is organised as follows:
+
+        create object
+        ↓
+        generate internal _when_last_communication_completed
+        ↓
+        open VISA
+        ↓
+        configure RS232
+        ↓
+        _query("*IDN?")
+        ↓
+        _wait_for_communication_slot()
+    """
+
+    LINUX_ADDRESS = "ASRL/dev/ttyUSB1::INSTR"
+    WINDOWS_ADDRESS = "ASRL12::INSTR"
+
+    def __init__(self,
+                addr      : str | None = None,
+                baud_rate : int = 9600,
+                timeout   : int = 2000):
+
+        if addr is None:
+            addr = (
+                self.WINDOWS_ADDRESS
+                if sys.platform == "win32"
+                else self.LINUX_ADDRESS
+            )
+
+        self.addr = addr
+
+        self.device: Any | None = None
+
+        # Must exist before any call to _query() / _write()
         self._when_last_communication_completed = 0.0
 
+        self.rm = pyvisa.ResourceManager()
+
+        try:
+            self.device = self.rm.open_resource(addr)
+
+            # Configure serial communication BEFORE first query
+            self.device.baud_rate = baud_rate
+            self.device.data_bits = 7
+            self.device.stop_bits = pyvisa.constants.StopBits.one
+            self.device.parity = pyvisa.constants.Parity.odd
+            self.device.write_termination = '\r\n'
+            self.device.read_termination = '\r\n'
+            self.device.timeout = timeout
+
+            identification = self._query("*IDN?")
+
+            if not identification:
+                raise RuntimeError("empty reply to *IDN?")
+
+        except Exception as exc:
+            self.close()
+
+            raise ConnectionError(
+                f"LakeShore 370 not detected at {self.addr}: {exc}"
+            ) from exc
+
+    @property
+    def connected(self) -> bool:
+        """Return whether a VISA session is currently open."""
+
+        return self.device is not None
+    
     #! -- Communication Methods -- #
     def _wait_for_communication_slot(self):
         """
@@ -766,6 +822,7 @@ class LakeShore370:
             except Exception as e:
                 print(f"Could not set autoscan {'ON' if current_bool else 'OFF'}.\nReason: {e}")
                 return False
+            
     def recover_scan(self) -> bool:
         """
         Reinitialize the Lake Shore scan and verify the final state.
@@ -858,11 +915,11 @@ class LakeShore370:
         if not (
             MIN_TARGET_TEMPERATURE_MK
             <= value_mk
-            <= 500.0
+            <= 800.0
         ):
             print(
                 "Temperature setpoint must be between "
-                "10 mK and 500 mK."
+                "10 mK and 800 mK."
             )
             return False
 
@@ -1790,7 +1847,6 @@ class LakeShore370:
     # ! -- Device control Methods -- #
     def close(self):
         try:
-
             with _lakeshore_mutex:
                 self.device.close()
             print("Device connection closed.")

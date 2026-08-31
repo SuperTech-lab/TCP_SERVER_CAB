@@ -814,6 +814,11 @@ def handle_command(command):
 
     cmd = command.strip()
 
+    CHECK_STATUS_COMMANDS = (
+        "check_bbcon",
+        "check_lakeshore"
+    )
+
     CONTROL_COMMAND_PREFIXES = (
         "set_mxc_temperature_setpoint",
         "set_temperature_setpoint",
@@ -835,11 +840,38 @@ def handle_command(command):
         "stop_bbcon_control",
         "get_bbcon_temperature",
         "set_bbcon_setpoint",
+        "set_bbcon_maxsetpoint",
         "set_bbcon_heater_range",
+        "set_bbcon_PID",
 
     )
 
-    if cmd.startswith(BBCON_COMMAND_PREFIXES):
+    if cmd.startswith(CHECK_STATUS_COMMANDS):
+        if cmd.startswith("check_bbcon"):
+            connected = False
+            try:
+                with bbcon_mutex:
+                    connected = bb.connected
+                return connected
+            except Exception as e:
+                message = f"❌ Could not get BBCON status\nReason: {e}"
+                print(message)
+                return False
+            return False
+        
+        elif cmd.startswith("check_lakeshore"):
+            connected = False
+            try:
+                with heater_mutex:
+                    connected = ls.connected
+                return connected
+            except Exception as e:
+                message = f"❌ Could not get LakeShore status\nReason: {e}"
+                print(message)
+                return False
+            return False
+            
+    elif cmd.startswith(BBCON_COMMAND_PREFIXES):
         if cmd.startswith("start_bbcon_control"):
             try:
                 with bbcon_mutex:
@@ -893,7 +925,7 @@ def handle_command(command):
                                 break
                             
                         if actual_setpoint is None:
-                            message = f"❌ Failed to read back {BBCON_NAME} setpoint after {attempts} attempts."
+                            message = f"❌ Failed to read back {BBCON_NAME} setpoint after {ATTEMPTS} attempts."
                             print(message)
                             return message
 
@@ -908,6 +940,45 @@ def handle_command(command):
                         message = f"❌ Failed to set temperature setpoint for {BBCON_NAME}"
                 else:
                     message = f"❌ Temperature setpoint for {BBCON_NAME} must be between 0.0 K and {MAX_BBCON_SETPOINT} K"
+
+                print(message)
+                return message
+            
+            except Exception as e:
+                print(f"❌ Error ocurred while setting setpoint for {BBCON_NAME}\nReason: {e}")
+
+        elif cmd.startswith("set_bbcon_maxsetpoint"):
+            try:
+                new_bbcon_maxsetpoint = float(cmd.split(":")[-1])
+                if 0.0 <= new_bbcon_maxsetpoint <= MAX_BBCON_SETPOINT:
+                    with bbcon_mutex:
+                        success = bb.set_maxsetpoint(new_bbcon_maxsetpoint)
+
+                    if success:
+                        actual_maxsetpoint = None
+                        for attempt in range(ATTEMPTS):
+                            time.sleep(0.2)
+                            with bbcon_mutex:
+                                actual_maxsetpoint = bb.query_maxsetpoint()
+                            if actual_maxsetpoint is not None:
+                                break
+                            
+                        if actual_maxsetpoint is None:
+                            message = f"❌ Failed to read back {BBCON_NAME} maximum setpoint after {ATTEMPTS} attempts."
+                            print(message)
+                            return message
+
+                        if abs(actual_maxsetpoint - new_bbcon_maxsetpoint) < 1e-2:
+                            message = f"✅ Maxmium setpoint for {BBCON_NAME} successfully set to {new_bbcon_maxsetpoint} K"
+                        else:
+                            message = (
+                                        f"⚠️ Mismatch: Tried to set {BBCON_NAME} setpoint to {new_bbcon_maxsetpoint:.2f} K, "+
+                                        f"but the device reports {actual_maxsetpoint:.2f} K"
+                                    )
+                    else:
+                        message = f"❌ Failed to set maximum setpoint for {BBCON_NAME}"
+                else:
+                    message = f"❌ Maximum setpoint for {BBCON_NAME} must be between 0.0 K and {MAX_BBCON_SETPOINT} K"
 
                 print(message)
                 return message
@@ -931,7 +1002,7 @@ def handle_command(command):
                                 break
 
                         if actual_range is None:
-                            message = f"❌ Failed to read back {BBCON_NAME} heater range after {attempts} attempts."
+                            message = f"❌ Failed to read back {BBCON_NAME} heater range after {ATTEMPTS} attempts."
                             print(message)
                             return message
 
@@ -947,6 +1018,41 @@ def handle_command(command):
 
             except Exception as e:
                 print(f"❌ Error ocurred while setting heater range for {BBCON_NAME}\nReason: {e}")
+
+        elif cmd.startswith("set_bbcon_PID"):
+            # set_bbcon_PID:0.003:1.0:1.0
+            # set_bbcon_PID:<P>:<I>:<D>
+            try:
+                P, I, D = cmd.split(':')[1:4]
+                new_PID = (float(P), float(I), float(D))
+            except Exception as e:
+                message = ("❌ Failed to set convert PID values to tuple[float, float, float]"
+                           +f"\nReason: {e}")
+                return message
+
+            with bbcon_mutex:
+                success = bb.set_PID(new_PID)
+
+            if success:
+                actual_PID = None
+                for attempt in range(ATTEMPTS):
+                    time.sleep(0.2)
+                    with bbcon_mutex:
+                        actual_PID = bb.query_PID(color = MAGENTA, header = '[Cryo-Con] PID Values:')
+                    if actual_PID is not None:
+                        break
+
+                if actual_PID is None:
+                    message = f"❌ Failed to read back {BBCON_NAME} PID values after {ATTEMPTS} attempts."
+                    print(message)
+                    return message
+
+                message = f"✅ PID values for {BBCON_NAME} successfully set to {new_PID}"
+
+            else:
+                message = f"❌ Failed to set PID values for {BBCON_NAME}"
+
+            return message
 
     if cmd.startswith(CONTROL_COMMAND_PREFIXES):
         try:
@@ -1527,7 +1633,7 @@ def handle_command(command):
         # Sintaxis to set the temperature setpoint for MXC: "set_temperature_setpoint_mxc:100"
         try:
             new_temperature_setpoint = float(command.split(":")[-1])
-            if 0.0 <= new_temperature_setpoint <= 500.0:
+            if 0.0 <= new_temperature_setpoint <= 800.0:
                 if (new_temperature_setpoint<10):
                     print("⚠️ Temperature setpoint under 10mK might be useless")
                 with heater_mutex:
@@ -1560,7 +1666,7 @@ def handle_command(command):
                 else:
                     message = f"❌ Failed to set temperature setpoint for MXC"
             else:
-                message = f"❌ Temperature setpoint for MXC must be between 10 mK and 500 mK"
+                message = f"❌ Temperature setpoint for MXC must be between 10 mK and 800 mK"
             print(message)
             return message
 
