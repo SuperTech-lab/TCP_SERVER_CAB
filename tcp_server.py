@@ -497,6 +497,8 @@ def start_relation(
     return _start_relation_common(
         channel_number=channel_number,
         label=label,
+        mode="MANUAL",
+        metadata={},
     )
 
 def start_relation_ramp(
@@ -517,9 +519,16 @@ def start_relation_ramp(
             "Ramp target and rate must be numeric."
         )
 
+    ramp_metadata = {
+        "target_mk": target_mk,
+        "rate_mk_per_min": rate_k_per_min * 1000.0,
+    }
+
     relation_id = _start_relation_common(
         channel_number=channel_number,
         label=label,
+        mode="RAMP",
+        metadata=ramp_metadata,
     )
 
     if relation_id is None:
@@ -566,11 +575,35 @@ def start_relation_ramp(
         )
         return None, error
 
-    RELATION_RAMP_CONTROLLED = True
-    RELATION_RAMP_TARGET_MK = target_mk
-    RELATION_RAMP_RATE_MK_PER_MIN = (
-        rate_k_per_min * 1000
-    )
+    with relation_lock:
+        relation_still_active = (
+            RELATION_ACTIVE
+            and RELATION_RUN_ID == relation_id
+            and RELATION_MODE == "RAMP"
+        )
+
+        if relation_still_active:
+            RELATION_RAMP_CONTROLLED = True
+            RELATION_RAMP_TARGET_MK = target_mk
+            RELATION_RAMP_RATE_MK_PER_MIN = (
+                rate_k_per_min * 1000
+            )
+    if not relation_still_active:
+        try:
+            with heater_mutex:
+                ls.stop_ramp()
+
+        except Exception as e:
+            print(
+                "❌ Could not stop Lake Shore ramp after "
+                "RELATION was cancelled during startup."
+                f"\nReason: {e}"
+            )
+
+        return None, (
+            "Relation was stopped while the ramp "
+            "was being started."
+        )
 
     print(
         "↗ MXC ramp associated with RELATION "
@@ -582,108 +615,134 @@ def start_relation_ramp(
     return relation_id, None
 
 def stop_relation():
+
     global RELATION_ACTIVE
-    global RELATION_RUN_ID
-    global RELATION_CHANNEL
-    global RELATION_LABEL
-    global RELATION_BUFFER
 
-    if not RELATION_ACTIVE or RELATION_RUN_ID is None:
-        print("⚠ No hay relation en curso")
-        return None, 0
+    with relation_lock:
 
-    file_name = RELATION_RUN_ID
-    n_points = len(RELATION_BUFFER)
-    channel_number = RELATION_CHANNEL
-    label = RELATION_LABEL
+        if (
+            not RELATION_ACTIVE
+            or RELATION_RUN_ID is None
+        ):
+            print("⚠ No hay relation en curso")
+            return None, 0
 
-    # Debe conservarse antes de reiniciar el estado.
-    ramp_controlled = RELATION_RAMP_CONTROLLED
+        # Stop accepting new samples immediately.
+        RELATION_ACTIVE = False
+
+        # Take an immutable snapshot of the relation state.
+        file_name = RELATION_RUN_ID
+        channel_number = RELATION_CHANNEL
+        label = RELATION_LABEL
+
+        relation_mode = RELATION_MODE
+        relation_metadata = dict(RELATION_METADATA)
+
+        buffer_snapshot = list(RELATION_BUFFER)
+        n_points = len(buffer_snapshot)
+
+        ramp_controlled = RELATION_RAMP_CONTROLLED
+
+    # From here onwards relation_lock is free.
+    # RELATION_RUN_ID remains populated until final cleanup,
+    # preventing a new relation from starting meanwhile.
+
     ramp_stop_error = None
 
-    dat_bytes = _build_relation_dat(
-        channel_number,
-        label,
-        RELATION_BUFFER,
-    )
+    try:
 
-    # Solo una relación que inició la rampa puede detenerla.
-    if ramp_controlled:
+        dat_bytes = _build_relation_dat(
+            channel_number=channel_number,
+            label=label,
+            buf_points=buffer_snapshot,
+            mode=relation_mode,
+            metadata=relation_metadata,
+        )
+
+        # Only a relation that owns the native Lake Shore
+        # ramp is allowed to stop it.
+        if ramp_controlled:
+
+            try:
+                with heater_mutex:
+                    ramp_result = ls.stop_ramp()
+
+                if not isinstance(ramp_result, dict):
+                    ramp_stop_error = (
+                        "Lake Shore returned an invalid "
+                        "ramp stop result."
+                    )
+
+                elif not ramp_result.get("ok"):
+                    ramp_stop_error = ramp_result.get(
+                        "error",
+                        "Unknown ramp stop error.",
+                    )
+
+            except Exception as e:
+                ramp_stop_error = str(e)
+
+            if ramp_stop_error is None:
+                print(
+                    "↘ MXC ramp stopped by RELATION "
+                    f"file={file_name}"
+                )
+
+            else:
+                print(
+                    "❌ RELATION stopped, but the MXC ramp "
+                    "could not be stopped."
+                    f"\nReason: {ramp_stop_error}"
+                )
+
         try:
-            with heater_mutex:
-                ramp_result = ls.stop_ramp()
+            with get_db_conn() as conn:
+                with conn.cursor() as cur:
 
-            if not isinstance(ramp_result, dict):
-                ramp_stop_error = (
-                    "Lake Shore returned an invalid "
-                    "ramp stop result."
-                )
+                    cur.execute(
+                        """
+                        INSERT INTO relation_files (
+                            file_name,
+                            channel_number,
+                            label,
+                            n_points,
+                            data
+                        )
+                        VALUES (%s, %s, %s, %s, %s)
+                        ON CONFLICT (file_name) DO UPDATE SET
+                            created_at = now(),
+                            channel_number = EXCLUDED.channel_number,
+                            label = EXCLUDED.label,
+                            n_points = EXCLUDED.n_points,
+                            data = EXCLUDED.data;
+                        """,
+                        (
+                            file_name,
+                            channel_number,
+                            label,
+                            n_points,
+                            psycopg2.Binary(dat_bytes),
+                        ),
+                    )
 
-            elif not ramp_result.get("ok"):
-                ramp_stop_error = ramp_result.get(
-                    "error",
-                    "Unknown ramp stop error.",
-                )
+                    conn.commit()
 
         except Exception as e:
-            ramp_stop_error = str(e)
-
-        if ramp_stop_error is None:
             print(
-                "↘ MXC ramp stopped by RELATION "
-                f"file={file_name}"
-            )
-        else:
-            print(
-                "❌ RELATION stopped, but the MXC ramp "
-                "could not be stopped."
-                f"\nReason: {ramp_stop_error}"
+                "❌ Error guardando relation file "
+                f"{file_name}: {e}"
             )
 
-    with get_db_conn() as conn:
-        with conn.cursor() as cur:
-            try:
-                cur.execute(
-                    """
-                    INSERT INTO relation_files (
-                        file_name,
-                        channel_number,
-                        label,
-                        n_points,
-                        data
-                    )
-                    VALUES (%s, %s, %s, %s, %s)
-                    ON CONFLICT (file_name) DO UPDATE SET
-                        created_at = now(),
-                        channel_number = EXCLUDED.channel_number,
-                        label = EXCLUDED.label,
-                        n_points = EXCLUDED.n_points,
-                        data = EXCLUDED.data;
-                    """,
-                    (
-                        file_name,
-                        channel_number,
-                        label,
-                        n_points,
-                        psycopg2.Binary(dat_bytes),
-                    ),
-                )
-                conn.commit()
-
-            except psycopg2.Error as e:
-                conn.rollback()
-                print(
-                    "❌ Error guardando relation file "
-                    f"{file_name}: {e}"
-                )
-                # Aunque falle la DB, se cierra la captura.
-
-    _reset_relation_state()
+    finally:
+        # The relation state must be released even if stopping
+        # the ramp or saving to PostgreSQL fails.
+        _reset_relation_state()
 
     print(
         "⏹ RELATION finalizada. "
         f"file={file_name} puntos={n_points}"
     )
+
     return file_name, n_points
 
 
@@ -1243,46 +1302,86 @@ def handle_command(command):
         return f"RELATION_STOPPED:{relation_id}:{n}"
     
     elif cmd == "get_relation_status":
-        if RELATION_ACTIVE and RELATION_RUN_ID is not None:
-            label = (
-                RELATION_LABEL
-                if RELATION_LABEL is not None
-                else ""
-            )
-            ch = (
-                RELATION_CHANNEL
-                if RELATION_CHANNEL is not None
-                else -1
-            )
-            n = len(RELATION_BUFFER)
+        with relation_lock:
 
-            if RELATION_RAMP_CONTROLLED:
-                relation_mode = "RAMP"
-                target_mk = (
-                    ""
-                    if RELATION_RAMP_TARGET_MK is None
-                    else f"{RELATION_RAMP_TARGET_MK:g}"
-                )
-                rate_mk_per_min = (
-                    ""
-                    if RELATION_RAMP_RATE_MK_PER_MIN is None
-                    else f"{RELATION_RAMP_RATE_MK_PER_MIN:g}"
-                )
-            else:
-                relation_mode = "MANUAL"
-                target_mk = ""
-                rate_mk_per_min = ""
-
-            return (
-                "RELATION_STATUS:ACTIVE:"
-                f"{RELATION_RUN_ID}:"
-                f"{ch}:"
-                f"{urllib.parse.quote(label)}:"
-                f"{n}:"
-                f"{relation_mode}:"
-                f"{target_mk}:"
-                f"{rate_mk_per_min}"
+            relation_active = (
+                RELATION_ACTIVE
+                and RELATION_RUN_ID is not None
             )
+
+            if relation_active:
+
+                relation_id = RELATION_RUN_ID
+
+                label = (
+                    RELATION_LABEL
+                    if RELATION_LABEL is not None
+                    else ""
+                )
+
+                ch = (
+                    RELATION_CHANNEL
+                    if RELATION_CHANNEL is not None
+                    else -1
+                )
+
+                n = len(RELATION_BUFFER)
+
+                relation_mode = (
+                    RELATION_MODE
+                    if RELATION_MODE is not None
+                    else "MANUAL"
+                )
+
+                metadata = dict(RELATION_METADATA)
+
+                # Legacy native-RAMP values are retained as fallback.
+                legacy_target_mk = RELATION_RAMP_TARGET_MK
+                legacy_rate_mk_per_min = (
+                    RELATION_RAMP_RATE_MK_PER_MIN
+                )
+
+        if not relation_active:
+            return "RELATION_STATUS:IDLE"
+
+        if relation_mode == "RAMP":
+
+            target_mk = metadata.get(
+                "target_mk",
+                legacy_target_mk,
+            )
+
+            rate_mk_per_min = metadata.get(
+                "rate_mk_per_min",
+                legacy_rate_mk_per_min,
+            )
+
+            target_mk = (
+                ""
+                if target_mk is None
+                else f"{target_mk:g}"
+            )
+
+            rate_mk_per_min = (
+                ""
+                if rate_mk_per_min is None
+                else f"{rate_mk_per_min:g}"
+            )
+
+        else:
+            target_mk = ""
+            rate_mk_per_min = ""
+
+        return (
+            "RELATION_STATUS:ACTIVE:"
+            f"{relation_id}:"
+            f"{ch}:"
+            f"{urllib.parse.quote(label)}:"
+            f"{n}:"
+            f"{relation_mode}:"
+            f"{target_mk}:"
+            f"{rate_mk_per_min}"
+        )
 
         return "RELATION_STATUS:IDLE"
     
@@ -3439,16 +3538,31 @@ def lakeshore_temperature_sensor():
                 sample_channel_status[ch] = None
                 extra_resistances[f"CH{ch}"] = None
 
-        if RELATION_ACTIVE and RELATION_RUN_ID is not None and RELATION_CHANNEL is not None:
-            try:
-                tmxc_k = temperatures.get("MXC")
-                r_key = f"CH{RELATION_CHANNEL}"
-                r_ohm = extra_resistances.get(r_key)
+        try:
+            with relation_lock:
 
-                if tmxc_k is not None and r_ohm is not None:
-                    RELATION_BUFFER.append((datetime.now(timezone.utc), float(tmxc_k), float(r_ohm)))
-            except Exception as e:
-                print(f"⚠ Relation sampling error: {e}")
+                if (
+                    RELATION_ACTIVE
+                    and RELATION_RUN_ID is not None
+                    and RELATION_CHANNEL is not None
+                    and RELATION_MODE in ("MANUAL", "RAMP")
+                ):
+                    tmxc_k = temperatures.get("MXC")
+
+                    r_key = f"CH{RELATION_CHANNEL}"
+                    r_ohm = extra_resistances.get(r_key)
+
+                    if tmxc_k is not None and r_ohm is not None:
+                        RELATION_BUFFER.append(
+                            (
+                                datetime.now(timezone.utc),
+                                float(tmxc_k),
+                                float(r_ohm),
+                            )
+                        )
+
+        except Exception as e:
+            print(f"⚠ Relation sampling error: {e}")
                 
         controlParams = {
             'MXCSP'           : tempSetPointMXC,
