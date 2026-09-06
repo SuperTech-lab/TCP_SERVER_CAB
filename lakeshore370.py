@@ -92,6 +92,31 @@ RESISTANCE_RANGE_LIST = {
     "8": (6.32, 'Ohms')
 }
 
+RESISTANCE_RANGE_FULL_SCALE_OHMS = {
+    1: 2.00e-3,
+    2: 6.32e-3,
+    3: 20.0e-3,
+    4: 63.2e-3,
+    5: 200e-3,
+    6: 632e-3,
+    7: 2.00,
+    8: 6.32,
+    9: 20.0,
+    10: 63.2,
+    11: 200.0,
+    12: 632.0,
+    13: 2.00e3,
+    14: 6.32e3,
+    15: 20.0e3,
+    16: 63.2e3,
+    17: 200e3,
+    18: 632e3,
+    19: 2.00e6,
+    20: 6.32e6,
+    21: 20.0e6,
+    22: 63.2e6,
+}
+
 DEFAULT_MXC_RESISTANCE_RANGE_SETTINGS = {
     "excitation_mode"  : 0,      # 0 for voltage, 1 for current
     "excitation_range" : 5,      # 5 for 200 uV and 100 pA
@@ -919,10 +944,10 @@ class LakeShore370:
 
         requested_autoscan = int(autoscan)
 
-        # Always issue SCAN: do not rely on the current autoscan state.
-        self.device.write(f"SCAN {channel},{requested_autoscan}")
+        with _lakeshore_mutex:
+            self._write(f"SCAN {channel},{requested_autoscan}")
+            reply = self._query("SCAN?").strip()
 
-        reply = self.device.query("SCAN?").strip()
         fields = [field.strip() for field in reply.split(",")]
 
         if len(fields) != 2:
@@ -983,7 +1008,7 @@ class LakeShore370:
         if not 1 <= channel <= 16:
             raise ValueError("channel must be between 1 and 16")
 
-        reply = self.device.query(f"FILTER? {channel}").strip()
+        reply = self._query(f"FILTER? {channel}").strip()
         fields = [field.strip() for field in reply.split(",")]
 
         if len(fields) != 3:
@@ -1019,6 +1044,186 @@ class LakeShore370:
             "window_percent": window_percent,
         }
 
+    def set_resistance_measurement_range(
+        self,
+        channel: int,
+        resistance_range: int,
+        autorange: bool = False,
+        excitation_on: bool = True,
+    ) -> bool:
+        """
+        Set the resistance measurement range of a channel while preserving
+        its excitation mode and excitation range.
+
+        Parameters
+        ----------
+        channel : int
+            Scanner channel to configure (1–16).
+        resistance_range : int
+            Lake Shore resistance-range code (1–22).
+        autorange : bool, optional
+            Enable or disable the Lake Shore internal autorange.
+            Default is False.
+        excitation_on : bool, optional
+            Leave the channel excitation on or off. Default is True.
+
+        Returns
+        -------
+        bool
+            True when the requested configuration has been verified.
+
+        Raises
+        ------
+        TypeError
+            If any argument has an invalid type.
+        ValueError
+            If channel or resistance_range is outside its valid range.
+        RuntimeError
+            If RDGRNG? returns an invalid response or verification fails.
+        """
+        if isinstance(channel, bool) or not isinstance(channel, int):
+            raise TypeError("channel must be an integer")
+
+        if not 1 <= channel <= 16:
+            raise ValueError("channel must be between 1 and 16")
+
+        if (
+            isinstance(resistance_range, bool)
+            or not isinstance(resistance_range, int)
+        ):
+            raise TypeError("resistance_range must be an integer")
+
+        if resistance_range not in RESISTANCE_RANGE_FULL_SCALE_OHMS:
+            raise ValueError("resistance_range must be between 1 and 22")
+
+        if not isinstance(autorange, bool):
+            raise TypeError("autorange must be a boolean")
+
+        if not isinstance(excitation_on, bool):
+            raise TypeError("excitation_on must be a boolean")
+
+        def parse_rdgrng_reply(reply: str) -> tuple[int, int, int, int, int]:
+            fields = [
+                field.strip()
+                for field in reply.strip().split(",")
+            ]
+
+            if len(fields) != 5:
+                raise RuntimeError(
+                    f"Invalid RDGRNG? reply: {reply!r}"
+                )
+
+            try:
+                values = tuple(int(field) for field in fields)
+            except ValueError as exc:
+                raise RuntimeError(
+                    f"Non-numeric content in RDGRNG? reply: {reply!r}"
+                ) from exc
+
+            (
+                excitation_mode,
+                excitation_range,
+                reported_resistance_range,
+                reported_autorange,
+                reported_cs_off,
+            ) = values
+
+            if excitation_mode not in (0, 1):
+                raise RuntimeError(
+                    f"Invalid excitation mode in RDGRNG? reply: {reply!r}"
+                )
+
+            maximum_excitation_range = (
+                12 if excitation_mode == 0 else 22
+            )
+
+            if not 1 <= excitation_range <= maximum_excitation_range:
+                raise RuntimeError(
+                    f"Invalid excitation range in RDGRNG? reply: {reply!r}"
+                )
+
+            if reported_resistance_range not in (
+                RESISTANCE_RANGE_FULL_SCALE_OHMS
+            ):
+                raise RuntimeError(
+                    f"Invalid resistance range in RDGRNG? reply: {reply!r}"
+                )
+
+            if reported_autorange not in (0, 1):
+                raise RuntimeError(
+                    f"Invalid autorange value in RDGRNG? reply: {reply!r}"
+                )
+
+            if reported_cs_off not in (0, 1):
+                raise RuntimeError(
+                    f"Invalid excitation state in RDGRNG? reply: {reply!r}"
+                )
+
+            return values
+
+        requested_autorange = int(autorange)
+
+        # RDGRNG uses "current source off":
+        # 0 means excitation ON and 1 means excitation OFF.
+        requested_cs_off = 0 if excitation_on else 1
+
+        # Keep read-modify-write-verification atomic.
+        with _lakeshore_mutex:
+            current_reply = self._query(f"RDGRNG? {channel}")
+
+            (
+                excitation_mode,
+                excitation_range,
+                _,
+                _,
+                _,
+            ) = parse_rdgrng_reply(current_reply)
+
+            command = (
+                f"RDGRNG {channel},"
+                f"{excitation_mode},"
+                f"{excitation_range:02d},"
+                f"{resistance_range:02d},"
+                f"{requested_autorange},"
+                f"{requested_cs_off}"
+            )
+
+            self._write(command)
+
+            verification_reply = self._query(f"RDGRNG? {channel}")
+            actual = parse_rdgrng_reply(verification_reply)
+
+        expected = (
+            excitation_mode,
+            excitation_range,
+            resistance_range,
+            requested_autorange,
+            requested_cs_off,
+        )
+
+        # When autorange is enabled, the instrument may immediately select
+        # another resistance range. The remaining fields must still match.
+        configuration_matches = (
+            actual[0] == expected[0]
+            and actual[1] == expected[1]
+            and actual[3] == expected[3]
+            and actual[4] == expected[4]
+        )
+
+        if not autorange:
+            configuration_matches = (
+                configuration_matches
+                and actual[2] == expected[2]
+            )
+
+        if not configuration_matches:
+            raise RuntimeError(
+                "Resistance measurement range verification failed: "
+                f"requested={expected}, received={actual}"
+            )
+
+        return True
+    
     def set_channel_setpoint(
         self,
         value: float,
