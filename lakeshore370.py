@@ -2,6 +2,7 @@ import sys
 import pyvisa
 import threading
 import time
+import math
 
 from typing import Any
 
@@ -1223,6 +1224,99 @@ class LakeShore370:
             )
 
         return True
+
+    def read_resistance_with_status(self, channel: int) -> dict:
+        """
+        Read a channel resistance bracketed by two reading-status queries.
+
+        The complete RDGST? -> RDGR? -> RDGST? sequence is executed
+        atomically so that no other Lake Shore communication can be
+        interleaved between the three queries.
+
+        Parameters
+        ----------
+        channel : int
+            Scanner channel to query (1–16).
+
+        Returns
+        -------
+        dict
+            Dictionary containing:
+            - valid: True only if both status queries returned zero.
+            - resistance_ohm: resistance in ohms, or None if invalid.
+            - raw_resistance_ohm: numeric resistance returned by RDGR?.
+            - status_before: RDGST? value before reading resistance.
+            - status_after: RDGST? value after reading resistance.
+            - status_code: bitwise combination of both status values.
+            - status_flags: descriptions of the combined status flags.
+
+        Raises
+        ------
+        TypeError
+            If channel is not an integer.
+        ValueError
+            If channel is outside the valid range.
+        RuntimeError
+            If any instrument reply is malformed or out of range.
+        """
+        if isinstance(channel, bool) or not isinstance(channel, int):
+            raise TypeError("channel must be an integer")
+
+        if not 1 <= channel <= 16:
+            raise ValueError("channel must be between 1 and 16")
+
+        def parse_status_reply(reply: str) -> int:
+            try:
+                status_code = int(reply.strip())
+            except ValueError as exc:
+                raise RuntimeError(
+                    f"Non-numeric content in RDGST? reply: {reply!r}"
+                ) from exc
+
+            if not 0 <= status_code <= 255:
+                raise RuntimeError(
+                    f"Invalid status code in RDGST? reply: {reply!r}"
+                )
+
+            return status_code
+
+        # Keep the complete status-resistance-status sequence atomic.
+        with _lakeshore_mutex:
+            status_before_reply = self._query(f"RDGST? {channel}")
+            resistance_reply = self._query(f"RDGR? {channel}")
+            status_after_reply = self._query(f"RDGST? {channel}")
+
+        status_before = parse_status_reply(status_before_reply)
+        status_after = parse_status_reply(status_after_reply)
+
+        try:
+            raw_resistance_ohm = float(resistance_reply.strip())
+        except ValueError as exc:
+            raise RuntimeError(
+                f"Non-numeric content in RDGR? reply: {resistance_reply!r}"
+            ) from exc
+
+        if not math.isfinite(raw_resistance_ohm):
+            raise RuntimeError(
+                f"Non-finite resistance in RDGR? reply: {resistance_reply!r}"
+            )
+
+        # A status flag detected before or after the measurement invalidates
+        # the resistance reading.
+        status_code = status_before | status_after
+        valid = status_code == 0
+
+        return {
+            "valid": valid,
+            "resistance_ohm": (
+                raw_resistance_ohm if valid else None
+            ),
+            "raw_resistance_ohm": raw_resistance_ohm,
+            "status_before": status_before,
+            "status_after": status_after,
+            "status_code": status_code,
+            "status_flags": self.describe_reading_status(status_code),
+        }
     
     def set_channel_setpoint(
         self,
