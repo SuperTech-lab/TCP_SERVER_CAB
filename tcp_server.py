@@ -404,22 +404,23 @@ def _reset_relation_state():
 def _start_relation_common(
     channel_number: int,
     label: str | None = None,
+    mode: str = "MANUAL",
+    metadata: dict | None = None,
 ):
     global RELATION_ACTIVE
     global RELATION_RUN_ID
     global RELATION_CHANNEL
     global RELATION_LABEL
     global RELATION_BUFFER
+    global RELATION_MODE
+    global RELATION_METADATA
     global RELATION_RAMP_CONTROLLED
     global RELATION_RAMP_TARGET_MK
     global RELATION_RAMP_RATE_MK_PER_MIN
 
-    if RELATION_ACTIVE:
-        print("⚠ Ya hay una relation en curso.")
-        return None
-
     try:
         channel_number = int(channel_number)
+
     except (ValueError, TypeError):
         print("❌ channel_number must be an integer")
         return None
@@ -431,26 +432,62 @@ def _start_relation_common(
         )
         return None
 
+    if mode not in RELATION_VALID_MODES:
+        print(
+            f"❌ Invalid relation mode: {mode!r}. "
+            f"Valid modes are: {RELATION_VALID_MODES}"
+        )
+        return None
+
+    if metadata is None:
+        metadata = {}
+
+    elif not isinstance(metadata, dict):
+        print("❌ relation metadata must be a dictionary")
+        return None
+
+    else:
+        # Do not retain a reference to a dictionary owned by the caller.
+        metadata = dict(metadata)
+
     if label is not None:
         label = label.strip() or None
 
-    RELATION_ACTIVE = True
-    RELATION_CHANNEL = channel_number
-    RELATION_LABEL = label
-    RELATION_BUFFER = []
-    RELATION_RUN_ID = _make_relation_filename(label)
+    relation_id = _make_relation_filename(label)
 
-    # A normal relation does not own a Lake Shore ramp.
-    RELATION_RAMP_CONTROLLED = False
-    RELATION_RAMP_TARGET_MK = None
-    RELATION_RAMP_RATE_MK_PER_MIN = None
+    with relation_lock:
+
+        # RUN_ID also protects the short STOPPING interval in which
+        # RELATION_ACTIVE has already been cleared but the previous
+        # relation is still being closed.
+        if RELATION_ACTIVE or RELATION_RUN_ID is not None:
+            print("⚠ Ya hay una relation en curso.")
+            return None
+
+        RELATION_ACTIVE = True
+        RELATION_RUN_ID = relation_id
+        RELATION_CHANNEL = channel_number
+        RELATION_LABEL = label
+        RELATION_BUFFER = []
+
+        RELATION_MODE = mode
+        RELATION_METADATA = metadata
+
+        # Default state: this relation does not yet own
+        # the native Lake Shore ramp.
+        RELATION_RAMP_CONTROLLED = False
+        RELATION_RAMP_TARGET_MK = None
+        RELATION_RAMP_RATE_MK_PER_MIN = None
 
     print(
         "▶ RELATION iniciada "
-        f"file={RELATION_RUN_ID} "
-        f"(CH{RELATION_CHANNEL}, label={RELATION_LABEL})"
+        f"file={relation_id} "
+        f"(CH{channel_number}, "
+        f"label={label}, "
+        f"mode={mode})"
     )
-    return RELATION_RUN_ID
+
+    return relation_id
 
 
 def start_relation(
