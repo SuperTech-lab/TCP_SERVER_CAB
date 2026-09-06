@@ -18,7 +18,7 @@ In this tab (selected by default), the information about the temperature of each
 
 ### BlackBody Control
 
-This tab is yet to be developed. It was created to manage the Black Body parameters and temperature.
+Backend already has Black Body control implementation through bbcon.py driver but Frontend is not connected to those features yet.
 
 ### MXC Comparison
 
@@ -71,6 +71,7 @@ Even though there is a considerable amount of code, the main data stream repeats
 ## Relevant Files
 
 - `lakeshore370.py`: device driver and low-level API.
+- `bbcon.py`: Cryo-Con Model 32 driver and low-level API.
 - `lakeshore370_dummy.py`: simulator for development and tests.
 - `tcp_server.py`: TCP server managing client connections and commands.
 - `http_server.py`: HTTP server for the UI and related endpoints.
