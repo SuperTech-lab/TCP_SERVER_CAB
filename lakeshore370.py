@@ -873,6 +873,84 @@ class LakeShore370:
             )
             return False
     
+    def select_scan_channel(self, channel: int, autoscan: bool = False) -> bool:
+
+        """
+        Select a scanner channel and explicitly set the autoscan state.
+
+        The SCAN command is always sent, even if the requested autoscan state
+        appears to be already active. The resulting configuration is verified
+        using SCAN?.
+
+        This method does not wait for the measurement to settle after changing
+        channel. That delay must be handled by the caller.
+
+        Parameters
+        ----------
+        channel : int
+            Scanner channel to select (1–16).
+        autoscan : bool, optional
+            True enables autoscan; False disables it. Default is False.
+
+        Returns
+        -------
+        bool
+            True when both the selected channel and autoscan state are verified.
+
+        Raises
+        ------
+        TypeError
+            If channel is not an integer or autoscan is not a boolean.
+        ValueError
+            If channel is outside the valid range.
+        RuntimeError
+            If SCAN? returns an invalid response or the requested configuration
+            cannot be verified.
+        """
+        
+        if isinstance(channel, bool) or not isinstance(channel, int):
+            raise TypeError("channel must be an integer")
+
+        if not 1 <= channel <= 16:
+            raise ValueError("channel must be between 1 and 16")
+
+        if not isinstance(autoscan, bool):
+            raise TypeError("autoscan must be a boolean")
+
+        requested_autoscan = int(autoscan)
+
+        # Always issue SCAN: do not rely on the current autoscan state.
+        self.device.write(f"SCAN {channel},{requested_autoscan}")
+
+        reply = self.device.query("SCAN?").strip()
+        fields = [field.strip() for field in reply.split(",")]
+
+        if len(fields) != 2:
+            raise RuntimeError(f"Invalid SCAN? reply: {reply!r}")
+
+        try:
+            actual_channel = int(fields[0])
+            actual_autoscan = int(fields[1])
+        except ValueError as exc:
+            raise RuntimeError(
+                f"Non-numeric content in SCAN? reply: {reply!r}"
+            ) from exc
+
+        if actual_autoscan not in (0, 1):
+            raise RuntimeError(f"Invalid autoscan value in SCAN? reply: {reply!r}")
+
+        if (
+            actual_channel != channel
+            or actual_autoscan != requested_autoscan
+        ):
+            raise RuntimeError(
+                "Scanner configuration verification failed: "
+                f"requested channel={channel}, autoscan={requested_autoscan}; "
+                f"received channel={actual_channel}, autoscan={actual_autoscan}"
+            )
+
+        return True
+
     def set_channel_setpoint(
         self,
         value: float,
