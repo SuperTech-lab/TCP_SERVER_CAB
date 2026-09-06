@@ -3140,6 +3140,13 @@ def cryocon_temperature_sensor():
                 heater_range = bb.query_range()
                 heater_power = bb.query_power()
 
+            # Patch check (bad reply format) -  inherited from BBCON code from sctlib library
+            if abs(heater_power - setpoint) < abs(temperature - setpoint) and float(bbcon_data["BBCON_P"]) > 1.0:
+                warning = ("⚠️ Warning: Black Body controller string in wrong format "
+                            "→ patching values...")
+                temperature = heater_power
+                heater_power = 0.0
+
             bbcon_data.update({
                 "BBCON_TEMP"       : temperature,
                 "BBCON_SP"         : setpoint,
@@ -3147,6 +3154,8 @@ def cryocon_temperature_sensor():
                 "BBCON_HRG"        : heater_range,
                 "BBCON_POWER"      : heater_power,
             })
+
+            print("Just for debugging purposes... INSTANT BBCON DATA", bbcon_data) 
 
         except Exception as e:
             print(f"❌ Error accessing {BBCON_NAME} telemetry.\nReason: {e}")
