@@ -26,6 +26,7 @@ try:
     from bbcon import BBCON
 except ImportError as e:
     print(f"❌ Failed importing Cryo-con driver\nReason: {e}")
+from relation_step_ramp import RelationStepRampController
 
 ls = LakeShore370()
 bb = BBCON()
