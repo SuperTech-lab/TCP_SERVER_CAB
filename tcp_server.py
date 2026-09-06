@@ -37,9 +37,11 @@ PORT = 65432  # Port to listen on
 # Mutex to protect the heater power level
 # Define separated mutex to avoid that slow communications with Cryo-con
 # bottleneck the communications with LakeShore or viceversa.
+# RLock on relations because some methods could access the mutex recursively.
 heater_mutex   = threading.Lock()
 bbcon_mutex    = threading.RLock()
 telemetry_lock = threading.Lock()
+relation_lock  = threading.RLock() 
 
 # DataBase conection params
 db_delay          = DB_INSERT_INTERVAL
@@ -63,15 +65,26 @@ last_bbcon_data = {
     "BBCON_D"          : None,
 }
 
-RELATION_ACTIVE = False
-RELATION_RUN_ID = None
-RELATION_CHANNEL = None   
-RELATION_LABEL = None     
-RELATION_BUFFER = []
-RELATION_RAMP_CONTROLLED = False
-RELATION_RAMP_TARGET_MK = None
-RELATION_RAMP_RATE_MK_PER_MIN = None
+RELATION_VALID_MODES = {
+    "MANUAL",
+    "RAMP",
+    "STEP_RAMP",
+}
 
+RELATION_ACTIVE  = False
+RELATION_RUN_ID  = None
+RELATION_CHANNEL = None
+RELATION_LABEL   = None
+RELATION_BUFFER  = []
+
+RELATION_MODE     = None
+RELATION_METADATA = {}
+
+# Native Lake Shore ramp state.
+# Kept for compatibility with the existing RAMP implementation.
+RELATION_RAMP_CONTROLLED      = False
+RELATION_RAMP_TARGET_MK       = None
+RELATION_RAMP_RATE_MK_PER_MIN = None
 
 def init_db_pool():
     global DB_POOL
@@ -315,18 +328,56 @@ def _make_relation_filename(label: str | None) -> str:
     safe = _safe_label(label)
     return f"{date}_RvsT_{safe}.dat"
 
-def _build_relation_dat(channel_number: int, label: str | None, buf_points: list[tuple]) -> bytes:
+def _build_relation_dat(
+    channel_number: int,
+    label: str | None,
+    buf_points: list[tuple],
+    mode: str | None = None,
+    metadata: dict | None = None,
+) -> bytes:
+
+    if metadata is None:
+        metadata = {}
+
     lines = []
-    lines.append(f"# Relation file")
-    lines.append(f"# created_at_utc: {datetime.now(timezone.utc).isoformat()}")
+
+    lines.append("# Relation file")
+    lines.append(
+        f"# created_at_utc: "
+        f"{datetime.now(timezone.utc).isoformat()}"
+    )
     lines.append(f"# channel_number: {channel_number}")
-    lines.append(f"# label: {label if label is not None else ''}")
-    lines.append("# columns: seq, ts_utc_iso, tmxc_k, resistance_ohm")
+    lines.append(
+        f"# label: {label if label is not None else ''}"
+    )
+    lines.append(
+        f"# mode: {mode if mode is not None else ''}"
+    )
+    lines.append(
+        "# metadata_json: "
+        + json.dumps(
+            metadata,
+            sort_keys=True,
+            default=str,
+        )
+    )
+
+    lines.append(
+        "# columns: seq, ts_utc_iso, "
+        "tmxc_k, resistance_ohm"
+    )
+
     for i, (ts, tmxc_k, r_ohm) in enumerate(buf_points):
         ts_iso = ts.isoformat()
-        lines.append(f"{i}\t{ts_iso}\t{tmxc_k:.12g}\t{r_ohm:.12g}")
-    return ("\n".join(lines) + "\n").encode("utf-8")
 
+        lines.append(
+            f"{i}\t"
+            f"{ts_iso}\t"
+            f"{tmxc_k:.12g}\t"
+            f"{r_ohm:.12g}"
+        )
+
+    return ("\n".join(lines) + "\n").encode("utf-8")
 
 def _reset_relation_state():
 
