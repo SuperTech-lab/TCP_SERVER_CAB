@@ -872,7 +872,7 @@ class LakeShore370:
                 f"Reason: {e}"
             )
             return False
-    
+
     def select_scan_channel(self, channel: int, autoscan: bool = False) -> bool:
 
         """
@@ -950,6 +950,74 @@ class LakeShore370:
             )
 
         return True
+
+    def get_filter_settings(self, channel: int) -> dict:
+        """
+        Read the firmware-filter configuration of a channel.
+
+        Parameters
+        ----------
+        channel : int
+            Scanner channel to query (1–16).
+
+        Returns
+        -------
+        dict
+            Dictionary containing:
+            - enabled: True if the firmware filter is enabled.
+            - settling_time_s: configured settling time in seconds.
+            - window_percent: filter window as percentage of full scale.
+
+        Raises
+        ------
+        TypeError
+            If channel is not an integer.
+        ValueError
+            If channel is outside the valid range.
+        RuntimeError
+            If FILTER? returns an invalid or out-of-range response.
+        """
+        if isinstance(channel, bool) or not isinstance(channel, int):
+            raise TypeError("channel must be an integer")
+
+        if not 1 <= channel <= 16:
+            raise ValueError("channel must be between 1 and 16")
+
+        reply = self.device.query(f"FILTER? {channel}").strip()
+        fields = [field.strip() for field in reply.split(",")]
+
+        if len(fields) != 3:
+            raise RuntimeError(f"Invalid FILTER? reply: {reply!r}")
+
+        try:
+            filter_state = int(fields[0])
+            settling_time_s = int(fields[1])
+            window_percent = int(fields[2])
+        except ValueError as exc:
+            raise RuntimeError(
+                f"Non-numeric content in FILTER? reply: {reply!r}"
+            ) from exc
+
+        if filter_state not in (0, 1):
+            raise RuntimeError(
+                f"Invalid filter state in FILTER? reply: {reply!r}"
+            )
+
+        if not 1 <= settling_time_s <= 200:
+            raise RuntimeError(
+                f"Invalid settling time in FILTER? reply: {reply!r}"
+            )
+
+        if not 1 <= window_percent <= 80:
+            raise RuntimeError(
+                f"Invalid filter window in FILTER? reply: {reply!r}"
+            )
+
+        return {
+            "enabled": bool(filter_state),
+            "settling_time_s": settling_time_s,
+            "window_percent": window_percent,
+        }
 
     def set_channel_setpoint(
         self,
