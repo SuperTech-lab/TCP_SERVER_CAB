@@ -10,7 +10,7 @@ import psycopg2
 from psycopg2.pool import ThreadedConnectionPool
 from contextlib import contextmanager
 from datetime import datetime, timezone
-
+from decimal import Decimal, InvalidOperation
 from default_config import (DEFAULT_PID, CURRENT_RANGE_LIST, DEFAULT_MXC_RESISTANCE_RANGE_SETTINGS, SENSOR_RESISTANCE_RANGE_LIST, DEFAULT_CHANNELS, DEFAULT_EXTRA_CHANNELS, 
                             DEFAULT_CHANNELS_ID, DEFAULT_SETTINGS, DEFAULT_MXC_SETPOINT_MK, DEFAULT_MXC_HEATER_RANGE, DEFAULT_SENSOR_RESISTANCE_SETTINGS, DB_INSERT_INTERVAL, 
                             DEFAULT_CURVES, CURVE_NAMES, SAMPLE_CHANNELS
@@ -379,27 +379,183 @@ def _build_relation_dat(
 
     return ("\n".join(lines) + "\n").encode("utf-8")
 
-def _reset_relation_state():
+def _reset_relation_state(
+    expected_relation_id: str | None = None,
+) -> bool:
 
     global RELATION_ACTIVE
     global RELATION_RUN_ID
     global RELATION_CHANNEL
     global RELATION_LABEL
     global RELATION_BUFFER
+    global RELATION_MODE
+    global RELATION_METADATA
     global RELATION_RAMP_CONTROLLED
     global RELATION_RAMP_TARGET_MK
     global RELATION_RAMP_RATE_MK_PER_MIN
 
-    RELATION_ACTIVE = False
-    RELATION_RUN_ID = None
-    RELATION_CHANNEL = None
-    RELATION_LABEL = None
-    RELATION_BUFFER = []
+    with relation_lock:
 
-    RELATION_RAMP_CONTROLLED = False
-    RELATION_RAMP_TARGET_MK = None
-    RELATION_RAMP_RATE_MK_PER_MIN = None
+        # When an expected ID is supplied, never reset the state of
+        # another relation that may have started meanwhile.
+        if (
+            expected_relation_id is not None
+            and RELATION_RUN_ID != expected_relation_id
+        ):
+            return False
 
+        RELATION_ACTIVE = False
+        RELATION_RUN_ID = None
+        RELATION_CHANNEL = None
+        RELATION_LABEL = None
+        RELATION_BUFFER = []
+
+        RELATION_MODE = None
+        RELATION_METADATA = {}
+
+        RELATION_RAMP_CONTROLLED = False
+        RELATION_RAMP_TARGET_MK = None
+        RELATION_RAMP_RATE_MK_PER_MIN = None
+
+    return True
+
+def _append_relation_point(
+    tmxc_k: float,
+    resistance_ohm: float,
+    expected_relation_id: str | None = None,
+    allowed_modes: tuple[str, ...] | None = None,
+) -> bool:
+    """
+    Append one temperature-resistance point to the active relation.
+
+    The relation state is checked and the append operation is performed
+    atomically under relation_lock.
+
+    Parameters
+    ----------
+    tmxc_k : float
+        MXC temperature in Kelvin.
+
+    resistance_ohm : float
+        Sample resistance in ohms.
+
+    expected_relation_id : str | None
+        If provided, the point is appended only if this is still the
+        currently active relation.
+
+    allowed_modes : tuple[str, ...] | None
+        Optional set of relation modes allowed to append this point.
+
+    Returns
+    -------
+    bool
+        True if the point was appended, False otherwise.
+    """
+
+    try:
+        tmxc_k = float(tmxc_k)
+        resistance_ohm = float(resistance_ohm)
+
+    except (TypeError, ValueError):
+        return False
+
+    timestamp = datetime.now(timezone.utc)
+
+    with relation_lock:
+
+        if (
+            not RELATION_ACTIVE
+            or RELATION_RUN_ID is None
+        ):
+            return False
+
+        if (
+            expected_relation_id is not None
+            and RELATION_RUN_ID != expected_relation_id
+        ):
+            return False
+
+        if (
+            allowed_modes is not None
+            and RELATION_MODE not in allowed_modes
+        ):
+            return False
+
+        RELATION_BUFFER.append(
+            (
+                timestamp,
+                tmxc_k,
+                resistance_ohm,
+            )
+        )
+
+    return True
+
+def build_step_ramp_setpoints(
+    initial_mk: float,
+    target_mk: float,
+    step_mk: float,
+) -> list[float]:
+    """
+    Build the temperature setpoint sequence for STEP_RAMP.
+
+    The direction is inferred from initial_mk and target_mk.
+    step_mk is always interpreted as a positive step magnitude.
+
+    Both the initial temperature and the final target are included.
+    If the total interval is not an exact multiple of step_mk, the
+    last step is shortened so that target_mk is included exactly.
+    """
+
+    try:
+        initial = Decimal(str(initial_mk))
+        target = Decimal(str(target_mk))
+        step = Decimal(str(step_mk))
+
+    except (InvalidOperation, ValueError, TypeError) as exc:
+        raise ValueError(
+            "initial_mk, target_mk and step_mk must be numeric."
+        ) from exc
+
+    if (
+        not initial.is_finite()
+        or not target.is_finite()
+        or not step.is_finite()
+    ):
+        raise ValueError(
+            "initial_mk, target_mk and step_mk must be finite."
+        )
+
+    if step <= 0:
+        raise ValueError(
+            "step_mk must be greater than zero."
+        )
+
+    if initial == target:
+        return [float(initial)]
+
+    direction = (
+        Decimal(1)
+        if target > initial
+        else Decimal(-1)
+    )
+
+    distance = abs(target - initial)
+
+    n_full_steps = int(distance // step)
+
+    setpoints = [
+        initial + direction * step * index
+        for index in range(n_full_steps + 1)
+    ]
+
+    if setpoints[-1] != target:
+        setpoints.append(target)
+
+    return [
+        float(value)
+        for value in setpoints
+    ]
 
 def _start_relation_common(
     channel_number: int,
@@ -544,7 +700,9 @@ def start_relation_ramp(
             )
 
     except Exception as e:
-        _reset_relation_state()
+        _reset_relation_state(
+            expected_relation_id=relation_id
+        )
 
         print(
             "❌ Error starting relation ramp."
@@ -553,7 +711,9 @@ def start_relation_ramp(
         return None, str(e)
 
     if not isinstance(ramp_result, dict):
-        _reset_relation_state()
+        _reset_relation_state(
+            expected_relation_id=relation_id
+        )
 
         return None, (
             "Lake Shore returned an invalid ramp result."
@@ -567,8 +727,9 @@ def start_relation_ramp(
 
         # Cancel the acquisition state if the ramp
         # could not be started and verified.
-        _reset_relation_state()
-
+        _reset_relation_state(
+            expected_relation_id=relation_id
+        )
         print(
             "❌ RELATION cancelled because the "
             f"MXC ramp failed: {error}"
@@ -614,7 +775,28 @@ def start_relation_ramp(
 
     return relation_id, None
 
-def stop_relation():
+def _finalize_relation(
+    expected_relation_id: str | None = None,
+):
+    """
+    Finalize the active relation.
+
+    Stops accepting new samples, snapshots the relation state, stops
+    the native Lake Shore ramp when the relation owns it, stores the
+    .dat file in PostgreSQL, and finally releases the relation state.
+
+    Parameters
+    ----------
+    expected_relation_id : str | None
+        If provided, finalization only proceeds if this is still the
+        current relation.
+
+    Returns
+    -------
+    tuple
+        (file_name, n_points), or (None, 0) if no matching active
+        relation exists.
+    """
 
     global RELATION_ACTIVE
 
@@ -624,33 +806,41 @@ def stop_relation():
             not RELATION_ACTIVE
             or RELATION_RUN_ID is None
         ):
-            print("⚠ No hay relation en curso")
             return None, 0
 
-        # Stop accepting new samples immediately.
+        if (
+            expected_relation_id is not None
+            and RELATION_RUN_ID != expected_relation_id
+        ):
+            return None, 0
+
+        # From this point no new samples may be accepted.
         RELATION_ACTIVE = False
 
-        # Take an immutable snapshot of the relation state.
         file_name = RELATION_RUN_ID
         channel_number = RELATION_CHANNEL
         label = RELATION_LABEL
 
         relation_mode = RELATION_MODE
-        relation_metadata = dict(RELATION_METADATA)
+        relation_metadata = dict(
+            RELATION_METADATA
+        )
 
-        buffer_snapshot = list(RELATION_BUFFER)
+        buffer_snapshot = list(
+            RELATION_BUFFER
+        )
+
         n_points = len(buffer_snapshot)
 
-        ramp_controlled = RELATION_RAMP_CONTROLLED
+        ramp_controlled = (
+            RELATION_RAMP_CONTROLLED
+        )
 
-    # From here onwards relation_lock is free.
-    # RELATION_RUN_ID remains populated until final cleanup,
-    # preventing a new relation from starting meanwhile.
+    # No slow operations are performed while relation_lock is held.
 
     ramp_stop_error = None
 
     try:
-
         dat_bytes = _build_relation_dat(
             channel_number=channel_number,
             label=label,
@@ -659,10 +849,8 @@ def stop_relation():
             metadata=relation_metadata,
         )
 
-        # Only a relation that owns the native Lake Shore
-        # ramp is allowed to stop it.
+        # Only a native-RAMP relation owns the Lake Shore ramp.
         if ramp_controlled:
-
             try:
                 with heater_mutex:
                     ramp_result = ls.stop_ramp()
@@ -734,9 +922,9 @@ def stop_relation():
             )
 
     finally:
-        # The relation state must be released even if stopping
-        # the ramp or saving to PostgreSQL fails.
-        _reset_relation_state()
+        _reset_relation_state(
+            expected_relation_id=file_name
+        )
 
     print(
         "⏹ RELATION finalizada. "
@@ -744,6 +932,9 @@ def stop_relation():
     )
 
     return file_name, n_points
+
+def stop_relation():
+    return _finalize_relation()
 
 
 def apply_default_channel_timing(channel: int) -> bool:
@@ -1381,10 +1572,7 @@ def handle_command(command):
             f"{relation_mode}:"
             f"{target_mk}:"
             f"{rate_mk_per_min}"
-        )
-
-        return "RELATION_STATUS:IDLE"
-    
+        )    
 
     elif cmd == "get_recent_relations":
         """
@@ -3547,19 +3735,32 @@ def lakeshore_temperature_sensor():
                     and RELATION_CHANNEL is not None
                     and RELATION_MODE in ("MANUAL", "RAMP")
                 ):
-                    tmxc_k = temperatures.get("MXC")
+                    relation_id = RELATION_RUN_ID
+                    relation_channel = RELATION_CHANNEL
 
-                    r_key = f"CH{RELATION_CHANNEL}"
-                    r_ohm = extra_resistances.get(r_key)
+                else:
+                    relation_id = None
+                    relation_channel = None
 
-                    if tmxc_k is not None and r_ohm is not None:
-                        RELATION_BUFFER.append(
-                            (
-                                datetime.now(timezone.utc),
-                                float(tmxc_k),
-                                float(r_ohm),
-                            )
-                        )
+            if (
+                relation_id is not None
+                and relation_channel is not None
+            ):
+                tmxc_k = temperatures.get("MXC")
+
+                r_key = f"CH{relation_channel}"
+                r_ohm = extra_resistances.get(r_key)
+
+                if (
+                    tmxc_k not in (None, "OFF")
+                    and r_ohm not in (None, "OFF")
+                ):
+                    _append_relation_point(
+                        tmxc_k=tmxc_k,
+                        resistance_ohm=r_ohm,
+                        expected_relation_id=relation_id,
+                        allowed_modes=("MANUAL", "RAMP"),
+                    )
 
         except Exception as e:
             print(f"⚠ Relation sampling error: {e}")
