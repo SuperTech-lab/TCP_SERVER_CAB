@@ -9,7 +9,7 @@ import uuid
 import io
 import base64
 from datetime import datetime
-from urllib.parse import urlparse, parse_qs, quote
+from urllib.parse import urlparse, parse_qs, quote, unquote
 import matplotlib.pyplot as plt
 
 
@@ -448,6 +448,548 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
                 response
             )
 
+        elif path == '/get-relation-status':
+
+            # ==============================================================
+            # Query the TCP backend.
+            # ==============================================================
+
+            raw = self.send_command_to_tcp_server(
+                "get_relation_status"
+            )
+
+            prefix = "RELATION_STATUS:"
+            idx = raw.find(prefix)
+
+            if idx == -1:
+
+                _respond_browser(
+                    self,
+                    'application/json; charset=utf-8',
+                    json.dumps({
+                        "ok": False,
+                        "error": (
+                            "Invalid response from TCP server"
+                        ),
+                        "raw": raw,
+                    }),
+                    status_code=502,
+                )
+
+                return
+
+            part = raw[
+                idx + len(prefix):
+            ].strip()
+
+            # ==============================================================
+            # IDLE
+            # ==============================================================
+
+            if part == "IDLE":
+
+                response = {
+                    "ok": True,
+                    "active": False,
+                    "mode": None,
+                }
+
+                _respond_browser(
+                    self,
+                    'application/json; charset=utf-8',
+                    json.dumps(response),
+                )
+
+                return
+
+            # ==============================================================
+            # STEP_RAMP
+            #
+            # TCP format:
+            #
+            # RELATION_STATUS:STEP_RAMP:{JSON}
+            # ==============================================================
+
+            step_prefix = "STEP_RAMP:"
+
+            if part.startswith(
+                step_prefix
+            ):
+
+                json_text = part[
+                    len(step_prefix):
+                ].strip()
+
+                try:
+
+                    payload = json.loads(
+                        json_text
+                    )
+
+                except json.JSONDecodeError as exc:
+
+                    _respond_browser(
+                        self,
+                        'application/json; charset=utf-8',
+                        json.dumps({
+                            "ok": False,
+                            "error": (
+                                "Invalid STEP_RAMP status JSON"
+                            ),
+                            "detail": str(exc),
+                        }),
+                        status_code=502,
+                    )
+
+                    return
+
+                if not isinstance(
+                    payload,
+                    dict,
+                ):
+
+                    _respond_browser(
+                        self,
+                        'application/json; charset=utf-8',
+                        json.dumps({
+                            "ok": False,
+                            "error": (
+                                "Invalid STEP_RAMP status payload"
+                            ),
+                        }),
+                        status_code=502,
+                    )
+
+                    return
+
+                payload["ok"] = True
+
+                _respond_browser(
+                    self,
+                    'application/json; charset=utf-8',
+                    json.dumps(payload),
+                )
+
+                return
+
+            # ==============================================================
+            # TCP-side status error
+            # ==============================================================
+
+            error_prefix = "ERROR:"
+
+            if part.startswith(
+                error_prefix
+            ):
+
+                _respond_browser(
+                    self,
+                    'application/json; charset=utf-8',
+                    json.dumps({
+                        "ok": False,
+                        "error": part[
+                            len(error_prefix):
+                        ].strip(),
+                    }),
+                    status_code=502,
+                )
+
+                return
+
+            # ==============================================================
+            # Existing MANUAL / native RAMP status.
+            #
+            # TCP format:
+            #
+            # ACTIVE:
+            #   relation_id:
+            #   channel:
+            #   quoted_label:
+            #   n_points:
+            #   mode:
+            #   target_mk:
+            #   rate_mk_per_min
+            # ==============================================================
+
+            active_prefix = "ACTIVE:"
+
+            if part.startswith(
+                active_prefix
+            ):
+
+                fields = part[
+                    len(active_prefix):
+                ].split(":", 6)
+
+                if len(fields) != 7:
+
+                    _respond_browser(
+                        self,
+                        'application/json; charset=utf-8',
+                        json.dumps({
+                            "ok": False,
+                            "error": (
+                                "Malformed active RELATION status"
+                            ),
+                            "raw": part,
+                        }),
+                        status_code=502,
+                    )
+
+                    return
+
+                (
+                    relation_id,
+                    channel_text,
+                    label_text,
+                    n_points_text,
+                    mode,
+                    target_text,
+                    rate_text,
+                ) = fields
+
+                try:
+
+                    channel = int(
+                        channel_text
+                    )
+
+                    n_points = int(
+                        n_points_text
+                    )
+
+                except ValueError as exc:
+
+                    _respond_browser(
+                        self,
+                        'application/json; charset=utf-8',
+                        json.dumps({
+                            "ok": False,
+                            "error": (
+                                "Invalid numeric RELATION status field"
+                            ),
+                            "detail": str(exc),
+                        }),
+                        status_code=502,
+                    )
+
+                    return
+
+                try:
+
+                    target_mk = (
+                        float(target_text)
+                        if target_text
+                        else None
+                    )
+
+                    rate_mk_per_min = (
+                        float(rate_text)
+                        if rate_text
+                        else None
+                    )
+
+                except ValueError as exc:
+
+                    _respond_browser(
+                        self,
+                        'application/json; charset=utf-8',
+                        json.dumps({
+                            "ok": False,
+                            "error": (
+                                "Invalid RAMP status value"
+                            ),
+                            "detail": str(exc),
+                        }),
+                        status_code=502,
+                    )
+
+                    return
+
+                response = {
+                    "ok": True,
+                    "active": True,
+                    "relation_id":
+                        relation_id,
+                    "channel":
+                        channel,
+                    "label":
+                        unquote(label_text),
+                    "n_points":
+                        n_points,
+                    "mode":
+                        mode,
+                    "target_mk":
+                        target_mk,
+                    "rate_mk_per_min":
+                        rate_mk_per_min,
+                }
+
+                _respond_browser(
+                    self,
+                    'application/json; charset=utf-8',
+                    json.dumps(response),
+                )
+
+                return
+
+            # ==============================================================
+            # Unknown response format
+            # ==============================================================
+
+            _respond_browser(
+                self,
+                'application/json; charset=utf-8',
+                json.dumps({
+                    "ok": False,
+                    "error": (
+                        "Unknown RELATION status response"
+                    ),
+                    "raw": part,
+                }),
+                status_code=502,
+            )
+
+            return
+
+        elif path == '/get-relation-live-points':
+
+            # ==============================================================
+            # Optional incremental sequence index.
+            #
+            # Examples:
+            #   /get-relation-live-points
+            #   /get-relation-live-points?from_seq=12
+            # ==============================================================
+
+            from_seq_values = query.get(
+                "from_seq"
+            )
+
+            if from_seq_values:
+
+                try:
+
+                    from_seq = int(
+                        from_seq_values[0]
+                    )
+
+                except (TypeError, ValueError):
+
+                    _respond_browser(
+                        self,
+                        'application/json; charset=utf-8',
+                        json.dumps({
+                            "ok": False,
+                            "error": (
+                                "from_seq must be an integer"
+                            ),
+                        }),
+                        status_code=400,
+                    )
+
+                    return
+
+                if from_seq < 0:
+
+                    _respond_browser(
+                        self,
+                        'application/json; charset=utf-8',
+                        json.dumps({
+                            "ok": False,
+                            "error": (
+                                "from_seq must be non-negative"
+                            ),
+                        }),
+                        status_code=400,
+                    )
+
+                    return
+
+                command = (
+                    "get_relation_live_points:"
+                    f"{from_seq}"
+                )
+
+            else:
+
+                command = (
+                    "get_relation_live_points"
+                )
+
+            # ==============================================================
+            # Query TCP backend.
+            # ==============================================================
+
+            raw = self.send_command_to_tcp_server(
+                command
+            )
+
+            prefix = (
+                "RELATION_LIVE_POINTS:"
+            )
+
+            idx = raw.find(
+                prefix
+            )
+
+            if idx == -1:
+
+                _respond_browser(
+                    self,
+                    'application/json; charset=utf-8',
+                    json.dumps({
+                        "ok": False,
+                        "error": (
+                            "Invalid live-points response "
+                            "from TCP server"
+                        ),
+                        "raw": raw,
+                    }),
+                    status_code=502,
+                )
+
+                return
+
+            part = raw[
+                idx + len(prefix):
+            ].strip()
+
+            # ==============================================================
+            # No currently open RELATION.
+            # ==============================================================
+
+            if part == "IDLE":
+
+                _respond_browser(
+                    self,
+                    'application/json; charset=utf-8',
+                    json.dumps({
+                        "ok": True,
+                        "active": False,
+                        "relation_id": None,
+                        "mode": None,
+                        "n_points": 0,
+                        "next_seq": 0,
+                        "reset_required": False,
+                        "points": [],
+                    }),
+                )
+
+                return
+
+            # ==============================================================
+            # Backend error.
+            # ==============================================================
+
+            error_prefix = "ERROR:"
+
+            if part.startswith(
+                error_prefix
+            ):
+
+                _respond_browser(
+                    self,
+                    'application/json; charset=utf-8',
+                    json.dumps({
+                        "ok": False,
+                        "error": part[
+                            len(error_prefix):
+                        ].strip(),
+                    }),
+                    status_code=502,
+                )
+
+                return
+
+            # ==============================================================
+            # Successful live-points response.
+            #
+            # TCP:
+            #   RELATION_LIVE_POINTS:OK:{JSON}
+            # ==============================================================
+
+            ok_prefix = "OK:"
+
+            if part.startswith(
+                ok_prefix
+            ):
+
+                json_text = part[
+                    len(ok_prefix):
+                ].strip()
+
+                try:
+
+                    payload = json.loads(
+                        json_text
+                    )
+
+                except json.JSONDecodeError as exc:
+
+                    _respond_browser(
+                        self,
+                        'application/json; charset=utf-8',
+                        json.dumps({
+                            "ok": False,
+                            "error": (
+                                "Invalid live-points JSON"
+                            ),
+                            "detail": str(exc),
+                        }),
+                        status_code=502,
+                    )
+
+                    return
+
+                if not isinstance(
+                    payload,
+                    dict,
+                ):
+
+                    _respond_browser(
+                        self,
+                        'application/json; charset=utf-8',
+                        json.dumps({
+                            "ok": False,
+                            "error": (
+                                "Invalid live-points payload"
+                            ),
+                        }),
+                        status_code=502,
+                    )
+
+                    return
+
+                payload["ok"] = True
+
+                _respond_browser(
+                    self,
+                    'application/json; charset=utf-8',
+                    json.dumps(payload),
+                )
+
+                return
+
+            # ==============================================================
+            # Unknown backend response.
+            # ==============================================================
+
+            _respond_browser(
+                self,
+                'application/json; charset=utf-8',
+                json.dumps({
+                    "ok": False,
+                    "error": (
+                        "Unknown live-points response"
+                    ),
+                    "raw": part,
+                }),
+                status_code=502,
+            )
+
+            return
+
         elif path == '/plot_run':
             run_vals = query.get("run_id")
             if not run_vals:
@@ -606,7 +1148,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
 
         elif self.path == '/send-command':
 
-            content_length = int(self.headers['Con tent-Length'])
+            content_length = int(self.headers['Content-Length'])
             post_data = self.rfile.read(content_length)
             data = json.loads(post_data.decode('utf-8'))
             command = data.get('command')
