@@ -9,7 +9,7 @@ import uuid
 import io
 import base64
 from datetime import datetime
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse, parse_qs, quote
 import matplotlib.pyplot as plt
 
 
@@ -488,9 +488,125 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
             self.send_error(404)
 
     def do_POST(self):
-        if self.path == '/send-command':
 
-            content_length = int(self.headers['Content-Length'])
+        if self.path == '/start-relation-step-ramp':
+
+            # ==============================================================
+            # Read STEP_RAMP configuration directly from the browser.
+            #
+            # http_server.py deliberately does not implement physical or
+            # acquisition validation. tcp_server.py and
+            # RelationStepRampController remain the source of truth.
+            # ==============================================================
+
+            try:
+
+                content_length = int(
+                    self.headers.get(
+                        'Content-Length',
+                        '0',
+                    )
+                )
+
+                if content_length <= 0:
+
+                    _respond_browser(
+                        self,
+                        'application/json; charset=utf-8',
+                        json.dumps({
+                            "status":
+                                "❌ Empty STEP_RAMP request body"
+                        }),
+                        status_code=400,
+                    )
+
+                    return
+
+                post_data = self.rfile.read(
+                    content_length
+                )
+
+                payload = json.loads(
+                    post_data.decode('utf-8')
+                )
+
+            except (
+                UnicodeDecodeError,
+                json.JSONDecodeError,
+                ValueError,
+            ) as exc:
+
+                _respond_browser(
+                    self,
+                    'application/json; charset=utf-8',
+                    json.dumps({
+                        "status":
+                            "❌ Invalid STEP_RAMP JSON",
+                        "error":
+                            str(exc),
+                    }),
+                    status_code=400,
+                )
+
+                return
+
+            if not isinstance(payload, dict):
+
+                _respond_browser(
+                    self,
+                    'application/json; charset=utf-8',
+                    json.dumps({
+                        "status":
+                            "❌ STEP_RAMP payload must "
+                            "be a JSON object"
+                    }),
+                    status_code=400,
+                )
+
+                return
+
+            # ==============================================================
+            # Build the TCP command.
+            #
+            # Compact JSON keeps the command short. Percent-encoding protects
+            # arbitrary label characters; tcp_server.py already performs
+            # urllib.parse.unquote() before json.loads().
+            # ==============================================================
+
+            payload_json = json.dumps(
+                payload,
+                separators=(",", ":"),
+                ensure_ascii=False,
+            )
+
+            command = (
+                "start_relation_step_ramp:"
+                + quote(
+                    payload_json,
+                    safe="",
+                )
+            )
+
+            response = (
+                self.send_command_to_tcp_server(
+                    command
+                )
+            )
+
+            _respond_browser(
+                self,
+                'application/json; charset=utf-8',
+                json.dumps({
+                    "status":
+                        response
+                }),
+            )
+
+            return
+
+        elif self.path == '/send-command':
+
+            content_length = int(self.headers['Con tent-Length'])
             post_data = self.rfile.read(content_length)
             data = json.loads(post_data.decode('utf-8'))
             command = data.get('command')
@@ -501,7 +617,12 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
 
             # Forward TCP socket server response to browser
             json_response = json.dumps({"status": response})
-            _respond_browser(self, 'application/json; charset=utf-8', json_response)
+            _respond_browser(
+                self,
+                'application/json; charset=utf-8',
+                json_response
+            )
+
         else:
             self.send_error(404)
 
