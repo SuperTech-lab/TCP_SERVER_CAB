@@ -1146,6 +1146,174 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
 
             return
 
+        elif self.path == '/stop-relation':
+
+            # ==============================================================
+            # Request RELATION stop.
+            #
+            # For STEP_RAMP this is asynchronous: the TCP backend only sets
+            # the controller abort Event. The worker performs cleanup and
+            # finalization itself.
+            #
+            # MANUAL / native RAMP may be finalized synchronously.
+            # ==============================================================
+
+            raw = self.send_command_to_tcp_server(
+                "stop_relation"
+            )
+
+            # ==============================================================
+            # STEP_RAMP stop requested successfully.
+            #
+            # TCP:
+            #   RELATION_STEP_RAMP_STOP_REQUESTED:<relation_id>
+            # ==============================================================
+
+            prefix = (
+                "RELATION_STEP_RAMP_STOP_REQUESTED:"
+            )
+
+            if raw.startswith(prefix):
+
+                relation_id = raw[
+                    len(prefix):
+                ].strip()
+
+                _respond_browser(
+                    self,
+                    'application/json; charset=utf-8',
+                    json.dumps({
+                        "ok": True,
+                        "status": "STOP_REQUESTED",
+                        "relation_id": relation_id,
+                        "asynchronous": True,
+                    }),
+                )
+
+                return
+
+            # ==============================================================
+            # Finalization is already underway.
+            #
+            # TCP:
+            #   RELATION_STOPPING:<relation_id>
+            # ==============================================================
+
+            prefix = "RELATION_STOPPING:"
+
+            if raw.startswith(prefix):
+
+                relation_id = raw[
+                    len(prefix):
+                ].strip()
+
+                _respond_browser(
+                    self,
+                    'application/json; charset=utf-8',
+                    json.dumps({
+                        "ok": True,
+                        "status": "STOPPING",
+                        "relation_id": relation_id,
+                        "asynchronous": True,
+                    }),
+                )
+
+                return
+
+            # ==============================================================
+            # RELATION finalized synchronously.
+            #
+            # TCP:
+            #   RELATION_STOPPED:<relation_id>:<n_points>
+            # ==============================================================
+
+            prefix = "RELATION_STOPPED:"
+
+            if raw.startswith(prefix):
+
+                remainder = raw[
+                    len(prefix):
+                ].strip()
+
+                try:
+
+                    relation_id, n_points_text = (
+                        remainder.rsplit(
+                            ":",
+                            1,
+                        )
+                    )
+
+                    n_points = int(
+                        n_points_text
+                    )
+
+                except (ValueError, TypeError):
+
+                    _respond_browser(
+                        self,
+                        'application/json; charset=utf-8',
+                        json.dumps({
+                            "ok": False,
+                            "error": (
+                                "Malformed RELATION_STOPPED response"
+                            ),
+                            "raw": raw,
+                        }),
+                        status_code=502,
+                    )
+
+                    return
+
+                _respond_browser(
+                    self,
+                    'application/json; charset=utf-8',
+                    json.dumps({
+                        "ok": True,
+                        "status": "STOPPED",
+                        "relation_id": relation_id,
+                        "n_points": n_points,
+                        "asynchronous": False,
+                    }),
+                )
+
+                return
+
+            # ==============================================================
+            # Nothing to stop.
+            # ==============================================================
+
+            if raw == "❌ No active relation":
+
+                _respond_browser(
+                    self,
+                    'application/json; charset=utf-8',
+                    json.dumps({
+                        "ok": False,
+                        "status": "NO_ACTIVE_RELATION",
+                        "active": False,
+                    }),
+                )
+
+                return
+
+            # ==============================================================
+            # TCP connection / backend failure.
+            # ==============================================================
+
+            _respond_browser(
+                self,
+                'application/json; charset=utf-8',
+                json.dumps({
+                    "ok": False,
+                    "status": "ERROR",
+                    "error": raw,
+                }),
+                status_code=502,
+            )
+
+            return
+        
         elif self.path == '/send-command':
 
             content_length = int(self.headers['Content-Length'])
