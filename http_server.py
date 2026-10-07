@@ -17,6 +17,14 @@ import matplotlib.pyplot as plt
 from default_config import (SAMPLE_CHANNELS)
 
 
+# Web assets are stored in the repository next to this server.
+PROJECT_ROOT = Path(__file__).resolve().parent
+INDEX_HTML_PATH = PROJECT_ROOT / "frontend" / "index.html"
+SCTLAB_LOGO_PATH = PROJECT_ROOT / "frontend" / "assets" / "SCTLab_logo.png"
+FRONTEND_CSS_PATH = PROJECT_ROOT / "frontend" / "css" / "style.css"
+FRONTEND_JS_PATH = PROJECT_ROOT / "frontend" / "js" / "script.js"
+
+
 # Configuration for the TCP socket server
 TCP_HOST = '192.168.38.3'      #Replace with the Raspberry Pi's IP address: 192.168.38.3
 TCP_PORT = 65432
@@ -488,12 +496,20 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         query = parse_qs(parsed.query)
 
         if path == '/':
-            with open('/home/SuperTech/TCP_SERVER_CAB/index.html', 'rb') as file:
+            with INDEX_HTML_PATH.open('rb') as file:
                 _respond_browser(self, 'text/html; charset=utf-8', file.read())
 
-        elif path == '/SCTLab_logo.png':
-            with open('/home/SuperTech/TCP_SERVER_CAB/SCTLab_logo.png', 'rb') as file:
+        elif path == '/assets/SCTLab_logo.png':
+            with SCTLAB_LOGO_PATH.open('rb') as file:
                 _respond_browser(self, 'image/png', file.read())
+
+        elif path == '/css/style.css':
+            with FRONTEND_CSS_PATH.open('rb') as file:
+                _respond_browser(self, 'text/css; charset=utf-8', file.read())
+
+        elif path == '/js/script.js':
+            with FRONTEND_JS_PATH.open('rb') as file:
+                _respond_browser(self, 'application/javascript; charset=utf-8', file.read())
         
         elif path == '/get-step-ramp-defaults':
             # ==============================================================

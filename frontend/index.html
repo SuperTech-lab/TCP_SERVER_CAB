@@ -1,0 +1,2021 @@
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SCLab Temperature Controller</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+
+  <body>
+    <canvas id="particles-canvas" class="particles-canvas"></canvas>
+   <div class="container top-header">
+    <img
+      src="assets/SCTLab_logo.png"
+      alt="SCTLab logo"
+      class="sctlab-logo"
+    />
+
+    <div class="tab-menu">
+      <button class="tab-button active" data-target="lakeshore-tab">
+        Fridge Control
+      </button>
+      <button class="tab-button" data-target="blackbody-tab">
+        Black Body Control
+      </button>
+      <button class="tab-button" data-target="relation-tab">
+        Resistance vs. TMXC
+      </button>
+    </div>
+  </div>
+
+    <div id="lakeshore-tab" class="tab-content active">
+      <div class="container lakeshore-container">
+        <!-- Global Settings Bar -->
+        <div class="row-container">
+          <div class="lakeshore-control-panel">
+            <div class="global-settings-title">
+              <span class="icon">⚙️</span>
+              GLOBAL SETTINGS
+            </div>
+            <div class="section-content">
+              <div class="global-controls-row">
+                <!-- Autoscan con estilo de panel -->
+                <div class="autoscan-panel">
+                  <label
+                    for="autoscanToggle"
+                    style="width: auto; font-weight: 700; margin-right: 10px"
+                  >
+                    Autoscan
+                  </label>
+                  <label class="switch" style="margin-left: 0">
+                    <input
+                      type="checkbox"
+                      id="autoscanToggle"
+                      onchange="toggleAutoscan()"
+                    />
+                    <span class="slider round"></span>
+                  </label>
+                </div>
+                <!-- Main Channel List -->
+                <details class="channel-dropdown" style="position: relative">
+                  <summary class="channel-dropdown-summary">
+                    <strong>CHANNEL ON/OFF </strong>
+                    <span class="channel-dropdown-arrow">▾</span>
+                  </summary>
+
+                  <div class="channel-dropdown-menu">
+                    <div class="control-row">
+                      <label>MXC</label>
+                      <label class="switch">
+                        <input
+                          type="checkbox"
+                          id="toggleMXCGlobal"
+                          onchange="globalToggleChannel('MXC')"
+                        />
+                        <span class="slider round"></span>
+                      </label>
+                    </div>
+
+                    <div class="control-row">
+                      <label>50K</label>
+                      <label class="switch">
+                        <input
+                          type="checkbox"
+                          id="toggle50KGlobal"
+                          onchange="globalToggleChannel('50K')"
+                        />
+                        <span class="slider round"></span>
+                      </label>
+                    </div>
+
+                    <div class="control-row">
+                      <label>4K</label>
+                      <label class="switch">
+                        <input
+                          type="checkbox"
+                          id="toggle4kGlobal"
+                          onchange="globalToggleChannel('4K')"
+                        />
+                        <span class="slider round"></span>
+                      </label>
+                    </div>
+
+                    <div class="control-row">
+                      <label>STILL</label>
+                      <label class="switch">
+                        <input
+                          type="checkbox"
+                          id="toggleSTILLGlobal"
+                          onchange="globalToggleChannel('STILL')"
+                        />
+                        <span class="slider round"></span>
+                      </label>
+                    </div>
+                  </div>
+                </details>
+                <label class="circular-checkbox">
+                  <input
+                    type="checkbox"
+                    id="autorangeMXC"
+                    checked
+                    onchange="toggleAutorangeMXC()"
+                  />
+                  <span></span>
+                  Autorange
+                </label>
+
+                <div class="recent-runs">
+                  <label class="run-label" for="recentRunsSelect"
+                    >Últimos RUNs</label
+                  >
+                  <select id="recentRunsSelect" class="run-select">
+                    <option value="">(cargando...)</option>
+                  </select>
+                </div>
+                <div class="run-control run-control-floating">
+                  <label for="runIdInput" class="run-label">RUN ID</label>
+                  <input
+                    type="number"
+                    id="runIdInput"
+                    class="run-input"
+                    value="1"
+                    min="1"
+                  />
+                  <label
+                    for="runDescInput"
+                    class="run-label"
+                    style="margin-left: 10px"
+                    >Desc</label
+                  >
+                  <input
+                    type="text"
+                    id="runDescInput"
+                    class="run-input"
+                    placeholder="Descripción del RUN..."
+                    style="min-width: 240px"
+                  />
+                  <button
+                    id="runPlayButton"
+                    class="inline-button run-play-button"
+                  >
+                    ▶
+                  </button>
+                  <button
+                    id="runStopButton"
+                    class="inline-button run-stop-button"
+                  >
+                    ⏹
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Fridge Control Panel Structure
+            Fridge Tab
+            â”œâ”€â”€ System Log row (new)
+            â”œâ”€â”€ 50K Stage
+            â”œâ”€â”€ 4K Stage
+            â”œâ”€â”€ STILL Stage
+            â””â”€â”€ MXC Stage -->
+
+        <!-- System Log for Fridge Tab -->
+        <div class="log-card">
+          <div class="section-title log-section-title">
+            <div style="display: flex; align-items: center; gap: 10px">
+              <span class="icon">📜</span>
+              SYSTEM LOG
+            </div>
+          </div>
+
+          <div class="section-content log-section">
+            <div class="log-box" id="logBoxLS"></div>
+          </div>
+        </div>
+        <!-- ------------------------- -->
+
+        <div class="stage-card stage-mxc">
+          <div class="section-title stage-title stage-title-mxc">
+            <h2>MXC Stage</h2>
+
+            <div id="mxcTitleControls" class="mxc-title-controls">
+              <div class="mxc-header-row mxc-header-row-top">
+                <button
+                  class="inline-button mxc-header-button"
+                  onclick="writeSensorSettingsMXC()"
+                >
+                  Write Sensor Settings
+                </button>
+
+                <button
+                  class="inline-button mxc-header-button"
+                  onclick="resetDefaultsMXC()"
+                >
+                  Reset to default
+                </button>
+
+                <div class="mxc-header-field mxc-header-field-curve">
+                  <label for="curveMXCSelect">Curve:</label>
+                  <select id="curveMXCSelect" class="control-input">
+                    <option value="1">PT-100-20K (PT1011)</option>
+                    <option value="2">CX-1050-CD-BF1 (X64005)</option>
+                    <option value="3">CX-1010-CD-BF0 (X63593)</option>
+                    <option value="4">RU-1000-BF0.007 (U03308)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="mxc-header-row mxc-header-row-bottom">
+                <div class="mxc-header-field">
+                  <label for="sensorModeMXC">Mode:</label>
+                  <select id="sensorModeMXC" class="control-input">
+                    <option value="0">Voltage</option>
+                    <option value="1">Current</option>
+                  </select>
+                </div>
+
+                <div class="mxc-header-field mxc-header-field-excitation">
+                  <label for="sensorRangeMXC">Excitation:</label>
+                  <select id="sensorRangeMXC" class="control-input">
+                    <option value="1">2.00 uV and 1.00 pA</option>
+                    <option value="2">6.32 uV and 3.16 pA</option>
+                    <option value="3">20.0 uV and 10.0 pA</option>
+                    <option value="4">63.2 uV and 31.6 pA</option>
+                    <option value="5">200 uV and 100 pA</option>
+                    <option value="6">632 uV and 316 pA</option>
+                    <option value="7">2.00 mV and 1.00 nA</option>
+                    <option value="8">6.32 mV and 3.16 nA</option>
+                  </select>
+                </div>
+
+                <div class="mxc-header-field">
+                  <label for="dwellMXC">Dwell:</label>
+                  <input
+                    type="number"
+                    class="control-input"
+                    id="dwellMXC"
+                    min="0"
+                    max="10"
+                    step="0.1"
+                  />
+                </div>
+
+                <div class="mxc-header-field">
+                  <label for="pauseMXC">Pause:</label>
+                  <input
+                    type="number"
+                    class="control-input"
+                    id="pauseMXC"
+                    min="0"
+                    max="10"
+                    step="0.1"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div id="mxcMiniChartBox" class="mxc-title-mini-chart">
+              <canvas id="temperatureChartMXCMini"></canvas>
+            </div>
+          </div>
+          <div class="section-content row-container stage-body">
+            <div class="lakeshore-control-panel">
+              <div class="control-group">
+                <!-- Temperature control -->
+                <div style="margin-top: 15px">
+                  <!-- SOLO Controles del PID + Heater Range -->
+                  <div id="control-settings-mxc">
+                    <div class="control-row" style="margin-bottom: 10px">
+                      <label style="width: 120px">Heater output:</label>
+                      <span id="heaterOutputMXC" class="current-value">- %</span>
+                    </div>
+                    <div class="control-row" style="margin-bottom: 10px">
+                      <label for="temperatureSetpointMXC" style="width: 120px"
+                        >Setpoint (mK):</label
+                      >
+                      <input
+                        type="number"
+                        id="temperatureSetpointMXC"
+                        class="control-input"
+                        style="width: 80px"
+                        min="0"
+                        max="500"
+                        step="1"
+                      />
+                    </div>
+
+                    <div class="control-row" style="margin-bottom: 10px">
+                      <label for="proportionalGainMXC" style="width: 120px"
+                        >P Gain:</label
+                      >
+                      <input
+                        type="number"
+                        id="proportionalGainMXC"
+                        class="control-input"
+                        style="width: 80px"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                      />
+                    </div>
+
+                    <div class="control-row" style="margin-bottom: 10px">
+                      <label for="integralGainMXC" style="width: 120px"
+                        >I Gain:</label
+                      >
+                      <input
+                        type="number"
+                        id="integralGainMXC"
+                        class="control-input"
+                        style="width: 80px"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                      />
+                    </div>
+
+                    <div class="control-row" style="margin-bottom: 10px">
+                      <label for="derivativeGainMXC" style="width: 120px"
+                        >D Gain:</label
+                      >
+                      <input
+                        type="number"
+                        id="derivativeGainMXC"
+                        class="control-input"
+                        style="width: 80px"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                      />
+                    </div>
+
+                    <div class="control-row" style="margin-bottom: 10px">
+                      <label for="heaterRangeMXC"
+                        >Heater Range:</label
+                      >
+                      <select
+                        id="heaterRangeMXC"
+                        class="control-input"
+                        style="width: 120px"
+                      >
+                        <option value="0">Off</option>
+                        <option value="1">31.6 µA</option>
+                        <option value="2">100 µA</option>
+                        <option value="3">316 µA</option>
+                        <option value="4">1 mA</option>
+                        <option value="5">3.16 mA</option>
+                        <option value="6">10.0 mA</option>
+                        <option value="7">31.6 mA</option>
+                        <option value="8">100 mA</option>
+                      </select>
+                    </div>
+
+                    <div class="control-row" style="margin-top: 10px">
+                      <button onclick="writeControlSettingsMXC()">
+                        Write Control Settings
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Barra de progreso -->
+                <div id="progressContainerMXC" style="display: none; margin-top: 10px">
+                  <div style="width: 100%; background-color: #ddd">
+                    <div id="progressBarMXC" style="width: 0%; height: 20px; background-color: #4caf50">
+                    </div>
+                  </div>
+                  <div id="progressTextMXC" style="font-size: 12px; margin-top: 5px">
+                    Processing...
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div
+              class="lakeshore-plot-panel"
+              style="
+                flex: 3;
+                min-width: 750px;
+                display: flex;
+                flex-direction: column;
+              "
+            >
+              <!-- Fila superior: Time range, autorange, valor actual -->
+              <div
+                class="control-row"
+                style="
+                  margin-bottom: 15px;
+                  align-items: center;
+                  padding-left: 0px;
+                "
+              >
+                <div style="display: flex; align-items: center;">
+                  <label
+                    for="timeRangeMXC"
+                    style="margin: 0 10px 0 25px;"
+                  >
+                    Time Range:
+                  </label>
+
+                  <select
+                    id="timeRangeMXC"
+                    style="margin-right: 50px;"
+                    onchange="updateTimeRange()"
+                  >
+                    <option value="21600">6 Hours</option>
+                    <option value="3600">1 Hour</option>
+                    <option value="1800">30 Minutes</option>
+                    <option value="900">15 Minutes</option>
+                    <option value="300">5 Minutes</option>
+                    <option value="60" selected>1 Minute</option>
+                  </select>
+
+                  <div id="statusCircleCH6" class="status-indicator-circle"></div>
+
+                  <select id="currentMXCValue" class="current-stage-value">
+                    <option value="temperature">- mK</option>
+                    <option value="resistance">- Ω</option>
+                    <option value="power">- W</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- GrÃ¡fica -->
+              <canvas id="temperatureChartMXC" width="800" height="250"></canvas>
+
+            </div>
+          </div>
+        </div>
+
+        <div class="section-title stage-still"><h2>STILL Stage</h2></div>
+        <div class="section-content row-container stage-still">
+          <div class="lakeshore-control-panel">
+            <div class="control-group">
+              <div class="control-row">
+                <label for="dwellSTILL">Dwell Time:</label>
+                <input
+                  type="number"
+                  class="control-input"
+                  id="dwellSTILL"
+                  min="0"
+                  max="10"
+                  step="0.1"
+                />
+              </div>
+              <div class="control-row">
+                <label for="pauseSTILL">Pause Time:</label>
+                <input
+                  type="number"
+                  class="control-input"
+                  id="pauseSTILL"
+                  min="0"
+                  max="10"
+                  step="0.1"
+                />
+              </div>
+              <div class="control-row">
+                <label for="sensorRangeSTILL">Excitation:</label>
+                <select
+                  id="sensorRangeSTILL"
+                  class="control-input"
+                  style="width: 160px"
+                >
+                  <option value="1">2.00 uV and 1.00 pA</option>
+                  <option value="2">6.32 uV and 3.16 pA</option>
+                  <option value="3">20.0 uV and 10.0 pA</option>
+                  <option value="4">63.2 uV and 31.6 pA</option>
+                  <option value="5">200 uV and 100 pA</option>
+                  <option value="6">632 uV and 316 pA</option>
+                  <option value="7">2.00 mV and 1.00 nA</option>
+                  <option value="8">6.32 mV and 3.16 nA</option>
+                </select>
+              </div>
+              <div class="control-row">
+                <label for="sensorModeSTILL">Mode:</label>
+                <select
+                  id="sensorModeSTILL"
+                  class="control-input"
+                  style="width: 90px"
+                >
+                  <option value="0">Voltage</option>
+                  <option value="1">Current</option>
+                </select>
+              </div>
+              <div class="control-row mxc-plot-toolbar">
+                <label for="curveSTILLSelect" style="width: 120px"
+                  >Curve:</label
+                >
+                <select
+                  id="curveSTILLSelect"
+                  class="control-input"
+                  style="width: 120px"
+                >
+                  <option value="1">PT-100-20K (PT1011)</option>
+                  <option value="2">CX-1050-CD-BF1 (X64005)</option>
+                  <option value="5">CX-1010-CD-BF0 (X63593)</option>
+                  <option value="6">RU-1000-BF0.007 (U03308)</option>
+                </select>
+              </div>
+              <div class="control-row">
+                <button onclick="writeSettingsSTILL()">Write Settings</button>
+              </div>
+              <div
+                id="progressContainerSTILL"
+                style="display: none; margin-top: 10px"
+              >
+                <div style="width: 100%; background-color: #ddd">
+                  <div
+                    id="progressBarSTILL"
+                    style="width: 0%; height: 20px; background-color: #4caf50"
+                  ></div>
+                </div>
+                <div
+                  id="progressTextSTILL"
+                  style="font-size: 12px; margin-top: 5px"
+                >
+                  Processing...
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="lakeshore-plot-panel">
+            <div class="control-row" style="align-items: center">
+              <button
+                class="inline-button"
+                style="margin-right: 25px; padding: 8px 18px; min-width: 160px"
+                onclick="resetDefaultsSTILL()"
+              >
+                Reset to default
+              </button>
+              <label
+                for="timeRangeSTILL"
+                style="margin-left: 30px; margin-right: 0px"
+              >
+                Time Range:
+              </label>
+              <select
+                id="timeRangeSTILL"
+                style="margin-right: 50px"
+                onchange="updateTimeRangeSTILL()"
+              >
+                <option value="60" selected>1 Minute</option>
+                <option value="300">5 Minutes</option>
+                <option value="900">15 Minutes</option>
+                <option value="1800">30 Minutes</option>
+                <option value="3600">1 Hour</option>
+                <option value="21600">6 Hours</option>
+              </select>
+
+              <div id="statusCircleCH5" class="status-indicator-circle"></div>
+              <select id="currentSTILLValue" class="current-stage-value">
+                <option value="temperature">- mK</option>
+                <option value="resistance">- Ω</option>
+                <option value="power">- W</option>
+              </select>
+            </div>
+            <canvas
+              id="temperatureChartSTILL"
+              width="800"
+              height="200"
+            ></canvas>
+          </div>
+        </div>
+
+        <div class="section-title stage-4k"><h2>4K Stage</h2></div>
+        <div class="section-content row-container stage-4k">
+          <div class="lakeshore-control-panel">
+            <div class="control-group">
+              <div class="control-row">
+                <label for="dwell4K">Dwell Time:</label>
+                <input
+                  type="number"
+                  class="control-input"
+                  id="dwell4K"
+                  min="0"
+                  max="10"
+                  step="0.1"
+                />
+              </div>
+              <div class="control-row">
+                <label for="pause4K">Pause Time:</label>
+                <input
+                  type="number"
+                  class="control-input"
+                  id="pause4K"
+                  min="0"
+                  max="10"
+                  step="0.1"
+                />
+              </div>
+              <div class="control-row">
+                <label for="sensorRange4K">Excitation:</label>
+                <select
+                  id="sensorRange4K"
+                  class="control-input"
+                  style="width: 160px"
+                >
+                  <option value="1">2.00 uV and 1.00 pA</option>
+                  <option value="2">6.32 uV and 3.16 pA</option>
+                  <option value="3">20.0 uV and 10.0 pA</option>
+                  <option value="4">63.2 uV and 31.6 pA</option>
+                  <option value="5">200 uV and 100 pA</option>
+                  <option value="6">632 uV and 316 pA</option>
+                  <option value="7">2.00 mV and 1.00 nA</option>
+                  <option value="8">6.32 mV and 3.16 nA</option>
+                </select>
+              </div>
+              <div class="control-row">
+                <label for="sensorMode4K">Mode:</label>
+                <select
+                  id="sensorMode4K"
+                  class="control-input"
+                  style="width: 90px"
+                >
+                  <option value="0">Voltage</option>
+                  <option value="1">Current</option>
+                </select>
+              </div>
+              <div class="control-row" style="margin-bottom: 10px">
+                <label for="curve4KSelect" style="width: 120px">Curve:</label>
+                <select
+                  id="curve4KSelect"
+                  class="control-input"
+                  style="width: 120px"
+                >
+                  <option value="1">PT-100-20K (PT1011)</option>
+                  <option value="2">CX-1050-CD-BF1 (X64005)</option>
+                  <option value="5">CX-1010-CD-BF0 (X63593)</option>
+                  <option value="6">RU-1000-BF0.007 (U03308)</option>
+                </select>
+              </div>
+              <div class="control-row">
+                <button onclick="writeSettings4K()">Write Settings</button>
+              </div>
+              <div
+                id="progressContainer4K"
+                style="display: none; margin-top: 10px"
+              >
+                <div style="width: 100%; background-color: #ddd">
+                  <div
+                    id="progressBar4K"
+                    style="width: 0%; height: 20px; background-color: #4caf50"
+                  ></div>
+                </div>
+                <div
+                  id="progressText4K"
+                  style="font-size: 12px; margin-top: 5px"
+                >
+                  Processing...
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="lakeshore-plot-panel">
+            <div class="control-row" style="align-items: center">
+              <button
+                class="inline-button"
+                style="margin-right: 25px; padding: 8px 18px; min-width: 160px"
+                onclick="resetDefaults4K()"
+              >
+                Reset to default
+              </button>
+              <label
+                for="timeRange4K"
+                style="margin-left: 30px; margin-right: 0px"
+              >
+                Time Range:
+              </label>
+              <select
+                id="timeRange4K"
+                style="margin-right: 50px"
+                onchange="updateTimeRange4K()"
+              >
+                <option value="60" selected>1 Minute</option>
+                <option value="300">5 Minutes</option>
+                <option value="900">15 Minutes</option>
+                <option value="1800">30 Minutes</option>
+                <option value="3600">1 Hour</option>
+                <option value="21600">6 Hours</option>
+              </select>
+
+              <div id="statusCircleCH2" class="status-indicator-circle"></div>
+
+              <select id="current4KValue" class="current-stage-value">
+                <option value="temperature">- mK</option>
+                <option value="resistance">- Ω</option>
+                <option value="power">- W</option>
+              </select>
+            </div>
+            <canvas id="temperatureChart4K" width="800" height="200"></canvas>
+          </div>
+        </div>
+
+        <div class="section-title stage-50k"><h2>50K Stage</h2></div>
+        <div class="section-content row-container stage-50k">
+          <div class="lakeshore-control-panel">
+            <div class="control-group">
+              <div class="control-row">
+                <label for="dwell50K">Dwell Time:</label>
+                <input
+                  type="number"
+                  class="control-input"
+                  id="dwell50K"
+                  min="0"
+                  max="10"
+                  step="0.1"
+                />
+              </div>
+              <div class="control-row">
+                <label for="pause50K">Pause Time:</label>
+                <input
+                  type="number"
+                  class="control-input"
+                  id="pause50K"
+                  min="0"
+                  max="10"
+                  step="0.1"
+                />
+              </div>
+              <div class="control-row">
+                <label for="sensorRange50K">Excitation:</label>
+                <select
+                  id="sensorRange50K"
+                  class="control-input"
+                  style="width: 160px"
+                >
+                  <option value="1">2.00 uV and 1.00 pA</option>
+                  <option value="2">6.32 uV and 3.16 pA</option>
+                  <option value="3">20.0 uV and 10.0 pA</option>
+                  <option value="4">63.2 uV and 31.6 pA</option>
+                  <option value="5">200 uV and 100 pA</option>
+                  <option value="6">632 uV and 316 pA</option>
+                  <option value="7">2.00 mV and 1.00 nA</option>
+                  <option value="8">6.32 mV and 3.16 nA</option>
+                </select>
+              </div>
+              <div class="control-row">
+                <label for="sensorMode50K">Mode:</label>
+                <select
+                  id="sensorMode50K"
+                  class="control-input"
+                  style="width: 90px"
+                >
+                  <option value="0">Voltage</option>
+                  <option value="1">Current</option>
+                </select>
+              </div>
+              <div class="control-row" style="margin-bottom: 10px">
+                <label for="curve50KSelect" style="width: 120px">Curve:</label>
+                <select
+                  id="curve50KSelect"
+                  class="control-input"
+                  style="width: 120px"
+                >
+                  <option value="1">PT-100-20K (PT1011)</option>
+                  <option value="2">CX-1050-CD-BF1 (X64005)</option>
+                  <option value="5">CX-1010-CD-BF0 (X63593)</option>
+                  <option value="6">RU-1000-BF0.007 (U03308)</option>
+                </select>
+              </div>
+              <div class="control-row">
+                <button onclick="writeSettings50K()">Write Settings</button>
+              </div>
+              <div
+                id="progressContainer50K"
+                style="display: none; margin-top: 10px"
+              >
+                <div style="width: 100%; background-color: #ddd">
+                  <div
+                    id="progressBar50K"
+                    style="width: 0%; height: 20px; background-color: #4caf50"
+                  ></div>
+                </div>
+                <div
+                  id="progressText50K"
+                  style="font-size: 12px; margin-top: 5px"
+                >
+                  Processing...
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="lakeshore-plot-panel">
+            <div class="control-row" style="margin-bottom: 10px">
+              <button
+                class="inline-button"
+                style="margin-right: 25px; padding: 8px 18px; min-width: 160px"
+                onclick="resetDefaults50K()"
+              >
+                Reset to default
+              </button>
+
+              <!-- Time range for 50K-->
+              <label
+                for="timeRange50K"
+                style="margin-left: 30px; margin-right: 0px"
+                >Time Range:</label
+              >
+              <select
+                id="timeRange50K"
+                style="margin-right: 50px"
+                onchange="updateTimeRange50K()"
+              >
+                <option value="60" selected>1 Minute</option>
+                <option value="300">5 Minutes</option>
+                <option value="900">15 Minutes</option>
+                <option value="1800">30 Minutes</option>
+                <option value="3600">1 Hour</option>
+                <option value="21600">6 Hours</option>
+              </select>
+
+              <div id="statusCircleCH1" class="status-indicator-circle"></div>
+
+              <select id="current50KValue" class="current-stage-value">
+                <option value="temperature">- mK</option>
+                <option value="resistance">- Ω</option>
+                <option value="power">- W</option>
+              </select>
+            </div>
+            <canvas id="temperatureChart50K" width="800" height="200"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="blackbody-tab" class="tab-content">
+      <div class="container">
+        <div class="blackbody-control-panel">
+          <h1>BB Controller</h1>
+          <div class="section-title">Heater Control</div>
+          <div class="section-content">
+            <div class="control-group">
+              <div class="control-row">
+                <label for="temperatureSetpoint">Setpoint (K):</label>
+                <span id="currentTemperatureSetpoint" class="current-value"
+                  >-</span
+                >
+                <input
+                  type="number"
+                  id="temperatureSetpoint"
+                  class="control-input"
+                  step="0.1"
+                />
+              </div>
+              <div class="control-row">
+                <label for="heaterPower">Power:</label>
+                <span id="currentHeaterPower" class="current-value">-</span>
+                <input
+                  type="number"
+                  id="heaterPower"
+                  class="control-input"
+                  min="0"
+                  max="1"
+                  step="0.1"
+                />
+              </div>
+              <div class="control-row">
+                <label for="heaterRange">Range:</label>
+                <span id="currentHeaterRange" class="current-value">-</span>
+                <select id="heaterRange" class="control-input">
+                  <option value="OFF">OFF</option>
+                  <option value="LOW">LOW</option>
+                  <option value="MEDIUM">MEDIUM</option>
+                  <option value="HIGH">HIGH</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="section-title collapsed">Safety Parameters</div>
+          <div class="section-content collapsed">
+            <div class="control-group">
+              <div class="control-row">
+                <label for="temperatureLimit">Temp Limit (K):</label>
+                <span id="currentTemperatureLimit" class="current-value"
+                  >-</span
+                >
+                <input
+                  type="number"
+                  id="temperatureLimit"
+                  class="control-input"
+                  min="0"
+                  step="0.1"
+                />
+              </div>
+              <div class="control-row">
+                <label for="timeout">Timeout (s):</label>
+                <span id="currentTimeout" class="current-value">-</span>
+                <input
+                  type="number"
+                  id="timeout"
+                  class="control-input"
+                  min="0"
+                  step="1"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div class="section-title collapsed">PID Parameters</div>
+          <div class="section-content collapsed">
+            <div class="control-group">
+              <div class="control-row">
+                <label for="proportionalGain">P Gain:</label>
+                <span id="currentProportionalGain" class="current-value"
+                  >-</span
+                >
+                <input
+                  type="number"
+                  id="proportionalGain"
+                  class="control-input"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+              <div class="control-row">
+                <label for="integralGain">I Gain:</label>
+                <span id="currentIntegralGain" class="current-value">-</span>
+                <input
+                  type="number"
+                  id="integralGain"
+                  class="control-input"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+              <div class="control-row">
+                <label for="derivativeGain">D Gain:</label>
+                <span id="currentDerivativeGain" class="current-value">-</span>
+                <input
+                  type="number"
+                  id="derivativeGain"
+                  class="control-input"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+            </div>
+          </div>
+
+          <button onclick="sendControlParameters()">Update Parameters</button>
+
+          <div class="section-title">System Log</div>
+          <div class="section-content">
+            <div class="log-box" id="logBoxBB"></div>
+          </div>
+        </div>
+
+        <div class="blackbody-plot-panel">
+          <div class="time-range-selector">
+            <label for="timeRangeBB">Time Range:</label>
+            <select id="timeRangeBB" onchange="updateTimeRange()">
+              <option value="21600">6 Hours</option>
+              <option value="3600">1 Hour</option>
+              <option value="1800">30 Minutes</option>
+              <option value="900">15 Minutes</option>
+              <option value="300">5 Minutes</option>
+              <option value="60" selected>1 Minute</option>
+            </select>
+          </div>
+
+          <canvas id="temperatureChartBB"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div id="relation-tab" class="tab-content">
+      <div class="container relation-container">
+        <div class="relation-control-panel">
+          <h1>Resistance vs. TMXC</h1>
+
+          <!-- Main Channel List -->
+          <details class="channel-dropdown" style="position: relative">
+            <summary class="channel-dropdown-summary">
+              <strong>CHANNEL ON/OFF </strong>
+              <span class="channel-dropdown-arrow">▾</span>
+            </summary>
+
+            <div class="channel-dropdown-menu">
+              <div class="control-row">
+                <div style="display: flex; align-items: center; width: 75px">
+                  <label style="width: auto; margin: 4; font-size: 14px"
+                    >Ch 9</label
+                  >
+                  <div
+                    id="statusCircleCH9"
+                    class="status-indicator-circle"
+                  ></div>
+                </div>
+                <span
+                  class="rch-box"
+                  id="currentRCH9"
+                  style="margin-left: auto; margin-right: 10px"
+                  >--</span
+                >
+                <label class="switch">
+                  <input
+                    type="checkbox"
+                    id="toggleExtraChannel9"
+                    onchange="globalToggleChannel('9')"
+                  />
+                  <span class="slider round"></span>
+                </label>
+                <details
+                  class="channel-dropdown"
+                  style="position: relative; margin-left: 10px"
+                >
+                  <summary
+                    class="channel-dropdown-summary"
+                    style="min-width: 100px; padding: 4px 8px"
+                  >
+                    <strong>Settings</strong>
+                    <span class="channel-dropdown-arrow">▾</span>
+                  </summary>
+                  <div class="channel-dropdown-menu" style="min-width: 320px">
+                    <div class="control-row">
+                      <label
+                        for="sensorRangeCH9"
+                        style="width: auto; margin-right: 8px"
+                        >Excitation:</label
+                      >
+                      <select
+                        id="sensorRangeCH9"
+                        class="control-input"
+                        style="width: 160px; margin-left: 0"
+                      >
+                        <option value="1">2.00 uV and 1.00 pA</option>
+                        <option value="2">6.32 uV and 3.16 pA</option>
+                        <option value="3">20.0 uV and 10.0 pA</option>
+                        <option value="4">63.2 uV and 31.6 pA</option>
+                        <option value="5">200 uV and 100 pA</option>
+                        <option value="6">632 uV and 316 pA</option>
+                        <option value="7">2.00 mV and 1.00 nA</option>
+                        <option value="8">6.32 mV and 3.16 nA</option>
+                      </select>
+                    </div>
+                    <div class="control-row">
+                      <label
+                        for="sensorModeCH9"
+                        style="width: auto; margin-right: 8px"
+                        >Mode:</label
+                      >
+                      <select
+                        id="sensorModeCH9"
+                        class="control-input"
+                        style="width: 90px; margin-left: 0"
+                      >
+                        <option value="0">Voltage</option>
+                        <option value="1">Current</option>
+                      </select>
+                    </div>
+                    <div class="control-row" style="margin-top: 10px">
+                      <button
+                        onclick="writeSettingsExtraChannel9()"
+                        class="inline-button"
+                      >
+                        Write Settings
+                      </button>
+                    </div>
+                    <div id="progressContainerCH9" style="display: none; margin-top: 8px">
+                      <div style="width: 100%; background-color: #eee">
+                        <div id="progressBarCH9" style="width: 0%; height: 12px; background-color: #4caf50"></div>
+                      </div>
+                      <div id="progressTextCH9" style="font-size: 11px; margin-top: 4px">Processing...</div>
+                    </div>
+                  </div>
+                </details>
+              </div>
+
+              <div class="control-row">
+                <div style="display: flex; align-items: center; width: 75px">
+                  <label style="width: auto; margin: 0; font-size: 14px"
+                    >Ch 10</label
+                  >
+                  <div
+                    id="statusCircleCH10"
+                    class="status-indicator-circle"
+                  ></div>
+                </div>
+                <span
+                  class="rch-box"
+                  id="currentRCH10"
+                  style="margin-left: auto; margin-right: 10px"
+                  >--</span
+                >
+                <label class="switch">
+                  <input
+                    type="checkbox"
+                    id="toggleExtraChannel10"
+                    onchange="globalToggleChannel('10')"
+                  />
+                  <span class="slider round"></span>
+                </label>
+                <details
+                  class="channel-dropdown"
+                  style="position: relative; margin-left: 10px"
+                >
+                  <summary
+                    class="channel-dropdown-summary"
+                    style="min-width: 100px; padding: 4px 8px"
+                  >
+                    <strong>Settings</strong>
+                    <span class="channel-dropdown-arrow">▾</span>
+                  </summary>
+                  <div class="channel-dropdown-menu" style="min-width: 320px">
+                    <div class="control-row">
+                      <label
+                        for="sensorRangeCH10"
+                        style="width: auto; margin-right: 8px"
+                        >Excitation:</label
+                      >
+                      <select
+                        id="sensorRangeCH10"
+                        class="control-input"
+                        style="width: 160px; margin-left: 0"
+                      >
+                        <option value="1">2.00 uV and 1.00 pA</option>
+                        <option value="2">6.32 uV and 3.16 pA</option>
+                        <option value="3">20.0 uV and 10.0 pA</option>
+                        <option value="4">63.2 uV and 31.6 pA</option>
+                        <option value="5">200 uV and 100 pA</option>
+                        <option value="6">632 uV and 316 pA</option>
+                        <option value="7">2.00 mV and 1.00 nA</option>
+                        <option value="8">6.32 mV and 3.16 nA</option>
+                      </select>
+                    </div>
+                    <div class="control-row">
+                      <label
+                        for="sensorModeCH10"
+                        style="width: auto; margin-right: 8px"
+                        >Mode:</label
+                      >
+                      <select
+                        id="sensorModeCH10"
+                        class="control-input"
+                        style="width: 90px; margin-left: 0"
+                      >
+                        <option value="0">Voltage</option>
+                        <option value="1">Current</option>
+                      </select>
+                    </div>
+                    <div class="control-row" style="margin-top: 10px">
+                      <button
+                        onclick="writeSettingsExtraChannel10()"
+                        class="inline-button"
+                      >
+                        Write Settings
+                      </button>
+                    </div>
+                    <div id="progressContainerCH10" style="display: none; margin-top: 8px">
+                      <div style="width: 100%; background-color: #eee">
+                        <div id="progressBarCH10" style="width: 0%; height: 12px; background-color: #4caf50"></div>
+                      </div>
+                      <div id="progressTextCH10" style="font-size: 11px; margin-top: 4px">Processing...</div>
+                    </div>
+                  </div>
+                </details>
+              </div>
+
+              <div class="control-row">
+                <div style="display: flex; align-items: center; width: 75px">
+                  <label style="width: auto; margin: 0; font-size: 14px"
+                    >Ch 11</label
+                  >
+                  <div
+                    id="statusCircleCH11"
+                    class="status-indicator-circle"
+                  ></div>
+                </div>
+                <span
+                  class="rch-box"
+                  id="currentRCH11"
+                  style="margin-left: auto; margin-right: 10px"
+                  >--</span
+                >
+                <label class="switch">
+                  <input
+                    type="checkbox"
+                    id="toggleExtraChannel11"
+                    onchange="globalToggleChannel('11')"
+                  />
+                  <span class="slider round"></span>
+                </label>
+                <details
+                  class="channel-dropdown"
+                  style="position: relative; margin-left: 10px"
+                >
+                  <summary
+                    class="channel-dropdown-summary"
+                    style="min-width: 100px; padding: 4px 8px"
+                  >
+                    <strong>Settings</strong>
+                    <span class="channel-dropdown-arrow">▾</span>
+                  </summary>
+                  <div class="channel-dropdown-menu" style="min-width: 320px">
+                    <div class="control-row">
+                      <label
+                        for="sensorRangeCH11"
+                        style="width: auto; margin-right: 8px"
+                        >Excitation:</label
+                      >
+                      <select
+                        id="sensorRangeCH11"
+                        class="control-input"
+                        style="width: 160px; margin-left: 0"
+                      >
+                        <option value="1">2.00 uV and 1.00 pA</option>
+                        <option value="2">6.32 uV and 3.16 pA</option>
+                        <option value="3">20.0 uV and 10.0 pA</option>
+                        <option value="4">63.2 uV and 31.6 pA</option>
+                        <option value="5">200 uV and 100 pA</option>
+                        <option value="6">632 uV and 316 pA</option>
+                        <option value="7">2.00 mV and 1.00 nA</option>
+                        <option value="8">6.32 mV and 3.16 nA</option>
+                      </select>
+                    </div>
+                    <div class="control-row">
+                      <label
+                        for="sensorModeCH11"
+                        style="width: auto; margin-right: 8px"
+                        >Mode:</label
+                      >
+                      <select
+                        id="sensorModeCH11"
+                        class="control-input"
+                        style="width: 90px; margin-left: 0"
+                      >
+                        <option value="0">Voltage</option>
+                        <option value="1">Current</option>
+                      </select>
+                    </div>
+                    <div class="control-row" style="margin-top: 10px">
+                      <button
+                        onclick="writeSettingsExtraChannel11()"
+                        class="inline-button"
+                      >
+                        Write Settings
+                      </button>
+                    </div>
+                    <div id="progressContainerCH11" style="display: none; margin-top: 8px">
+                      <div style="width: 100%; background-color: #eee">
+                        <div id="progressBarCH11" style="width: 0%; height: 12px; background-color: #4caf50"></div>
+                      </div>
+                      <div id="progressTextCH11" style="font-size: 11px; margin-top: 4px">Processing...</div>
+                    </div>
+                  </div>
+                </details>
+              </div>
+
+              <div class="control-row">
+                <div style="display: flex; align-items: center; width: 75px">
+                  <label style="width: auto; margin: 0; font-size: 14px"
+                    >Ch 12</label
+                  >
+                  <div
+                    id="statusCircleCH12"
+                    class="status-indicator-circle"
+                  ></div>
+                </div>
+                <span
+                  class="rch-box"
+                  id="currentRCH12"
+                  style="margin-left: auto; margin-right: 10px"
+                  >--</span
+                >
+                <label class="switch">
+                  <input
+                    type="checkbox"
+                    id="toggleExtraChannel12"
+                    onchange="globalToggleChannel('12')"
+                  />
+                  <span class="slider round"></span>
+                </label>
+                <details
+                  class="channel-dropdown"
+                  style="position: relative; margin-left: 10px"
+                >
+                  <summary
+                    class="channel-dropdown-summary"
+                    style="min-width: 100px; padding: 4px 8px"
+                  >
+                    <strong>Settings</strong>
+                    <span class="channel-dropdown-arrow">▾</span>
+                  </summary>
+                  <div class="channel-dropdown-menu" style="min-width: 320px">
+                    <div class="control-row">
+                      <label
+                        for="sensorRangeCH12"
+                        style="width: auto; margin-right: 8px"
+                        >Excitation:</label
+                      >
+                      <select
+                        id="sensorRangeCH12"
+                        class="control-input"
+                        style="width: 160px; margin-left: 0"
+                      >
+                        <option value="1">2.00 uV and 1.00 pA</option>
+                        <option value="2">6.32 uV and 3.16 pA</option>
+                        <option value="3">20.0 uV and 10.0 pA</option>
+                        <option value="4">63.2 uV and 31.6 pA</option>
+                        <option value="5">200 uV and 100 pA</option>
+                        <option value="6">632 uV and 316 pA</option>
+                        <option value="7">2.00 mV and 1.00 nA</option>
+                        <option value="8">6.32 mV and 3.16 nA</option>
+                      </select>
+                    </div>
+                    <div class="control-row">
+                      <label
+                        for="sensorModeCH12"
+                        style="width: auto; margin-right: 8px"
+                        >Mode:</label
+                      >
+                      <select
+                        id="sensorModeCH12"
+                        class="control-input"
+                        style="width: 90px; margin-left: 0"
+                      >
+                        <option value="0">Voltage</option>
+                        <option value="1">Current</option>
+                      </select>
+                    </div>
+                    <div class="control-row" style="margin-top: 10px">
+                      <button
+                        onclick="writeSettingsExtraChannel12()"
+                        class="inline-button"
+                      >
+                        Write Settings
+                      </button>
+                    </div>
+                    <div id="progressContainerCH12" style="display: none; margin-top: 8px">
+                      <div style="width: 100%; background-color: #eee">
+                        <div id="progressBarCH12" style="width: 0%; height: 12px; background-color: #4caf50"></div>
+                      </div>
+                      <div id="progressTextCH12" style="font-size: 11px; margin-top: 4px">Processing...</div>
+                    </div>
+                  </div>
+                </details>
+              </div>
+
+              <div class="control-row">
+                <div style="display: flex; align-items: center; width: 75px">
+                  <label style="width: auto; margin: 0; font-size: 14px"
+                    >Ch 13</label
+                  >
+                  <div
+                    id="statusCircleCH13"
+                    class="status-indicator-circle"
+                  ></div>
+                </div>
+                <span
+                  class="rch-box"
+                  id="currentRCH13"
+                  style="margin-left: auto; margin-right: 10px"
+                  >--</span
+                >
+                <label class="switch">
+                  <input
+                    type="checkbox"
+                    id="toggleExtraChannel13"
+                    onchange="globalToggleChannel('13')"
+                  />
+                  <span class="slider round"></span>
+                </label>
+                <details
+                  class="channel-dropdown"
+                  style="position: relative; margin-left: 10px"
+                >
+                  <summary
+                    class="channel-dropdown-summary"
+                    style="min-width: 100px; padding: 4px 8px"
+                  >
+                    <strong>Settings</strong>
+                    <span class="channel-dropdown-arrow">▾</span>
+                  </summary>
+                  <div class="channel-dropdown-menu" style="min-width: 320px">
+                    <div class="control-row">
+                      <label
+                        for="sensorRangeCH13"
+                        style="width: auto; margin-right: 8px"
+                        >Excitation:</label
+                      >
+                      <select
+                        id="sensorRangeCH13"
+                        class="control-input"
+                        style="width: 160px; margin-left: 0"
+                      >
+                        <option value="1">2.00 uV and 1.00 pA</option>
+                        <option value="2">6.32 uV and 3.16 pA</option>
+                        <option value="3">20.0 uV and 10.0 pA</option>
+                        <option value="4">63.2 uV and 31.6 pA</option>
+                        <option value="5">200 uV and 100 pA</option>
+                        <option value="6">632 uV and 316 pA</option>
+                        <option value="7">2.00 mV and 1.00 nA</option>
+                        <option value="8">6.32 mV and 3.16 nA</option>
+                      </select>
+                    </div>
+                    <div class="control-row">
+                      <label
+                        for="sensorModeCH13"
+                        style="width: auto; margin-right: 8px"
+                        >Mode:</label
+                      >
+                      <select
+                        id="sensorModeCH13"
+                        class="control-input"
+                        style="width: 90px; margin-left: 0"
+                      >
+                        <option value="0">Voltage</option>
+                        <option value="1">Current</option>
+                      </select>
+                    </div>
+                    <div class="control-row" style="margin-top: 10px">
+                      <button
+                        onclick="writeSettingsExtraChannel13()"
+                        class="inline-button"
+                      >
+                        Write Settings
+                      </button>
+                    </div>
+                    <div id="progressContainerCH13" style="display: none; margin-top: 8px">
+                      <div style="width: 100%; background-color: #eee">
+                        <div id="progressBarCH13" style="width: 0%; height: 12px; background-color: #4caf50"></div>
+                      </div>
+                      <div id="progressTextCH13" style="font-size: 11px; margin-top: 4px">Processing...</div>
+                    </div>
+                  </div>
+                </details>
+              </div>
+
+              <div class="control-row">
+                <div style="display: flex; align-items: center; width: 75px">
+                  <label style="width: auto; margin: 0; font-size: 14px"
+                    >Ch 14</label
+                  >
+                  <div
+                    id="statusCircleCH14"
+                    class="status-indicator-circle"
+                  ></div>
+                </div>
+                <span
+                  class="rch-box"
+                  id="currentRCH14"
+                  style="margin-left: auto; margin-right: 10px"
+                  >--</span
+                >
+                <label class="switch">
+                  <input
+                    type="checkbox"
+                    id="toggleExtraChannel14"
+                    onchange="globalToggleChannel('14')"
+                  />
+                  <span class="slider round"></span>
+                </label>
+                <details
+                  class="channel-dropdown"
+                  style="position: relative; margin-left: 10px"
+                >
+                  <summary
+                    class="channel-dropdown-summary"
+                    style="min-width: 100px; padding: 4px 8px"
+                  >
+                    <strong>Settings</strong>
+                    <span class="channel-dropdown-arrow">▾</span>
+                  </summary>
+                  <div class="channel-dropdown-menu" style="min-width: 320px">
+                    <div class="control-row">
+                      <label
+                        for="sensorRangeCH14"
+                        style="width: auto; margin-right: 8px"
+                        >Excitation:</label
+                      >
+                      <select
+                        id="sensorRangeCH14"
+                        class="control-input"
+                        style="width: 160px; margin-left: 0"
+                      >
+                        <option value="1">2.00 uV and 1.00 pA</option>
+                        <option value="2">6.32 uV and 3.16 pA</option>
+                        <option value="3">20.0 uV and 10.0 pA</option>
+                        <option value="4">63.2 uV and 31.6 pA</option>
+                        <option value="5">200 uV and 100 pA</option>
+                        <option value="6">632 uV and 316 pA</option>
+                        <option value="7">2.00 mV and 1.00 nA</option>
+                        <option value="8">6.32 mV and 3.16 nA</option>
+                      </select>
+                    </div>
+                    <div class="control-row">
+                      <label
+                        for="sensorModeCH14"
+                        style="width: auto; margin-right: 8px"
+                        >Mode:</label
+                      >
+                      <select
+                        id="sensorModeCH14"
+                        class="control-input"
+                        style="width: 90px; margin-left: 0"
+                      >
+                        <option value="0">Voltage</option>
+                        <option value="1">Current</option>
+                      </select>
+                    </div>
+                    <div class="control-row" style="margin-top: 10px">
+                      <button
+                        onclick="writeSettingsExtraChannel14()"
+                        class="inline-button"
+                      >
+                        Write Settings
+                      </button>
+                    </div>
+                    <div id="progressContainerCH14" style="display: none; margin-top: 8px">
+                      <div style="width: 100%; background-color: #eee">
+                        <div id="progressBarCH14" style="width: 0%; height: 12px; background-color: #4caf50"></div>
+                      </div>
+                      <div id="progressTextCH14" style="font-size: 11px; margin-top: 4px">Processing...</div>
+                    </div>
+                  </div>
+                </details>
+              </div>
+
+            </div>
+          </details>
+
+          <div class="section-title">Relation plot</div>
+          <div class="section-content">
+            <div class="control-group">
+              <div class="control-row" style="margin-top: 10px">
+                <label style="width: 120px">MXC (x):</label>
+                <span id="relationCurrentMXC" class="current-value">-</span>
+              </div>
+              <div class="control-row">
+                <label style="width: 120px">R channel (y):</label>
+                <span id="relationCurrentR" class="current-value">-</span>
+              </div>
+              <div class="control-row">
+                <div id="relationCurrentConfig" class="relation-current-config">
+                  <div class="relation-config-title">
+                    <strong>Actual configuration (could be different):</strong>
+                  </div>
+                  <ul class="relation-config-list">
+                    <li>CH9 → Ti #1</li>
+                    <li>CH10 → TiAu #1</li>
+                    <li>CH12 → TiAlAu #1</li>
+                    <li>CH13 → Ti #2</li>
+                    <li>CH14 → Ti #3</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <div class="control-row" style="margin-top: 10px; align-items: center">
+              <label style="width: 120px">MXC control:</label>
+
+              <select
+                id="relationModeSelect"
+                class="styled-select"
+                style="width: 140px"
+              >
+                <option value="MANUAL">Manual</option>
+                <option value="RAMP">Ramp</option>
+                <option value="STEP_RAMP">Step Ramp</option>
+              </select>
+            </div>
+
+            <div id="relationRampControls" style="display: none">
+              <div class="control-row" style="margin-top: 10px; align-items: center">
+                <label style="width: 120px">Target:</label>
+
+                <input
+                  id="relationTargetInput"
+                  type="number"
+                  value="100"
+                  min="0.001"
+                  step="0.1"
+                  style="width: 90px; height: 32px"
+                />
+
+                <span style="margin-left: 6px">mK</span>
+              </div>
+
+              <div class="control-row" style="margin-top: 10px; align-items: center">
+                <label style="width: 120px">Ramp rate:</label>
+
+                <input
+                  id="relationRateInput"
+                  type="number"
+                  value="10"
+                  min="0.001"
+                  step="0.1"
+                  style="width: 90px; height: 32px"
+                />
+
+                <span style="margin-left: 6px">mK/min</span>
+              </div>
+            </div>
+            
+            <div
+              id="relationStepRampControls"
+              style="
+                display: none;
+                margin-top: 14px;
+                padding: 12px;
+                border: 1px solid #d1d5db;
+                border-radius: 8px;
+                background: #f9fafb;
+              "
+            >
+              <div
+                style="
+                  font-weight: 700;
+                  margin-bottom: 12px;
+                  color: #374151;
+                "
+              >
+                Step Ramp parameters
+              </div>
+
+              <!-- ============================================================
+                  Main STEP_RAMP parameters
+
+                  Organisation (to help)
+                  <div class="control-row">
+                    Initial
+                  </div>
+
+                  <div class="control-row">
+                    Target
+                  </div>
+
+                  <div class="control-row">
+                    Step
+                  </div>
+
+                  All these fields must have a JavaScript field.
+
+                  For example:
+                      const stepTargetInput = document.getElementById(
+                        "relationStepTargetInput",
+                      );
+                  ============================================================ -->
+
+
+              <div class="control-row">
+                <label style="width: 150px">
+                  Initial:
+                </label>
+
+                <input
+                  id="relationStepInitialInput"
+                  type="number"
+                  min="10"
+                  max="800"
+                  step="0.1"
+                  placeholder="required"
+                  style="width: 90px; height: 32px"
+                />
+
+                <span style="margin-left: 6px">mK</span>
+              </div>
+              <div class="control-row">
+                <label style="width: 150px">
+                  Target:
+                </label>
+
+                <input
+                  id="relationStepTargetInput"
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  placeholder="required"
+                  style="width: 90px; height: 32px"
+                />
+
+                <span style="margin-left: 6px">mK</span>
+              </div>
+
+              <div class="control-row">
+                <label style="width: 150px">
+                  Step:
+                </label>
+
+                <input
+                  id="relationStepSizeInput"
+                  type="number"
+                  min="0.001"
+                  step="0.1"
+                  placeholder="required"
+                  style="width: 90px; height: 32px"
+                />
+
+                <span style="margin-left: 6px">mK</span>
+              </div>
+
+              <div class="control-row">
+                <label style="width: 150px">
+                  Tolerance:
+                </label>
+
+                <input
+                  id="relationStepToleranceInput"
+                  type="number"
+                  min="0.001"
+                  step="0.01"
+                  placeholder="required"
+                  style="width: 90px; height: 32px"
+                />
+
+                <span style="margin-left: 6px">mK</span>
+              </div>
+
+              <div class="control-row">
+                <label style="width: 150px">
+                  Stable time:
+                </label>
+
+                <input
+                  id="relationStepStableTimeInput"
+                  type="number"
+                  min="0.001"
+                  step="1"
+                  placeholder="required"
+                  style="width: 90px; height: 32px"
+                />
+
+                <span style="margin-left: 6px">s</span>
+              </div>
+
+              <div class="control-row">
+                <label style="width: 150px">
+                  Stability timeout:
+                </label>
+
+                <input
+                  id="relationStepTimeoutInput"
+                  type="number"
+                  min="0.001"
+                  step="1"
+                  placeholder="required"
+                  style="width: 90px; height: 32px"
+                />
+
+                <span style="margin-left: 6px">s</span>
+              </div>
+
+              <div class="control-row">
+                <label style="width: 150px">
+                  R samples:
+                </label>
+
+                <input
+                  id="relationStepResistanceSamplesInput"
+                  type="number"
+                  min="1"
+                  step="1"
+                  placeholder="required"
+                  style="width: 90px; height: 32px"
+                />
+              </div>
+
+              <!-- ============================================================
+                  Acquisition parameters required by the backend
+                  ============================================================ -->
+
+              <details
+                style="margin-top: 12px"
+                ontoggle="updateRelationRampControls()"
+              >
+                <summary
+                  style="
+                    cursor: pointer;
+                    font-weight: 700;
+                    color: #4b5563;
+                  "
+                >
+                  Advanced acquisition parameters
+                </summary>
+
+                <div style="margin-top: 12px">
+
+                  <div class="control-row">
+                    <label style="width: 190px">
+                      Stability sample interval:
+                    </label>
+
+                    <input
+                      id="relationStepStabilityIntervalInput"
+                      type="number"
+                      min="0.001"
+                      step="0.1"
+                      placeholder="required"
+                      style="width: 90px; height: 32px"
+                    />
+
+                    <span style="margin-left: 6px">s</span>
+                  </div>
+
+                  <div class="control-row">
+                    <label style="width: 190px">
+                      Autorange max attempts:
+                    </label>
+
+                    <input
+                      id="relationStepAutorangeAttemptsInput"
+                      type="number"
+                      min="1"
+                      step="1"
+                      placeholder="required"
+                      style="width: 90px; height: 32px"
+                    />
+                  </div>
+
+                  <div class="control-row">
+                    <label style="width: 190px">
+                      R sample interval:
+                    </label>
+
+                    <input
+                      id="relationStepResistanceIntervalInput"
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      placeholder="required"
+                      style="width: 90px; height: 32px"
+                    />
+
+                    <span style="margin-left: 6px">s</span>
+                  </div>
+
+                  <div class="control-row">
+                    <label style="width: 190px">
+                      R max attempts:
+                    </label>
+
+                    <input
+                      id="relationStepResistanceAttemptsInput"
+                      type="number"
+                      min="1"
+                      step="1"
+                      placeholder="required"
+                      style="width: 90px; height: 32px"
+                    />
+                  </div>
+
+                  <!-- ==========================================================
+                      Optional stability / retry limits
+                      ========================================================== -->
+
+                  <div
+                    style="
+                      margin-top: 14px;
+                      margin-bottom: 8px;
+                      font-weight: 700;
+                      color: #6b7280;
+                    "
+                  >
+                    Optional limits
+                  </div>
+
+                  <div class="control-row">
+                    <label style="width: 190px">
+                      Max T std:
+                    </label>
+
+                    <input
+                      id="relationStepMaxStdInput"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="optional"
+                      style="width: 90px; height: 32px"
+                    />
+
+                    <span style="margin-left: 6px">mK</span>
+                  </div>
+
+                  <div class="control-row">
+                    <label style="width: 190px">
+                      Max T slope:
+                    </label>
+
+                    <input
+                      id="relationStepMaxSlopeInput"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="optional"
+                      style="width: 90px; height: 32px"
+                    />
+
+                    <span style="margin-left: 6px">
+                      mK/min
+                    </span>
+                  </div>
+
+                  <div class="control-row">
+                    <label style="width: 190px">
+                      Point max attempts:
+                    </label>
+
+                    <input
+                      id="relationStepPointAttemptsInput"
+                      type="number"
+                      min="1"
+                      step="1"
+                      placeholder="optional"
+                      style="width: 90px; height: 32px"
+                    />
+                  </div>
+
+                </div>
+              </details>
+            </div>
+
+            <div
+              class="control-row"
+              style="margin-top: 10px; align-items: center"
+            >
+              <label style="width: 120px">Channel:</label>
+
+              <select
+                id="relationChannelSelect"
+                class="styled-select"
+                style="width: 120px"
+                onchange="onRelationChannelChange()"
+              >
+                <option value="CH9">CH9</option>
+                <option value="CH10">CH10</option>
+                <option value="CH11">CH11</option>
+                <option value="CH12">CH12</option>
+                <option value="CH13">CH13</option>
+                <option value="CH14">CH14</option>
+              </select>
+
+              <input
+                id="relationLabelInput"
+                type="text"
+                placeholder="Label"
+                style="margin-left: 10px; width: 160px"
+              />
+            </div>
+            <div class="control-row" style="margin-top: 14px; gap: 10px">
+              <button
+                id="relationStartButton"
+                class="inline-button run-play-button"
+                style="width: 120px"
+              >
+                ▶
+              </button>
+
+              <button
+                id="relationStopButton"
+                class="inline-button run-stop-button"
+                style="width: 120px"
+                disabled
+              >
+                ⏹
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="relation-plot-panel">
+          <canvas id="relationChart"></canvas>
+        </div>
+      </div>
+      <!-- Progress bar for sample channels (CH9..CH14) -->
+      <div id="progressContainerEXTRA" style="display: none; margin-top: 10px">
+        <div style="width: 100%; background-color: #ddd">
+          <div id="progressBarEXTRA" style="width: 0%; height: 20px; background-color: #4caf50"></div>
+        </div>
+        <div id="progressTextEXTRA" style="font-size: 12px; margin-top: 5px">Processing...</div>
+      </div>
+
+      <!-- Relation reconstruction (historical .dat) -->
+      <div class="relation-reconstruction-section">
+        <h2>Reconstruction of saved .dat</h2>
+
+        <div class="relation-reconstruction-row">
+          <select id="relationFilesSelect" class="styled-select">
+            <option value="">Selecciona un .dat...</option>
+          </select>
+
+          <button
+            id="relationFilesRefreshButton"
+            class="inline-button"
+            title="Refresh list"
+          >
+            ⟳
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/business.js"></script>
+    <script src="js/charts.js"></script>
+    <script src="js/control.js"></script>
+    <script src="js/main.js"></script>
+    <script src="js/particles.js"></script>
+    <script src="js/state.js"></script>
+    <script src="js/ui.js"></script>
+  </body>
+</html>

@@ -75,6 +75,6 @@ Even though there is a considerable amount of code, the main data stream repeats
 - `lakeshore370_dummy.py`: simulator for development and tests.
 - `tcp_server.py`: TCP server managing client connections and commands.
 - `http_server.py`: HTTP server for the UI and related endpoints.
-- `index.html`, `index.js`: web interface and client-side logic.
+- `frontend/index.html`: web interface and client-side logic.
 - `default_config.py`: default values and configuration.
 - `dbconfig.sql`: postgresql configuration file for the database.
