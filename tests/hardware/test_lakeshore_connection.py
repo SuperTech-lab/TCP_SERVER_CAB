@@ -1,13 +1,14 @@
 import time
 import pyvisa
 from pyvisa.constants import StopBits, Parity
+from sctlab.config.settings import TEST_LAKESHORE_ADDRESS
 
 # Create resource manager
 rm = pyvisa.ResourceManager()
 
 # Open the serial port (make sure this matches your system)
 try:
-    device = rm.open_resource('ASRL/dev/ttyUSB0::INSTR')
+    device = rm.open_resource(TEST_LAKESHORE_ADDRESS)
     print("Resource Manager Open")
 except Exception as e:
     print("Resource Manage failed. \nReason:", e)

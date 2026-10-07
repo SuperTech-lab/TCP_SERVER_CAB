@@ -1,0 +1,10 @@
+/* ==========================================================================
+   SCTLab Temperature Controller - Master Stylesheet
+   Importa los módulos de estilos de la aplicación
+   ========================================================================== */
+
+@import url("theme.css");
+@import url("layout.css");
+@import url("controls.css");
+@import url("charts.css");
+@import url("relations.css");

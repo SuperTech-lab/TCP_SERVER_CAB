@@ -1,0 +1,126 @@
+/* ==========================================================================
+   RELATIONS & EXPERIMENTS (Resistance vs. TMXC)
+   Paneles, controles, gráfica de relación y reconstrucción de ficheros .dat
+   ========================================================================== */
+
+.relation-container {
+  display: flex;
+  max-width: 1400px;
+  margin: 0 auto;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.relation-control-panel {
+  flex: 1;
+  background-color: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  min-width: 250px;
+}
+
+.relation-plot-panel {
+  flex: 3;
+  background-color: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  min-width: 750px;
+}
+
+#relationChart {
+  height: 420px;
+}
+
+.relation-control-panel .current-value {
+  width: auto;
+  white-space: nowrap;
+  text-align: left;
+  margin-left: 8px;
+}
+
+#relationRampControls {
+  display: none;
+}
+
+#relationLabelInput {
+  width: 90px;
+  max-width: 90px;
+  height: 32px;
+  padding: 4px 6px;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+}
+
+.relation-label-input {
+  margin-left: 10px;
+  width: 160px;
+}
+
+/* Reconstrucción de ficheros .dat */
+.relation-reconstruction {
+  max-width: 1400px;
+  margin: 14px auto 0 auto;
+  background: white;
+  padding: 14px 18px;
+  border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
+}
+
+.relation-reconstruction h3 {
+  margin: 0 0 10px 0;
+  font-size: 16px;
+}
+
+.relation-reconstruction .row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.relation-reconstruction .meta {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #4b5563;
+}
+
+.relation-reconstruction-section {
+  max-width: 1360px;
+  margin: 32px auto 40px;
+  background: white;
+  padding: 20px 24px;
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.relation-reconstruction-section h2 {
+  margin: 0 0 18px 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: #222;
+  position: relative;
+  display: inline-block;
+}
+
+.relation-reconstruction-section h2::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -6px;
+  width: 100%;
+  height: 3px;
+  background: #3b82f6;
+  border-radius: 2px;
+}
+
+.relation-reconstruction-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.relation-reconstruction-row select {
+  min-width: 520px;
+}
+

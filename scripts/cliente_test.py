@@ -1,7 +1,8 @@
 import socket
+from sctlab.config.settings import TCP_PORT, TCP_SERVER_HOST
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-s.connect(("localhost", 65432))
+s.connect((TCP_SERVER_HOST, TCP_PORT))
 
 print("Conectado. Enviando SUB...")
 s.sendall(b"SUB\n")

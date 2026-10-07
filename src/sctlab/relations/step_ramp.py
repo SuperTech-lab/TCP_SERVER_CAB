@@ -8,7 +8,7 @@ import threading
 from collections.abc import Callable
 from typing import Any
 
-from default_config import SAMPLE_CHANNELS
+from sctlab.config.defaults import SAMPLE_CHANNELS
 
 # Tagging the callback types for clarity. 
 # These tags correspond to _append_relation_point() and _

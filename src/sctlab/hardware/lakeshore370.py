@@ -5,6 +5,10 @@ import time
 import math
 
 from typing import Any
+from sctlab.config.settings import (
+    LAKESHORE_LINUX_ADDRESS,
+    LAKESHORE_WINDOWS_ADDRESS,
+)
 
 # Shared mutex lock for safe device access
 # Changed Lock for RLock (Reentrant Lock) to allow the same thread to acquire the lock multiple times if needed
@@ -167,8 +171,8 @@ class LakeShore370:
         _wait_for_communication_slot()
     """
 
-    LINUX_ADDRESS = "ASRL/dev/ttyUSB1::INSTR"
-    WINDOWS_ADDRESS = "ASRL12::INSTR"
+    LINUX_ADDRESS = LAKESHORE_LINUX_ADDRESS
+    WINDOWS_ADDRESS = LAKESHORE_WINDOWS_ADDRESS
 
     def __init__(self,
                 addr      : str | None = None,

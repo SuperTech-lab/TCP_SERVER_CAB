@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sctlab"
+version = "0.1.0"
+description = "LakeShore 370 and Cryo-Con control system"
+requires-python = ">=3.10"
+dependencies = [
+	"matplotlib",
+	"psycopg2-binary",
+	"pyvisa",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

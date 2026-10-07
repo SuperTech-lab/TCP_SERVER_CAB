@@ -11,29 +11,40 @@ from psycopg2.pool import ThreadedConnectionPool
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
-from default_config import (DEFAULT_PID, CURRENT_RANGE_LIST, DEFAULT_MXC_RESISTANCE_RANGE_SETTINGS, SENSOR_RESISTANCE_RANGE_LIST, DEFAULT_CHANNELS, DEFAULT_EXTRA_CHANNELS, 
+from sctlab.config.defaults import (DEFAULT_PID, CURRENT_RANGE_LIST, DEFAULT_MXC_RESISTANCE_RANGE_SETTINGS, SENSOR_RESISTANCE_RANGE_LIST, DEFAULT_CHANNELS, DEFAULT_EXTRA_CHANNELS,
                             DEFAULT_CHANNELS_ID, DEFAULT_SETTINGS, DEFAULT_MXC_SETPOINT_MK, DEFAULT_MXC_HEATER_RANGE, DEFAULT_SENSOR_RESISTANCE_SETTINGS, DB_INSERT_INTERVAL, 
                             DEFAULT_CURVES, CURVE_NAMES, SAMPLE_CHANNELS
                             )
-from default_config import (
+from sctlab.config.defaults import (
     BBCON_NAME, MAX_BBCON_SETPOINT, ATTEMPTS
 )
 
-from colors import RESET, BOLD, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, GRAY
+from sctlab.config.colors import RESET, BOLD, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, GRAY
+from sctlab.config.settings import (
+    DB_HOST,
+    DB_NAME,
+    DB_PASSWORD,
+    DB_PORT,
+    DB_USER,
+    DB_MAX_CONNECTIONS,
+    DB_MIN_CONNECTIONS,
+    TCP_BIND_HOST,
+    TCP_PORT,
+)
 
-from lakeshore370 import LakeShore370
+from sctlab.hardware.lakeshore370 import LakeShore370
 try:
-    from bbcon import BBCON
+    from sctlab.hardware.bbcon import BBCON
 except ImportError as e:
     print(f"❌ Failed importing Cryo-con driver\nReason: {e}")
-from relation_step_ramp import RelationStepRampController
+from sctlab.relations.step_ramp import RelationStepRampController
 
 ls = LakeShore370()
 bb = BBCON()
 
 # Configuration
-HOST = '0.0.0.0' # Listen on all network interfaces
-PORT = 65432  # Port to listen on
+HOST = TCP_BIND_HOST
+PORT = TCP_PORT
 
 # Mutex to protect the heater power level
 # Define separated mutex to avoid that slow communications with Cryo-con
@@ -91,13 +102,13 @@ def init_db_pool():
     global DB_POOL
     if DB_POOL is None:
         DB_POOL = ThreadedConnectionPool(
-            minconn=1,
-            maxconn=10,   
-            host="192.168.38.4",
-            port=5432,
-            dbname="lakeshore_db",
-            user="lakeshore_app",  
-            password="Ricardo",
+            minconn=DB_MIN_CONNECTIONS,
+            maxconn=DB_MAX_CONNECTIONS,
+            host=DB_HOST,
+            port=DB_PORT,
+            dbname=DB_NAME,
+            user=DB_USER,
+            password=DB_PASSWORD,
         )
         print("✅ DB connection pool initialized")
 

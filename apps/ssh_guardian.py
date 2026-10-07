@@ -4,19 +4,28 @@ import re
 import sys
 import ipaddress  
 import json
+from sctlab.config.settings import (
+    SSH_AUTH_LOG,
+    SSH_RANK_1_END,
+    SSH_RANK_1_START,
+    SSH_RANK_2_END,
+    SSH_RANK_2_START,
+    SSH_TEMPORARY_IPS_FILE,
+    SSH_TIME_MAX_INACTIVITY,
+    SSH_USER,
+)
 
- 
-TIME_MAX_INACTIVITY = 604800 # 1 week temporary IPs
-AUTH_LOG = "/var/log/auth.log"
-USER = "admin"
-TEMPORARY_IPS_FILE = "temporary_ips.json"
+TIME_MAX_INACTIVITY = SSH_TIME_MAX_INACTIVITY
+AUTH_LOG = SSH_AUTH_LOG
+USER = SSH_USER
+TEMPORARY_IPS_FILE = SSH_TEMPORARY_IPS_FILE
 TEMPORARY_IPS = {}
 
 #  RANKS WHITELIST 
-RANK_1_START = "192.168.38.1" 
-RANK_1_END =  "192.168.38.7" 
-RANK_2_START ="192.168.11.120"
-RANK_2_END =  "192.168.11.135" 
+RANK_1_START = SSH_RANK_1_START
+RANK_1_END = SSH_RANK_1_END
+RANK_2_START = SSH_RANK_2_START
+RANK_2_END = SSH_RANK_2_END
 
 def is_authorized_ip(ip):
     if is_in_whitelist(ip):

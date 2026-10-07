@@ -6,9 +6,18 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from psycopg2.pool import ThreadedConnectionPool
 from contextlib import contextmanager
-from default_config import (DB_INSERT_INTERVAL, SAMPLE_CHANNELS)
+from sctlab.config.defaults import (DB_INSERT_INTERVAL, SAMPLE_CHANNELS)
+from sctlab.config.settings import (
+    DB_HOST,
+    DB_NAME,
+    DB_PASSWORD,
+    DB_PORT,
+    DB_USER,
+    DB_MAX_CONNECTIONS,
+    DB_MIN_CONNECTIONS,
+)
 
-from lakeshore370 import LakeShore370
+from sctlab.hardware.lakeshore370 import LakeShore370
 
 # DataBase conection params
 db_delay          = DB_INSERT_INTERVAL
@@ -41,13 +50,13 @@ def init_db_pool():
     global DB_POOL
     if DB_POOL is None:
         DB_POOL = ThreadedConnectionPool(
-            minconn=1,
-            maxconn=10,   
-            host="192.168.38.4",
-            port=5432,
-            dbname="lakeshore_db",
-            user="lakeshore_app",  
-            password="Ricardo",
+            minconn=DB_MIN_CONNECTIONS,
+            maxconn=DB_MAX_CONNECTIONS,
+            host=DB_HOST,
+            port=DB_PORT,
+            dbname=DB_NAME,
+            user=DB_USER,
+            password=DB_PASSWORD,
         )
         print("✅ DB connection pool initialized")
 

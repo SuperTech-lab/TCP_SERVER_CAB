@@ -1,0 +1,175 @@
+/* ==========================================================================
+   CHARTS & TELEMETRY LOGS
+   Dimensiones de gráficas, canvas, mini-gráfica MXC, toolbars y log box
+   ========================================================================== */
+
+/* Dimensiones fijas de gráficas */
+#temperatureChartBB {
+  width: 100%;
+  max-width: 800px;
+  height: 300px;
+  display: block;
+}
+
+#temperatureChart50K,
+#temperatureChart4K,
+#temperatureChartSTILL,
+#temperatureChartMXC {
+  height: 250px;
+}
+
+/* Mini gráfica de MXC cuando está colapsado */
+.mxc-title-mini-chart {
+  display: none;
+  flex: 1;
+  height: 70px;
+  min-width: 420px;
+  margin-left: 20px;
+}
+
+.mxc-title-mini-chart canvas {
+  width: 100% !important;
+  height: 70px !important;
+}
+
+.stage-title-mxc.collapsed .mxc-title-mini-chart {
+  display: block;
+}
+
+/* Barras de herramientas de gráficas */
+.mxc-plot-toolbar {
+  margin-bottom: 15px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 18px;
+}
+
+.mxc-plot-toolbar label {
+  width: auto;
+  margin: 0;
+}
+
+.mxc-plot-toolbar #timeRangeMXC {
+  width: 150px;
+  margin-left: 0;
+}
+
+.mxc-plot-toolbar .current-stage-value {
+  width: 120px;
+  margin-left: 10px;
+}
+
+.stage-card.stage-mxc .stage-body {
+  padding-top: 8px;
+}
+
+.current-stage-value {
+  width: 120px;
+  margin-left: 30px;
+  margin-top: 0;
+  align-self: center;
+}
+
+#timeRangeMXC {
+  width: 150px;
+}
+
+.time-range-label {
+  margin: 0 10px 0 25px;
+}
+
+.time-range-label-stage {
+  margin-left: 30px;
+  margin-right: 0px;
+}
+
+.time-range-select {
+  margin-right: 50px;
+}
+
+/* Panel y tarjeta de Logs de telemetría / comandos */
+.log-card {
+  width: 100%;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.10);
+  margin: 15px 0 30px 0;
+  overflow: hidden;
+}
+
+.log-section-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0;
+  padding: 18px 24px;
+  cursor: pointer;
+  justify-content: space-between;
+  background-color: white;
+  border-radius: 8px 8px 0 0;
+  box-shadow: none;
+  border-bottom: none;
+}
+
+.log-card .section-title {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.log-section-title .icon {
+  font-size: 1.2rem;
+}
+
+.log-title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.log-section {
+  padding: 10px 24px 18px 24px;
+  margin: 0;
+}
+
+.log-box {
+  width: 98.5%;
+  height: 150px;
+  margin-top: 20px;
+  padding: 10px;
+  font-size: 14px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  background-color: #f9f9f9;
+  overflow-y: auto;
+}
+
+.log-card .log-box {
+  width: 100%;
+  height: 120px;
+  margin-top: 0;
+  box-sizing: border-box;
+  background-color: #f9f9f9;
+}
+
+.log-entry {
+  margin-bottom: 5px;
+  padding: 3px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.log-sent {
+  color: #007bff;
+}
+
+.log-received {
+  color: #28a745;
+}
+
+.log-status {
+  color: #6c757d;
+  font-weight: bold;
+}
+

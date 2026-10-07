@@ -1,0 +1,1435 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SCLab Temperature Controller</title>
+    <!-- Hojas de estilo modularizadas -->
+    <link rel="stylesheet" href="css/theme.css" />
+    <link rel="stylesheet" href="css/layout.css" />
+    <link rel="stylesheet" href="css/controls.css" />
+    <link rel="stylesheet" href="css/charts.css" />
+    <link rel="stylesheet" href="css/relations.css" />
+  </head>
+
+  <body>
+    <canvas id="particles-canvas" class="particles-canvas"></canvas>
+   <div class="container top-header">
+    <img
+      src="assets/SCTLab_logo.png"
+      alt="SCTLab logo"
+      class="sctlab-logo"
+    />
+
+    <div class="tab-menu">
+      <button class="tab-button active" data-target="lakeshore-tab">
+        Fridge Control
+      </button>
+      <button class="tab-button" data-target="blackbody-tab">
+        Black Body Control
+      </button>
+      <button class="tab-button" data-target="relation-tab">
+        Resistance vs. TMXC
+      </button>
+    </div>
+  </div>
+
+    <div id="lakeshore-tab" class="tab-content active">
+      <div class="container lakeshore-container">
+        <!-- Global Settings Bar -->
+        <div class="row-container">
+          <div class="lakeshore-control-panel">
+            <div class="global-settings-title">
+              <span class="icon">⚙</span>
+              GLOBAL SETTINGS
+            </div>
+            <div class="section-content">
+              <div class="global-controls-row">
+                <!-- Autoscan con estilo de panel -->
+                <div class="autoscan-panel">
+                  <label
+                    for="autoscanToggle"
+                    class="autoscan-label"
+                  >
+                    Autoscan
+                  </label>
+                  <label class="switch switch-no-margin">
+                    <input
+                      type="checkbox"
+                      id="autoscanToggle"
+                      onchange="toggleAutoscan()"
+                    />
+                    <span class="slider round"></span>
+                  </label>
+                </div>
+                <!-- Main Channel List -->
+                <details class="channel-dropdown">
+                  <summary class="channel-dropdown-summary">
+                    <strong>CHANNEL ON/OFF </strong>
+                    <span class="channel-dropdown-arrow">▾</span>
+                  </summary>
+
+                  <div class="channel-dropdown-menu">
+                    <div class="control-row">
+                      <label>MXC</label>
+                      <label class="switch">
+                        <input
+                          type="checkbox"
+                          id="toggleMXCGlobal"
+                          onchange="globalToggleChannel('MXC')"
+                        />
+                        <span class="slider round"></span>
+                      </label>
+                    </div>
+
+                    <div class="control-row">
+                      <label>50K</label>
+                      <label class="switch">
+                        <input
+                          type="checkbox"
+                          id="toggle50KGlobal"
+                          onchange="globalToggleChannel('50K')"
+                        />
+                        <span class="slider round"></span>
+                      </label>
+                    </div>
+
+                    <div class="control-row">
+                      <label>4K</label>
+                      <label class="switch">
+                        <input
+                          type="checkbox"
+                          id="toggle4kGlobal"
+                          onchange="globalToggleChannel('4K')"
+                        />
+                        <span class="slider round"></span>
+                      </label>
+                    </div>
+
+                    <div class="control-row">
+                      <label>STILL</label>
+                      <label class="switch">
+                        <input
+                          type="checkbox"
+                          id="toggleSTILLGlobal"
+                          onchange="globalToggleChannel('STILL')"
+                        />
+                        <span class="slider round"></span>
+                      </label>
+                    </div>
+                  </div>
+                </details>
+                <label class="circular-checkbox">
+                  <input
+                    type="checkbox"
+                    id="autorangeMXC"
+                    checked
+                    onchange="toggleAutorangeMXC()"
+                  />
+                  <span></span>
+                  Autorange
+                </label>
+
+                <div class="recent-runs">
+                  <label class="run-label" for="recentRunsSelect"
+                    >Últimos RUNs</label
+                  >
+                  <select id="recentRunsSelect" class="run-select">
+                    <option value="">(cargando...)</option>
+                  </select>
+                </div>
+                <div class="run-control run-control-floating">
+                  <label for="runIdInput" class="run-label">RUN ID</label>
+                  <input
+                    type="number"
+                    id="runIdInput"
+                    class="run-input"
+                    value="1"
+                    min="1"
+                  />
+                  <label
+                    for="runDescInput"
+                    class="run-label run-label-desc"
+                    >Desc</label
+                  >
+                  <input
+                    type="text"
+                    id="runDescInput"
+                    class="run-input run-input-desc"
+                    placeholder="Descripción del RUN..."
+                  />
+                  <button
+                    id="runPlayButton"
+                    class="inline-button run-play-button"
+                  >
+                    ▶
+                  </button>
+                  <button
+                    id="runStopButton"
+                    class="inline-button run-stop-button"
+                  >
+                    ⏹
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- System Log for Fridge Tab -->
+        <div class="log-card">
+          <div class="section-title log-section-title">
+            <div class="log-title-wrapper">
+              <span class="icon">📜</span>
+              SYSTEM LOG
+            </div>
+          </div>
+
+          <div class="section-content log-section">
+            <div class="log-box" id="logBoxLS"></div>
+          </div>
+        </div>
+
+        <div class="stage-card stage-mxc">
+          <div class="section-title stage-title stage-title-mxc">
+            <h2>MXC Stage</h2>
+
+            <div id="mxcTitleControls" class="mxc-title-controls">
+              <div class="mxc-header-row mxc-header-row-top">
+                <button
+                  class="inline-button mxc-header-button"
+                  onclick="writeSensorSettingsMXC()"
+                >
+                  Write Sensor Settings
+                </button>
+
+                <button
+                  class="inline-button mxc-header-button"
+                  onclick="resetDefaultsMXC()"
+                >
+                  Reset to default
+                </button>
+
+                <div class="mxc-header-field mxc-header-field-curve">
+                  <label for="curveMXCSelect">Curve:</label>
+                  <select id="curveMXCSelect" class="control-input">
+                    <option value="1">PT-100-20K (PT1011)</option>
+                    <option value="2">CX-1050-CD-BF1 (X64005)</option>
+                    <option value="3">CX-1010-CD-BF0 (X63593)</option>
+                    <option value="4">RU-1000-BF0.007 (U03308)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="mxc-header-row mxc-header-row-bottom">
+                <div class="mxc-header-field">
+                  <label for="sensorModeMXC">Mode:</label>
+                  <select id="sensorModeMXC" class="control-input">
+                    <option value="0">Voltage</option>
+                    <option value="1">Current</option>
+                  </select>
+                </div>
+
+                <div class="mxc-header-field mxc-header-field-excitation">
+                  <label for="sensorRangeMXC">Excitation:</label>
+                  <select id="sensorRangeMXC" class="control-input">
+                    <option value="1">2.00 uV and 1.00 pA</option>
+                    <option value="2">6.32 uV and 3.16 pA</option>
+                    <option value="3">20.0 uV and 10.0 pA</option>
+                    <option value="4">63.2 uV and 31.6 pA</option>
+                    <option value="5">200 uV and 100 pA</option>
+                    <option value="6">632 uV and 316 pA</option>
+                    <option value="7">2.00 mV and 1.00 nA</option>
+                    <option value="8">6.32 mV and 3.16 nA</option>
+                  </select>
+                </div>
+
+                <div class="mxc-header-field">
+                  <label for="dwellMXC">Dwell:</label>
+                  <input
+                    type="number"
+                    class="control-input"
+                    id="dwellMXC"
+                    min="0"
+                    max="10"
+                    step="0.1"
+                  />
+                </div>
+
+                <div class="mxc-header-field">
+                  <label for="pauseMXC">Pause:</label>
+                  <input
+                    type="number"
+                    class="control-input"
+                    id="pauseMXC"
+                    min="0"
+                    max="10"
+                    step="0.1"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div id="mxcMiniChartBox" class="mxc-title-mini-chart">
+              <canvas id="temperatureChartMXCMini"></canvas>
+            </div>
+          </div>
+          <div class="section-content row-container stage-body">
+            <div class="lakeshore-control-panel">
+              <div class="control-group">
+                <!-- Temperature control -->
+                <div class="mxc-control-wrapper">
+                  <!-- SOLO Controles del PID + Heater Range -->
+                  <div id="control-settings-mxc">
+                    <div class="control-row">
+                      <label>Heater output:</label>
+                      <span id="heaterOutputMXC" class="current-value">- %</span>
+                    </div>
+                    <div class="control-row">
+                      <label for="temperatureSetpointMXC">Setpoint (mK):</label>
+                      <input
+                        type="number"
+                        id="temperatureSetpointMXC"
+                        class="control-input input-80"
+                        min="0"
+                        max="500"
+                        step="1"
+                      />
+                    </div>
+
+                    <div class="control-row">
+                      <label for="proportionalGainMXC">P Gain:</label>
+                      <input
+                        type="number"
+                        id="proportionalGainMXC"
+                        class="control-input input-80"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                      />
+                    </div>
+
+                    <div class="control-row">
+                      <label for="integralGainMXC">I Gain:</label>
+                      <input
+                        type="number"
+                        id="integralGainMXC"
+                        class="control-input input-80"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                      />
+                    </div>
+
+                    <div class="control-row">
+                      <label for="derivativeGainMXC">D Gain:</label>
+                      <input
+                        type="number"
+                        id="derivativeGainMXC"
+                        class="control-input input-80"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                      />
+                    </div>
+
+                    <div class="control-row">
+                      <label for="heaterRangeMXC">Heater Range:</label>
+                      <select
+                        id="heaterRangeMXC"
+                        class="control-input input-120"
+                      >
+                        <option value="0">Off</option>
+                        <option value="1">31.6 µA</option>
+                        <option value="2">100 µA</option>
+                        <option value="3">316 µA</option>
+                        <option value="4">1 mA</option>
+                        <option value="5">3.16 mA</option>
+                        <option value="6">10.0 mA</option>
+                        <option value="7">31.6 mA</option>
+                        <option value="8">100 mA</option>
+                      </select>
+                    </div>
+
+                    <div class="control-row control-row-mt">
+                      <button onclick="writeControlSettingsMXC()">
+                        Write Control Settings
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Barra de progreso -->
+                <div id="progressContainerMXC" class="progress-container">
+                  <div class="progress-track">
+                    <div id="progressBarMXC" class="progress-fill"></div>
+                  </div>
+                  <div id="progressTextMXC" class="progress-text">
+                    Processing...
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="lakeshore-plot-panel lakeshore-plot-panel-flex">
+              <!-- Fila superior: Time range, autorange, valor actual -->
+              <div class="control-row control-row-header">
+                <div class="flex-align-center">
+                  <label for="timeRangeMXC" class="time-range-label">
+                    Time Range:
+                  </label>
+
+                  <select
+                    id="timeRangeMXC"
+                    class="time-range-select"
+                    onchange="updateTimeRange()"
+                  >
+                    <option value="21600">6 Hours</option>
+                    <option value="3600">1 Hour</option>
+                    <option value="1800">30 Minutes</option>
+                    <option value="900">15 Minutes</option>
+                    <option value="300">5 Minutes</option>
+                    <option value="60" selected>1 Minute</option>
+                  </select>
+
+                  <div id="statusCircleCH6" class="status-indicator-circle"></div>
+
+                  <select id="currentMXCValue" class="current-stage-value">
+                    <option value="temperature">- mK</option>
+                    <option value="resistance">- Ω</option>
+                    <option value="power">- W</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Gráfica -->
+              <canvas id="temperatureChartMXC" width="800" height="250"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-title stage-still"><h2>STILL Stage</h2></div>
+        <div class="section-content row-container stage-still">
+          <div class="lakeshore-control-panel">
+            <div class="control-group">
+              <div class="control-row">
+                <label for="dwellSTILL">Dwell Time:</label>
+                <input
+                  type="number"
+                  class="control-input"
+                  id="dwellSTILL"
+                  min="0"
+                  max="10"
+                  step="0.1"
+                />
+              </div>
+              <div class="control-row">
+                <label for="pauseSTILL">Pause Time:</label>
+                <input
+                  type="number"
+                  class="control-input"
+                  id="pauseSTILL"
+                  min="0"
+                  max="10"
+                  step="0.1"
+                />
+              </div>
+              <div class="control-row">
+                <label for="sensorRangeSTILL">Excitation:</label>
+                <select id="sensorRangeSTILL" class="control-input input-160">
+                  <option value="1">2.00 uV and 1.00 pA</option>
+                  <option value="2">6.32 uV and 3.16 pA</option>
+                  <option value="3">20.0 uV and 10.0 pA</option>
+                  <option value="4">63.2 uV and 31.6 pA</option>
+                  <option value="5">200 uV and 100 pA</option>
+                  <option value="6">632 uV and 316 pA</option>
+                  <option value="7">2.00 mV and 1.00 nA</option>
+                  <option value="8">6.32 mV and 3.16 nA</option>
+                </select>
+              </div>
+              <div class="control-row">
+                <label for="sensorModeSTILL">Mode:</label>
+                <select id="sensorModeSTILL" class="control-input input-90">
+                  <option value="0">Voltage</option>
+                  <option value="1">Current</option>
+                </select>
+              </div>
+              <div class="control-row mxc-plot-toolbar">
+                <label for="curveSTILLSelect">Curve:</label>
+                <select id="curveSTILLSelect" class="control-input input-120">
+                  <option value="1">PT-100-20K (PT1011)</option>
+                  <option value="2">CX-1050-CD-BF1 (X64005)</option>
+                  <option value="5">CX-1010-CD-BF0 (X63593)</option>
+                  <option value="6">RU-1000-BF0.007 (U03308)</option>
+                </select>
+              </div>
+              <div class="control-row">
+                <button onclick="writeSettingsSTILL()">Write Settings</button>
+              </div>
+              <div id="progressContainerSTILL" class="progress-container">
+                <div class="progress-track">
+                  <div id="progressBarSTILL" class="progress-fill"></div>
+                </div>
+                <div id="progressTextSTILL" class="progress-text">
+                  Processing...
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="lakeshore-plot-panel">
+            <div class="control-row flex-align-center">
+              <button
+                class="inline-button reset-btn"
+                onclick="resetDefaultsSTILL()"
+              >
+                Reset to default
+              </button>
+              <label for="timeRangeSTILL" class="time-range-label-stage">
+                Time Range:
+              </label>
+              <select
+                id="timeRangeSTILL"
+                class="time-range-select"
+                onchange="updateTimeRangeSTILL()"
+              >
+                <option value="60" selected>1 Minute</option>
+                <option value="300">5 Minutes</option>
+                <option value="900">15 Minutes</option>
+                <option value="1800">30 Minutes</option>
+                <option value="3600">1 Hour</option>
+                <option value="21600">6 Hours</option>
+              </select>
+
+              <div id="statusCircleCH5" class="status-indicator-circle"></div>
+              <select id="currentSTILLValue" class="current-stage-value">
+                <option value="temperature">- mK</option>
+                <option value="resistance">- Ω</option>
+                <option value="power">- W</option>
+              </select>
+            </div>
+            <canvas id="temperatureChartSTILL" width="800" height="200"></canvas>
+          </div>
+        </div>
+
+        <div class="section-title stage-4k"><h2>4K Stage</h2></div>
+        <div class="section-content row-container stage-4k">
+          <div class="lakeshore-control-panel">
+            <div class="control-group">
+              <div class="control-row">
+                <label for="dwell4K">Dwell Time:</label>
+                <input
+                  type="number"
+                  class="control-input"
+                  id="dwell4K"
+                  min="0"
+                  max="10"
+                  step="0.1"
+                />
+              </div>
+              <div class="control-row">
+                <label for="pause4K">Pause Time:</label>
+                <input
+                  type="number"
+                  class="control-input"
+                  id="pause4K"
+                  min="0"
+                  max="10"
+                  step="0.1"
+                />
+              </div>
+              <div class="control-row">
+                <label for="sensorRange4K">Excitation:</label>
+                <select id="sensorRange4K" class="control-input input-160">
+                  <option value="1">2.00 uV and 1.00 pA</option>
+                  <option value="2">6.32 uV and 3.16 pA</option>
+                  <option value="3">20.0 uV and 10.0 pA</option>
+                  <option value="4">63.2 uV and 31.6 pA</option>
+                  <option value="5">200 uV and 100 pA</option>
+                  <option value="6">632 uV and 316 pA</option>
+                  <option value="7">2.00 mV and 1.00 nA</option>
+                  <option value="8">6.32 mV and 3.16 nA</option>
+                </select>
+              </div>
+              <div class="control-row">
+                <label for="sensorMode4K">Mode:</label>
+                <select id="sensorMode4K" class="control-input input-90">
+                  <option value="0">Voltage</option>
+                  <option value="1">Current</option>
+                </select>
+              </div>
+              <div class="control-row control-row-mb">
+                <label for="curve4KSelect">Curve:</label>
+                <select id="curve4KSelect" class="control-input input-120">
+                  <option value="1">PT-100-20K (PT1011)</option>
+                  <option value="2">CX-1050-CD-BF1 (X64005)</option>
+                  <option value="5">CX-1010-CD-BF0 (X63593)</option>
+                  <option value="6">RU-1000-BF0.007 (U03308)</option>
+                </select>
+              </div>
+              <div class="control-row">
+                <button onclick="writeSettings4K()">Write Settings</button>
+              </div>
+              <div id="progressContainer4K" class="progress-container">
+                <div class="progress-track">
+                  <div id="progressBar4K" class="progress-fill"></div>
+                </div>
+                <div id="progressText4K" class="progress-text">
+                  Processing...
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="lakeshore-plot-panel">
+            <div class="control-row flex-align-center">
+              <button
+                class="inline-button reset-btn"
+                onclick="resetDefaults4K()"
+              >
+                Reset to default
+              </button>
+              <label for="timeRange4K" class="time-range-label-stage">
+                Time Range:
+              </label>
+              <select
+                id="timeRange4K"
+                class="time-range-select"
+                onchange="updateTimeRange4K()"
+              >
+                <option value="60" selected>1 Minute</option>
+                <option value="300">5 Minutes</option>
+                <option value="900">15 Minutes</option>
+                <option value="1800">30 Minutes</option>
+                <option value="3600">1 Hour</option>
+                <option value="21600">6 Hours</option>
+              </select>
+
+              <div id="statusCircleCH2" class="status-indicator-circle"></div>
+
+              <select id="current4KValue" class="current-stage-value">
+                <option value="temperature">- mK</option>
+                <option value="resistance">- Ω</option>
+                <option value="power">- W</option>
+              </select>
+            </div>
+            <canvas id="temperatureChart4K" width="800" height="200"></canvas>
+          </div>
+        </div>
+
+        <div class="section-title stage-50k"><h2>50K Stage</h2></div>
+        <div class="section-content row-container stage-50k">
+          <div class="lakeshore-control-panel">
+            <div class="control-group">
+              <div class="control-row">
+                <label for="dwell50K">Dwell Time:</label>
+                <input
+                  type="number"
+                  class="control-input"
+                  id="dwell50K"
+                  min="0"
+                  max="10"
+                  step="0.1"
+                />
+              </div>
+              <div class="control-row">
+                <label for="pause50K">Pause Time:</label>
+                <input
+                  type="number"
+                  class="control-input"
+                  id="pause50K"
+                  min="0"
+                  max="10"
+                  step="0.1"
+                />
+              </div>
+              <div class="control-row">
+                <label for="sensorRange50K">Excitation:</label>
+                <select id="sensorRange50K" class="control-input input-160">
+                  <option value="1">2.00 uV and 1.00 pA</option>
+                  <option value="2">6.32 uV and 3.16 pA</option>
+                  <option value="3">20.0 uV and 10.0 pA</option>
+                  <option value="4">63.2 uV and 31.6 pA</option>
+                  <option value="5">200 uV and 100 pA</option>
+                  <option value="6">632 uV and 316 pA</option>
+                  <option value="7">2.00 mV and 1.00 nA</option>
+                  <option value="8">6.32 mV and 3.16 nA</option>
+                </select>
+              </div>
+              <div class="control-row">
+                <label for="sensorMode50K">Mode:</label>
+                <select id="sensorMode50K" class="control-input input-90">
+                  <option value="0">Voltage</option>
+                  <option value="1">Current</option>
+                </select>
+              </div>
+              <div class="control-row control-row-mb">
+                <label for="curve50KSelect">Curve:</label>
+                <select id="curve50KSelect" class="control-input input-120">
+                  <option value="1">PT-100-20K (PT1011)</option>
+                  <option value="2">CX-1050-CD-BF1 (X64005)</option>
+                  <option value="5">CX-1010-CD-BF0 (X63593)</option>
+                  <option value="6">RU-1000-BF0.007 (U03308)</option>
+                </select>
+              </div>
+              <div class="control-row">
+                <button onclick="writeSettings50K()">Write Settings</button>
+              </div>
+              <div id="progressContainer50K" class="progress-container">
+                <div class="progress-track">
+                  <div id="progressBar50K" class="progress-fill"></div>
+                </div>
+                <div id="progressText50K" class="progress-text">
+                  Processing...
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="lakeshore-plot-panel">
+            <div class="control-row control-row-mb">
+              <button
+                class="inline-button reset-btn"
+                onclick="resetDefaults50K()"
+              >
+                Reset to default
+              </button>
+              <label for="timeRange50K" class="time-range-label-stage">
+                Time Range:
+              </label>
+              <select
+                id="timeRange50K"
+                class="time-range-select"
+                onchange="updateTimeRange50K()"
+              >
+                <option value="60" selected>1 Minute</option>
+                <option value="300">5 Minutes</option>
+                <option value="900">15 Minutes</option>
+                <option value="1800">30 Minutes</option>
+                <option value="3600">1 Hour</option>
+                <option value="21600">6 Hours</option>
+              </select>
+
+              <div id="statusCircleCH1" class="status-indicator-circle"></div>
+
+              <select id="current50KValue" class="current-stage-value">
+                <option value="temperature">- mK</option>
+                <option value="resistance">- Ω</option>
+                <option value="power">- W</option>
+              </select>
+            </div>
+            <canvas id="temperatureChart50K" width="800" height="200"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="blackbody-tab" class="tab-content">
+      <div class="container">
+        <div class="blackbody-control-panel">
+          <h1>BB Controller</h1>
+          <div class="section-title">Heater Control</div>
+          <div class="section-content">
+            <div class="control-group">
+              <div class="control-row">
+                <label for="temperatureSetpoint">Setpoint (K):</label>
+                <span id="currentTemperatureSetpoint" class="current-value">-</span>
+                <input
+                  type="number"
+                  id="temperatureSetpoint"
+                  class="control-input"
+                  step="0.1"
+                />
+              </div>
+              <div class="control-row">
+                <label for="heaterPower">Power:</label>
+                <span id="currentHeaterPower" class="current-value">-</span>
+                <input
+                  type="number"
+                  id="heaterPower"
+                  class="control-input"
+                  min="0"
+                  max="1"
+                  step="0.1"
+                />
+              </div>
+              <div class="control-row">
+                <label for="heaterRange">Range:</label>
+                <span id="currentHeaterRange" class="current-value">-</span>
+                <select id="heaterRange" class="control-input">
+                  <option value="OFF">OFF</option>
+                  <option value="LOW">LOW</option>
+                  <option value="MEDIUM">MEDIUM</option>
+                  <option value="HIGH">HIGH</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="section-title collapsed">Safety Parameters</div>
+          <div class="section-content collapsed">
+            <div class="control-group">
+              <div class="control-row">
+                <label for="temperatureLimit">Temp Limit (K):</label>
+                <span id="currentTemperatureLimit" class="current-value">-</span>
+                <input
+                  type="number"
+                  id="temperatureLimit"
+                  class="control-input"
+                  min="0"
+                  step="0.1"
+                />
+              </div>
+              <div class="control-row">
+                <label for="timeout">Timeout (s):</label>
+                <span id="currentTimeout" class="current-value">-</span>
+                <input
+                  type="number"
+                  id="timeout"
+                  class="control-input"
+                  min="0"
+                  step="1"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div class="section-title collapsed">PID Parameters</div>
+          <div class="section-content collapsed">
+            <div class="control-group">
+              <div class="control-row">
+                <label for="proportionalGain">P Gain:</label>
+                <span id="currentProportionalGain" class="current-value">-</span>
+                <input
+                  type="number"
+                  id="proportionalGain"
+                  class="control-input"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+              <div class="control-row">
+                <label for="integralGain">I Gain:</label>
+                <span id="currentIntegralGain" class="current-value">-</span>
+                <input
+                  type="number"
+                  id="integralGain"
+                  class="control-input"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+              <div class="control-row">
+                <label for="derivativeGain">D Gain:</label>
+                <span id="currentDerivativeGain" class="current-value">-</span>
+                <input
+                  type="number"
+                  id="derivativeGain"
+                  class="control-input"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+            </div>
+          </div>
+
+          <button onclick="sendControlParameters()">Update Parameters</button>
+
+          <div class="section-title">System Log</div>
+          <div class="section-content">
+            <div class="log-box" id="logBoxBB"></div>
+          </div>
+        </div>
+
+        <div class="blackbody-plot-panel">
+          <div class="time-range-selector">
+            <label for="timeRangeBB">Time Range:</label>
+            <select id="timeRangeBB" onchange="updateTimeRange()">
+              <option value="21600">6 Hours</option>
+              <option value="3600">1 Hour</option>
+              <option value="1800">30 Minutes</option>
+              <option value="900">15 Minutes</option>
+              <option value="300">5 Minutes</option>
+              <option value="60" selected>1 Minute</option>
+            </select>
+          </div>
+
+          <canvas id="temperatureChartBB"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div id="relation-tab" class="tab-content">
+      <div class="container relation-container">
+        <div class="relation-control-panel">
+          <h1>Resistance vs. TMXC</h1>
+
+          <!-- Main Channel List -->
+          <details class="channel-dropdown">
+            <summary class="channel-dropdown-summary">
+              <strong>CHANNEL ON/OFF </strong>
+              <span class="channel-dropdown-arrow">▾</span>
+            </summary>
+
+            <div class="channel-dropdown-menu">
+              <div class="control-row">
+                <div class="channel-name-wrapper">
+                  <label class="channel-name-label">Ch 9</label>
+                  <div id="statusCircleCH9" class="status-indicator-circle"></div>
+                </div>
+                <span class="rch-box rch-box-right" id="currentRCH9">--</span>
+                <label class="switch">
+                  <input
+                    type="checkbox"
+                    id="toggleExtraChannel9"
+                    onchange="globalToggleChannel('9')"
+                  />
+                  <span class="slider round"></span>
+                </label>
+                <details class="channel-dropdown channel-dropdown-extra">
+                  <summary class="channel-dropdown-summary summary-extra">
+                    <strong>Settings</strong>
+                    <span class="channel-dropdown-arrow">▾</span>
+                  </summary>
+                  <div class="channel-dropdown-menu menu-extra">
+                    <div class="control-row">
+                      <label for="sensorRangeCH9" class="settings-label">Excitation:</label>
+                      <select id="sensorRangeCH9" class="control-input settings-select-wide">
+                        <option value="1">2.00 uV and 1.00 pA</option>
+                        <option value="2">6.32 uV and 3.16 pA</option>
+                        <option value="3">20.0 uV and 10.0 pA</option>
+                        <option value="4">63.2 uV and 31.6 pA</option>
+                        <option value="5">200 uV and 100 pA</option>
+                        <option value="6">632 uV and 316 pA</option>
+                        <option value="7">2.00 mV and 1.00 nA</option>
+                        <option value="8">6.32 mV and 3.16 nA</option>
+                      </select>
+                    </div>
+                    <div class="control-row">
+                      <label for="sensorModeCH9" class="settings-label">Mode:</label>
+                      <select id="sensorModeCH9" class="control-input settings-select-narrow">
+                        <option value="0">Voltage</option>
+                        <option value="1">Current</option>
+                      </select>
+                    </div>
+                    <div class="control-row control-row-mt">
+                      <button
+                        onclick="writeSettingsExtraChannel9()"
+                        class="inline-button"
+                      >
+                        Write Settings
+                      </button>
+                    </div>
+                    <div id="progressContainerCH9" class="progress-container-small">
+                      <div class="progress-track-small">
+                        <div id="progressBarCH9" class="progress-fill-small"></div>
+                      </div>
+                      <div id="progressTextCH9" class="progress-text-small">Processing...</div>
+                    </div>
+                  </div>
+                </details>
+              </div>
+
+              <div class="control-row">
+                <div class="channel-name-wrapper">
+                  <label class="channel-name-label">Ch 10</label>
+                  <div id="statusCircleCH10" class="status-indicator-circle"></div>
+                </div>
+                <span class="rch-box rch-box-right" id="currentRCH10">--</span>
+                <label class="switch">
+                  <input
+                    type="checkbox"
+                    id="toggleExtraChannel10"
+                    onchange="globalToggleChannel('10')"
+                  />
+                  <span class="slider round"></span>
+                </label>
+                <details class="channel-dropdown channel-dropdown-extra">
+                  <summary class="channel-dropdown-summary summary-extra">
+                    <strong>Settings</strong>
+                    <span class="channel-dropdown-arrow">▾</span>
+                  </summary>
+                  <div class="channel-dropdown-menu menu-extra">
+                    <div class="control-row">
+                      <label for="sensorRangeCH10" class="settings-label">Excitation:</label>
+                      <select id="sensorRangeCH10" class="control-input settings-select-wide">
+                        <option value="1">2.00 uV and 1.00 pA</option>
+                        <option value="2">6.32 uV and 3.16 pA</option>
+                        <option value="3">20.0 uV and 10.0 pA</option>
+                        <option value="4">63.2 uV and 31.6 pA</option>
+                        <option value="5">200 uV and 100 pA</option>
+                        <option value="6">632 uV and 316 pA</option>
+                        <option value="7">2.00 mV and 1.00 nA</option>
+                        <option value="8">6.32 mV and 3.16 nA</option>
+                      </select>
+                    </div>
+                    <div class="control-row">
+                      <label for="sensorModeCH10" class="settings-label">Mode:</label>
+                      <select id="sensorModeCH10" class="control-input settings-select-narrow">
+                        <option value="0">Voltage</option>
+                        <option value="1">Current</option>
+                      </select>
+                    </div>
+                    <div class="control-row control-row-mt">
+                      <button
+                        onclick="writeSettingsExtraChannel10()"
+                        class="inline-button"
+                      >
+                        Write Settings
+                      </button>
+                    </div>
+                    <div id="progressContainerCH10" class="progress-container-small">
+                      <div class="progress-track-small">
+                        <div id="progressBarCH10" class="progress-fill-small"></div>
+                      </div>
+                      <div id="progressTextCH10" class="progress-text-small">Processing...</div>
+                    </div>
+                  </div>
+                </details>
+              </div>
+
+              <div class="control-row">
+                <div class="channel-name-wrapper">
+                  <label class="channel-name-label">Ch 11</label>
+                  <div id="statusCircleCH11" class="status-indicator-circle"></div>
+                </div>
+                <span class="rch-box rch-box-right" id="currentRCH11">--</span>
+                <label class="switch">
+                  <input
+                    type="checkbox"
+                    id="toggleExtraChannel11"
+                    onchange="globalToggleChannel('11')"
+                  />
+                  <span class="slider round"></span>
+                </label>
+                <details class="channel-dropdown channel-dropdown-extra">
+                  <summary class="channel-dropdown-summary summary-extra">
+                    <strong>Settings</strong>
+                    <span class="channel-dropdown-arrow">▾</span>
+                  </summary>
+                  <div class="channel-dropdown-menu menu-extra">
+                    <div class="control-row">
+                      <label for="sensorRangeCH11" class="settings-label">Excitation:</label>
+                      <select id="sensorRangeCH11" class="control-input settings-select-wide">
+                        <option value="1">2.00 uV and 1.00 pA</option>
+                        <option value="2">6.32 uV and 3.16 pA</option>
+                        <option value="3">20.0 uV and 10.0 pA</option>
+                        <option value="4">63.2 uV and 31.6 pA</option>
+                        <option value="5">200 uV and 100 pA</option>
+                        <option value="6">632 uV and 316 pA</option>
+                        <option value="7">2.00 mV and 1.00 nA</option>
+                        <option value="8">6.32 mV and 3.16 nA</option>
+                      </select>
+                    </div>
+                    <div class="control-row">
+                      <label for="sensorModeCH11" class="settings-label">Mode:</label>
+                      <select id="sensorModeCH11" class="control-input settings-select-narrow">
+                        <option value="0">Voltage</option>
+                        <option value="1">Current</option>
+                      </select>
+                    </div>
+                    <div class="control-row control-row-mt">
+                      <button
+                        onclick="writeSettingsExtraChannel11()"
+                        class="inline-button"
+                      >
+                        Write Settings
+                      </button>
+                    </div>
+                    <div id="progressContainerCH11" class="progress-container-small">
+                      <div class="progress-track-small">
+                        <div id="progressBarCH11" class="progress-fill-small"></div>
+                      </div>
+                      <div id="progressTextCH11" class="progress-text-small">Processing...</div>
+                    </div>
+                  </div>
+                </details>
+              </div>
+
+              <div class="control-row">
+                <div class="channel-name-wrapper">
+                  <label class="channel-name-label">Ch 12</label>
+                  <div id="statusCircleCH12" class="status-indicator-circle"></div>
+                </div>
+                <span class="rch-box rch-box-right" id="currentRCH12">--</span>
+                <label class="switch">
+                  <input
+                    type="checkbox"
+                    id="toggleExtraChannel12"
+                    onchange="globalToggleChannel('12')"
+                  />
+                  <span class="slider round"></span>
+                </label>
+                <details class="channel-dropdown channel-dropdown-extra">
+                  <summary class="channel-dropdown-summary summary-extra">
+                    <strong>Settings</strong>
+                    <span class="channel-dropdown-arrow">▾</span>
+                  </summary>
+                  <div class="channel-dropdown-menu menu-extra">
+                    <div class="control-row">
+                      <label for="sensorRangeCH12" class="settings-label">Excitation:</label>
+                      <select id="sensorRangeCH12" class="control-input settings-select-wide">
+                        <option value="1">2.00 uV and 1.00 pA</option>
+                        <option value="2">6.32 uV and 3.16 pA</option>
+                        <option value="3">20.0 uV and 10.0 pA</option>
+                        <option value="4">63.2 uV and 31.6 pA</option>
+                        <option value="5">200 uV and 100 pA</option>
+                        <option value="6">632 uV and 316 pA</option>
+                        <option value="7">2.00 mV and 1.00 nA</option>
+                        <option value="8">6.32 mV and 3.16 nA</option>
+                      </select>
+                    </div>
+                    <div class="control-row">
+                      <label for="sensorModeCH12" class="settings-label">Mode:</label>
+                      <select id="sensorModeCH12" class="control-input settings-select-narrow">
+                        <option value="0">Voltage</option>
+                        <option value="1">Current</option>
+                      </select>
+                    </div>
+                    <div class="control-row control-row-mt">
+                      <button
+                        onclick="writeSettingsExtraChannel12()"
+                        class="inline-button"
+                      >
+                        Write Settings
+                      </button>
+                    </div>
+                    <div id="progressContainerCH12" class="progress-container-small">
+                      <div class="progress-track-small">
+                        <div id="progressBarCH12" class="progress-fill-small"></div>
+                      </div>
+                      <div id="progressTextCH12" class="progress-text-small">Processing...</div>
+                    </div>
+                  </div>
+                </details>
+              </div>
+
+              <div class="control-row">
+                <div class="channel-name-wrapper">
+                  <label class="channel-name-label">Ch 13</label>
+                  <div id="statusCircleCH13" class="status-indicator-circle"></div>
+                </div>
+                <span class="rch-box rch-box-right" id="currentRCH13">--</span>
+                <label class="switch">
+                  <input
+                    type="checkbox"
+                    id="toggleExtraChannel13"
+                    onchange="globalToggleChannel('13')"
+                  />
+                  <span class="slider round"></span>
+                </label>
+                <details class="channel-dropdown channel-dropdown-extra">
+                  <summary class="channel-dropdown-summary summary-extra">
+                    <strong>Settings</strong>
+                    <span class="channel-dropdown-arrow">▾</span>
+                  </summary>
+                  <div class="channel-dropdown-menu menu-extra">
+                    <div class="control-row">
+                      <label for="sensorRangeCH13" class="settings-label">Excitation:</label>
+                      <select id="sensorRangeCH13" class="control-input settings-select-wide">
+                        <option value="1">2.00 uV and 1.00 pA</option>
+                        <option value="2">6.32 uV and 3.16 pA</option>
+                        <option value="3">20.0 uV and 10.0 pA</option>
+                        <option value="4">63.2 uV and 31.6 pA</option>
+                        <option value="5">200 uV and 100 pA</option>
+                        <option value="6">632 uV and 316 pA</option>
+                        <option value="7">2.00 mV and 1.00 nA</option>
+                        <option value="8">6.32 mV and 3.16 nA</option>
+                      </select>
+                    </div>
+                    <div class="control-row">
+                      <label for="sensorModeCH13" class="settings-label">Mode:</label>
+                      <select id="sensorModeCH13" class="control-input settings-select-narrow">
+                        <option value="0">Voltage</option>
+                        <option value="1">Current</option>
+                      </select>
+                    </div>
+                    <div class="control-row control-row-mt">
+                      <button
+                        onclick="writeSettingsExtraChannel13()"
+                        class="inline-button"
+                      >
+                        Write Settings
+                      </button>
+                    </div>
+                    <div id="progressContainerCH13" class="progress-container-small">
+                      <div class="progress-track-small">
+                        <div id="progressBarCH13" class="progress-fill-small"></div>
+                      </div>
+                      <div id="progressTextCH13" class="progress-text-small">Processing...</div>
+                    </div>
+                  </div>
+                </details>
+              </div>
+
+              <div class="control-row">
+                <div class="channel-name-wrapper">
+                  <label class="channel-name-label">Ch 14</label>
+                  <div id="statusCircleCH14" class="status-indicator-circle"></div>
+                </div>
+                <span class="rch-box rch-box-right" id="currentRCH14">--</span>
+                <label class="switch">
+                  <input
+                    type="checkbox"
+                    id="toggleExtraChannel14"
+                    onchange="globalToggleChannel('14')"
+                  />
+                  <span class="slider round"></span>
+                </label>
+                <details class="channel-dropdown channel-dropdown-extra">
+                  <summary class="channel-dropdown-summary summary-extra">
+                    <strong>Settings</strong>
+                    <span class="channel-dropdown-arrow">▾</span>
+                  </summary>
+                  <div class="channel-dropdown-menu menu-extra">
+                    <div class="control-row">
+                      <label for="sensorRangeCH14" class="settings-label">Excitation:</label>
+                      <select id="sensorRangeCH14" class="control-input settings-select-wide">
+                        <option value="1">2.00 uV and 1.00 pA</option>
+                        <option value="2">6.32 uV and 3.16 pA</option>
+                        <option value="3">20.0 uV and 10.0 pA</option>
+                        <option value="4">63.2 uV and 31.6 pA</option>
+                        <option value="5">200 uV and 100 pA</option>
+                        <option value="6">632 uV and 316 pA</option>
+                        <option value="7">2.00 mV and 1.00 nA</option>
+                        <option value="8">6.32 mV and 3.16 nA</option>
+                      </select>
+                    </div>
+                    <div class="control-row">
+                      <label for="sensorModeCH14" class="settings-label">Mode:</label>
+                      <select id="sensorModeCH14" class="control-input settings-select-narrow">
+                        <option value="0">Voltage</option>
+                        <option value="1">Current</option>
+                      </select>
+                    </div>
+                    <div class="control-row control-row-mt">
+                      <button
+                        onclick="writeSettingsExtraChannel14()"
+                        class="inline-button"
+                      >
+                        Write Settings
+                      </button>
+                    </div>
+                    <div id="progressContainerCH14" class="progress-container-small">
+                      <div class="progress-track-small">
+                        <div id="progressBarCH14" class="progress-fill-small"></div>
+                      </div>
+                      <div id="progressTextCH14" class="progress-text-small">Processing...</div>
+                    </div>
+                  </div>
+                </details>
+              </div>
+
+              <div class="control-row">
+                <div class="channel-name-wrapper">
+                  <label class="channel-name-label">Ch 15</label>
+                  <div id="statusCircleCH15" class="status-indicator-circle"></div>
+                </div>
+                <span class="rch-box rch-box-right" id="currentRCH15">--</span>
+                <label class="switch">
+                  <input
+                    type="checkbox"
+                    id="toggleExtraChannel15"
+                    onchange="globalToggleChannel('15')"
+                  />
+                  <span class="slider round"></span>
+                </label>
+                <details class="channel-dropdown channel-dropdown-extra">
+                  <summary class="channel-dropdown-summary summary-extra">
+                    <strong>Settings</strong>
+                    <span class="channel-dropdown-arrow">▾</span>
+                  </summary>
+                  <div class="channel-dropdown-menu menu-extra">
+                    <div class="control-row">
+                      <label for="sensorRangeCH15" class="settings-label">Excitation:</label>
+                      <select id="sensorRangeCH15" class="control-input settings-select-wide">
+                        <option value="1">2.00 uV and 1.00 pA</option>
+                        <option value="2">6.32 uV and 3.16 pA</option>
+                        <option value="3">20.0 uV and 10.0 pA</option>
+                        <option value="4">63.2 uV and 31.6 pA</option>
+                        <option value="5">200 uV and 100 pA</option>
+                        <option value="6">632 uV and 316 pA</option>
+                        <option value="7">2.00 mV and 1.00 nA</option>
+                        <option value="8">6.32 mV and 3.16 nA</option>
+                      </select>
+                    </div>
+                    <div class="control-row">
+                      <label for="sensorModeCH15" class="settings-label">Mode:</label>
+                      <select id="sensorModeCH15" class="control-input settings-select-narrow">
+                        <option value="0">Voltage</option>
+                        <option value="1">Current</option>
+                      </select>
+                    </div>
+                    <div class="control-row control-row-mt">
+                      <button
+                        onclick="writeSettingsExtraChannel15()"
+                        class="inline-button"
+                      >
+                        Write Settings
+                      </button>
+                    </div>
+                    <div id="progressContainerCH15" class="progress-container-small">
+                      <div class="progress-track-small">
+                        <div id="progressBarCH15" class="progress-fill-small"></div>
+                      </div>
+                      <div id="progressTextCH15" class="progress-text-small">Processing...</div>
+                    </div>
+                  </div>
+                </details>
+              </div>
+            </div>
+          </details>
+
+          <div class="section-title">Relation plot</div>
+          <div class="section-content">
+            <div class="control-group">
+              <div class="control-row control-row-mt">
+                <label>MXC (x):</label>
+                <span id="relationCurrentMXC" class="current-value">-</span>
+              </div>
+              <div class="control-row">
+                <label>R channel (y):</label>
+                <span id="relationCurrentR" class="current-value">-</span>
+              </div>
+              <div class="control-row">
+                <div id="relationCurrentConfig" class="relation-current-config">
+                  <div class="relation-config-title">
+                    <strong>Actual configuration (could be different):</strong>
+                  </div>
+                  <ul class="relation-config-list">
+                    <li>CH9 → Ti #1</li>
+                    <li>CH10 → TiAu #1</li>
+                    <li>CH12 → TiAlAu #1</li>
+                    <li>CH13 → Ti #2</li>
+                    <li>CH14 → Ti #3</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <div class="control-row control-row-center">
+              <label>MXC control:</label>
+
+              <select
+                id="relationModeSelect"
+                class="styled-select select-120"
+              >
+                <option value="MANUAL">Manual</option>
+                <option value="RAMP">Ramp</option>
+              </select>
+            </div>
+
+            <div id="relationRampControls">
+              <div class="control-row control-row-center">
+                <label>Target:</label>
+
+                <input
+                  id="relationTargetInput"
+                  type="number"
+                  value="100"
+                  min="0.001"
+                  step="0.1"
+                  class="input-small"
+                />
+
+                <span class="unit-label">mK</span>
+              </div>
+
+              <div class="control-row control-row-center">
+                <label>Ramp rate:</label>
+
+                <input
+                  id="relationRateInput"
+                  type="number"
+                  value="10"
+                  min="0.001"
+                  step="0.1"
+                  class="input-small"
+                />
+
+                <span class="unit-label">mK/min</span>
+              </div>
+            </div>
+
+            <div class="control-row control-row-center">
+              <label>Channel:</label>
+
+              <select
+                id="relationChannelSelect"
+                class="styled-select select-120"
+                onchange="onRelationChannelChange()"
+              >
+                <option value="CH9">CH9</option>
+                <option value="CH10">CH10</option>
+                <option value="CH11">CH11</option>
+                <option value="CH12">CH12</option>
+                <option value="CH13">CH13</option>
+                <option value="CH14">CH14</option>
+                <option value="CH15">CH15</option>
+              </select>
+
+              <input
+                id="relationLabelInput"
+                type="text"
+                placeholder="Etiqueta"
+                class="relation-label-input"
+              />
+            </div>
+            <div class="control-row control-row-actions">
+              <button
+                id="relationStartButton"
+                class="inline-button run-play-button btn-120"
+              >
+                ▶
+              </button>
+
+              <button
+                id="relationStopButton"
+                class="inline-button run-stop-button btn-120"
+                disabled
+              >
+                ⏹
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="relation-plot-panel">
+          <canvas id="relationChart"></canvas>
+        </div>
+      </div>
+      <!-- Progress bar for Extra channels (CH9..CH15) -->
+      <div id="progressContainerEXTRA" class="progress-container">
+        <div class="progress-track">
+          <div id="progressBarEXTRA" class="progress-fill"></div>
+        </div>
+        <div id="progressTextEXTRA" class="progress-text">Processing...</div>
+      </div>
+
+      <!-- Relation reconstruction (historical .dat) -->
+      <div class="relation-reconstruction-section">
+        <h2>Reconstruction of saved .dat</h2>
+
+        <div class="relation-reconstruction-row">
+          <select id="relationFilesSelect" class="styled-select">
+            <option value="">Selecciona un .dat...</option>
+          </select>
+
+          <button
+            id="relationFilesRefreshButton"
+            class="inline-button"
+            title="Refresh list"
+          >
+            ⟳
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Archivos de la aplicación modularizada -->
+    <script src="js/state.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/charts.js"></script>
+    <script src="js/controls.js"></script>
+    <script src="js/business.js"></script>
+    <script src="js/particles.js"></script>
+    <script src="js/main.js"></script>
+  </body>
+</html>
