@@ -1,0 +1,23 @@
+# Default values for the STEP_RAMP frontend.
+#
+# Temperatures are expressed in mK.
+# Times and intervals are expressed in seconds.
+
+initial_mk: 650.0
+target_mk: 500.0
+step_mk: 2.0
+
+tolerance_mk: 0.5
+stable_time_s: 60.0
+stability_timeout_s: 3600.0
+stability_sample_interval_s: 2.0
+
+autorange_max_attempts: 22
+
+resistance_n_samples: 10
+resistance_sample_interval_s: 0.5
+resistance_max_attempts: 30
+
+max_std_mk: null
+max_slope_mk_per_min: null
+point_measurement_max_attempts: 3

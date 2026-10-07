@@ -6,22 +6,27 @@ import threading
 import urllib.parse
 import re
 import psycopg2
+import math
 
 from psycopg2.pool import ThreadedConnectionPool
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
-from default_config import (DEFAULT_PID, CURRENT_RANGE_LIST, DEFAULT_MXC_RESISTANCE_RANGE_SETTINGS, SENSOR_RESISTANCE_RANGE_LIST, DEFAULT_CHANNELS, DEFAULT_EXTRA_CHANNELS, 
+from default_config import (DEFAULT_PID, CURRENT_RANGE_LIST, DEFAULT_MXC_RESISTANCE_RANGE_SETTINGS, SENSOR_RESISTANCE_RANGE_LIST, DEFAULT_CHANNELS, 
                             DEFAULT_CHANNELS_ID, DEFAULT_SETTINGS, DEFAULT_MXC_SETPOINT_MK, DEFAULT_MXC_HEATER_RANGE, DEFAULT_SENSOR_RESISTANCE_SETTINGS, DB_INSERT_INTERVAL, 
-                            DEFAULT_CURVES, CURVE_NAMES, SAMPLE_CHANNELS
+                            DEFAULT_CURVES, CURVE_NAMES, SAMPLE_CHANNELS, SUPPORTED_CHANNELS
                             )
 from default_config import (
-    BBCON_NAME, MAX_BBCON_SETPOINT, ATTEMPTS
+    BBCON_NAME, MAX_BBCON_SETPOINT, ATTEMPTS, 
+    MAX_LAKESHORE_TEMPERATURE, MIN_LAKESHORE_TEMPERATURE
 )
 
 from colors import RESET, BOLD, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, GRAY
 
-from lakeshore370 import LakeShore370
+from lakeshore370 import (
+    LakeShore370,
+    validate_resistance_measurement_combination,
+)
 try:
     from bbcon import BBCON
 except ImportError as e:
@@ -53,6 +58,10 @@ CURRENT_RUN_ID    = None
 last_sensorValues  = None
 last_controlParams = None
 last_sensorParams  = None
+
+# Global variables to store the last MXC temperature and timestamp (monotonic)
+last_mxc_temperature_mk        = None
+last_mxc_temperature_monotonic = None
 
 # Global variable used to store bbcon telemetry data.
 last_bbcon_data = {
@@ -86,6 +95,11 @@ RELATION_METADATA = {}
 RELATION_RAMP_CONTROLLED      = False
 RELATION_RAMP_TARGET_MK       = None
 RELATION_RAMP_RATE_MK_PER_MIN = None
+# STEP_RAMP controller.
+#
+# The reference is intentionally retained after completion so that
+# its terminal status can later be exposed to the frontend.
+RELATION_STEP_RAMP_CONTROLLER: RelationStepRampController | None = None
 
 def init_db_pool():
     global DB_POOL
@@ -492,6 +506,48 @@ def _append_relation_point(
 
     return True
 
+
+def _get_mxc_temperature_sample(
+) -> tuple[float | None, float | None]:
+    """
+    Return the latest MXC telemetry sample for STEP_RAMP.
+
+    Returns
+    -------
+    tuple
+        (
+            temperature_mk,
+            acquisition_monotonic_s,
+        )
+
+        Both values are None until the Lake Shore telemetry thread has
+        acquired its first valid MXC temperature.
+
+    Notes
+    -----
+    The monotonic timestamp corresponds to the instant at which the
+    temperature was acquired from the Lake Shore, not to the instant at
+    which this function is called.
+
+    This allows RelationStepRampController to distinguish genuinely new
+    telemetry samples from repeated reads of the same cached value.
+    """
+
+    with telemetry_lock:
+
+        temperature_mk = (
+            last_mxc_temperature_mk
+        )
+
+        sample_monotonic_s = (
+            last_mxc_temperature_monotonic
+        )
+
+    return (
+        temperature_mk,
+        sample_monotonic_s,
+    )
+
 def build_step_ramp_setpoints(
     initial_mk: float,
     target_mk: float,
@@ -776,6 +832,428 @@ def start_relation_ramp(
 
     return relation_id, None
 
+def start_relation_step_ramp(
+    channel_number                 : int,
+    initial_mk                     : float,
+    target_mk                      : float,
+    step_mk                        : float,
+    tolerance_mk                   : float,
+    stable_time_s                  : float,
+    stability_timeout_s            : float,
+    stability_sample_interval_s    : float,
+    autorange_max_attempts         : int,
+    resistance_n_samples           : int,
+    resistance_sample_interval_s   : float,
+    resistance_max_attempts        : int,
+    label                          : str   | None = None,
+    max_std_mk                     : float | None = None,
+    max_slope_mk_per_min           : float | None = None,
+    point_measurement_max_attempts : int   | None = None,
+):
+    """
+    Start a backend-controlled STEP_RAMP relation.
+
+    STEP_RAMP uses a sequence of discrete MXC setpoints. It does not use
+    the native Lake Shore RAMP command.
+
+    The initial point is supplied explicitly by the client in initial_mk.
+    build_step_ramp_setpoints() constructs the complete discrete sequence
+    from initial_mk to target_mk, including both endpoints.
+
+    Returns
+    -------
+    tuple
+        (relation_id, None) on success.
+
+        (None, error_message) if the STEP_RAMP could not be started.
+    """
+
+    global RELATION_STEP_RAMP_CONTROLLER
+
+    # ==================================================================
+    # Basic request validation
+    # ==================================================================
+
+    try:
+        channel_number = int(
+            channel_number
+        )
+
+    except (TypeError, ValueError):
+        return None, (
+            "STEP_RAMP channel_number must be an integer."
+        )
+
+    if channel_number not in SAMPLE_CHANNELS:
+        return None, (
+            f"Invalid STEP_RAMP channel {channel_number}. "
+            f"Valid channels are: {SAMPLE_CHANNELS}."
+        )
+
+    try:
+
+        initial_mk = float(
+            initial_mk
+        )
+
+        target_mk = float(
+            target_mk
+        )
+
+        step_mk = float(
+            step_mk
+        )
+
+        tolerance_mk = float(
+            tolerance_mk
+        )
+
+        stable_time_s = float(
+            stable_time_s
+        )
+
+        stability_timeout_s = float(
+            stability_timeout_s
+        )
+
+        stability_sample_interval_s = float(
+            stability_sample_interval_s
+        )
+
+        resistance_sample_interval_s = float(
+            resistance_sample_interval_s
+        )
+
+    except (TypeError, ValueError) as exc:
+
+        return None, (
+            "STEP_RAMP temperature/timing parameters "
+            f"must be numeric: {exc}"
+        )
+
+    float_parameters = {
+
+        "initial_mk":
+            initial_mk,
+
+        "target_mk":
+            target_mk,
+
+        "step_mk":
+            step_mk,
+
+        "tolerance_mk":
+            tolerance_mk,
+
+        "stable_time_s":
+            stable_time_s,
+
+        "stability_timeout_s":
+            stability_timeout_s,
+
+        "stability_sample_interval_s":
+            stability_sample_interval_s,
+
+        "resistance_sample_interval_s":
+            resistance_sample_interval_s,
+    }
+
+    for name, value in float_parameters.items():
+
+        if not math.isfinite(value):
+            return None, (
+                f"{name} must be finite."
+            )
+
+    if not MIN_LAKESHORE_TEMPERATURE <= initial_mk <= MAX_LAKESHORE_TEMPERATURE:
+        return None, (
+            f"initial_mk must be between "
+            f"{MIN_LAKESHORE_TEMPERATURE} and "
+            f"{MAX_LAKESHORE_TEMPERATURE} mK."
+        )
+
+    if step_mk <= 0:
+        return None, (
+            "step_mk must be greater than zero."
+        )
+
+    # ==================================================================
+    # Do not start over another running STEP_RAMP controller.
+    #
+    # _start_relation_common() separately protects all RELATION modes.
+    # ==================================================================
+
+    with relation_lock:
+
+        existing_controller = (
+            RELATION_STEP_RAMP_CONTROLLER
+        )
+
+    if (
+        existing_controller is not None
+        and existing_controller.is_running()
+    ):
+        return None, (
+            "A STEP_RAMP controller is already running."
+        )
+
+    # ==================================================================
+    # Build discrete setpoint sequence.
+    # ==================================================================
+
+    try:
+        setpoints_mk = (
+            build_step_ramp_setpoints(
+                initial_mk = initial_mk,
+                target_mk  = target_mk,
+                step_mk    = step_mk,
+            )
+        )
+
+    except Exception as exc:
+
+        return None, (
+            "Could not build STEP_RAMP setpoints: "
+            f"{exc}"
+        )
+
+    # ==================================================================
+    # Store acquisition parameters in the RELATION metadata.
+    #
+    # This makes the saved .dat self-describing without changing the
+    # database schema or the existing point columns.
+    # ==================================================================
+
+    step_ramp_metadata = {
+        "initial_mk":
+            initial_mk,
+
+        "target_mk":
+            target_mk,
+
+        "step_mk":
+            step_mk,
+
+        "setpoints_mk":
+            list(setpoints_mk),
+
+        "tolerance_mk":
+            tolerance_mk,
+
+        "stable_time_s":
+            stable_time_s,
+
+        "stability_timeout_s":
+            stability_timeout_s,
+
+        "stability_sample_interval_s":
+            stability_sample_interval_s,
+
+        "max_std_mk":
+            max_std_mk,
+
+        "max_slope_mk_per_min":
+            max_slope_mk_per_min,
+
+        "autorange_max_attempts":
+            autorange_max_attempts,
+
+        "resistance_n_samples":
+            resistance_n_samples,
+
+        "resistance_sample_interval_s":
+            resistance_sample_interval_s,
+
+        "resistance_max_attempts":
+            resistance_max_attempts,
+
+        "point_measurement_max_attempts":
+            point_measurement_max_attempts,
+    }
+
+    # ==================================================================
+    # Open the RELATION as STEP_RAMP.
+    # ==================================================================
+
+    relation_id = _start_relation_common(
+        channel_number=channel_number,
+        label=label,
+        mode="STEP_RAMP",
+        metadata=step_ramp_metadata,
+    )
+
+    if relation_id is None:
+
+        return None, (
+            "Could not start the STEP_RAMP relation."
+        )
+
+    # ==================================================================
+    # Build controller.
+    #
+    # Constructor validation is deliberately allowed to perform the
+    # detailed validation of integer/optional acquisition parameters.
+    # If construction fails, the RELATION is released before returning.
+    # ==================================================================
+
+    try:
+
+        controller = RelationStepRampController(
+            lakeshore=ls,
+            heater_mutex=heater_mutex,
+
+            relation_id=relation_id,
+            channel_number=channel_number,
+
+            setpoints_mk=setpoints_mk,
+            target_mk=target_mk,
+            step_mk=step_mk,
+
+            tolerance_mk=tolerance_mk,
+            stable_time_s=stable_time_s,
+
+            stability_timeout_s=(
+                stability_timeout_s
+            ),
+
+            stability_sample_interval_s=(
+                stability_sample_interval_s
+            ),
+
+            autorange_max_attempts=(
+                autorange_max_attempts
+            ),
+
+            resistance_n_samples=(
+                resistance_n_samples
+            ),
+
+            resistance_sample_interval_s=(
+                resistance_sample_interval_s
+            ),
+
+            resistance_max_attempts=(
+                resistance_max_attempts
+            ),
+
+            max_std_mk=max_std_mk,
+
+            max_slope_mk_per_min=(
+                max_slope_mk_per_min
+            ),
+
+            point_measurement_max_attempts=(
+                point_measurement_max_attempts
+            ),
+
+            append_point=(
+                _append_relation_point
+            ),
+
+            finalize_relation=(
+                _finalize_relation
+            ),
+
+            get_mxc_temperature_sample=(
+                _get_mxc_temperature_sample
+            ),
+        )
+
+    except Exception as exc:
+
+        _reset_relation_state(
+            expected_relation_id=relation_id
+        )
+
+        print(
+            "❌ Could not create STEP_RAMP controller."
+            f"\nReason: {exc}"
+        )
+
+        return None, str(exc)
+
+    # ==================================================================
+    # Publish and start controller atomically with respect to RELATION
+    # state changes.
+    #
+    # This closes the short race between creating the RELATION and
+    # launching its worker.
+    # ==================================================================
+
+    try:
+
+        with relation_lock:
+
+            relation_still_active = (
+                RELATION_ACTIVE
+                and RELATION_RUN_ID == relation_id
+                and RELATION_MODE == "STEP_RAMP"
+            )
+
+            if not relation_still_active:
+
+                return None, (
+                    "STEP_RAMP relation was stopped "
+                    "during startup."
+                )
+
+            RELATION_STEP_RAMP_CONTROLLER = (
+                controller
+            )
+
+            started = controller.start()
+
+    except Exception as exc:
+
+        with relation_lock:
+
+            if (
+                RELATION_STEP_RAMP_CONTROLLER
+                is controller
+            ):
+                RELATION_STEP_RAMP_CONTROLLER = None
+
+        _reset_relation_state(
+            expected_relation_id=relation_id
+        )
+
+        print(
+            "❌ Could not start STEP_RAMP worker."
+            f"\nReason: {exc}"
+        )
+
+        return None, str(exc)
+
+    if not started:
+
+        with relation_lock:
+
+            if (
+                RELATION_STEP_RAMP_CONTROLLER
+                is controller
+            ):
+                RELATION_STEP_RAMP_CONTROLLER = None
+
+        _reset_relation_state(
+            expected_relation_id=relation_id
+        )
+
+        return None, (
+            "STEP_RAMP worker could not be started."
+        )
+
+    print(
+        "▶ STEP_RAMP controller started "
+        f"file={relation_id}, "
+        f"CH{channel_number}, "
+        f"initial={initial_mk:g} mK, "
+        f"target={target_mk:g} mK, "
+        f"step={step_mk:g} mK, "
+        f"points={len(setpoints_mk)}"
+    )
+
+    return relation_id, None
+
 def _finalize_relation(
     expected_relation_id: str | None = None,
 ):
@@ -916,11 +1394,20 @@ def _finalize_relation(
 
                     conn.commit()
 
-        except Exception as e:
-            print(
-                "❌ Error guardando relation file "
-                f"{file_name}: {e}"
+        except Exception as exc:
+
+            message = (
+                "Could not persist RELATION file "
+                f"{file_name} in PostgreSQL: {exc}"
             )
+
+            print(
+                f"❌ {message}"
+            )
+
+            raise RuntimeError(
+                message
+            ) from exc
 
     finally:
         _reset_relation_state(
@@ -934,9 +1421,270 @@ def _finalize_relation(
 
     return file_name, n_points
 
-def stop_relation():
-    return _finalize_relation()
+def stop_relation() -> dict:
 
+    """
+    Stop the active RELATION using the procedure appropriate for its mode.
+
+    MANUAL / RAMP
+        Finalize synchronously using the existing RELATION mechanism.
+
+    STEP_RAMP
+        Do not finalize directly. Request asynchronous termination of the
+        RelationStepRampController. The worker itself is responsible for:
+
+            abort
+            -> cleanup
+            -> relation finalization
+
+    Returns
+    -------
+    dict
+        Result describing whether the relation was finalized immediately,
+        a STEP_RAMP stop was requested, or no relation was active.
+    """
+
+    with relation_lock:
+
+        relation_id = RELATION_RUN_ID
+        relation_active = RELATION_ACTIVE
+        relation_mode = RELATION_MODE
+
+        step_ramp_controller = (
+            RELATION_STEP_RAMP_CONTROLLER
+        )
+
+    # ==================================================================
+    # No relation exists.
+    # ==================================================================
+
+    if relation_id is None:
+
+        return {
+            "status": "NO_ACTIVE_RELATION",
+            "relation_id": None,
+        }
+
+    # ==================================================================
+    # RELATION_ACTIVE is already False but RUN_ID still exists.
+    #
+    # This is the short interval while _finalize_relation() is doing its
+    # slow persistence work outside relation_lock.
+    # ==================================================================
+
+    if not relation_active:
+
+        return {
+            "status": "STOPPING",
+            "relation_id": relation_id,
+        }
+
+    # ==================================================================
+    # STEP_RAMP
+    #
+    # Never call _finalize_relation() directly here.
+    # ==================================================================
+
+    if relation_mode == "STEP_RAMP":
+
+        if step_ramp_controller is None:
+
+            return {
+                "status": "ERROR",
+                "relation_id": relation_id,
+                "error": (
+                    "STEP_RAMP relation is active but no "
+                    "controller is available."
+                ),
+            }
+
+        if (
+            step_ramp_controller.relation_id
+            != relation_id
+        ):
+
+            return {
+                "status": "ERROR",
+                "relation_id": relation_id,
+                "error": (
+                    "STEP_RAMP controller does not match "
+                    "the active relation."
+                ),
+            }
+
+        controller_status = (
+            step_ramp_controller.get_status()
+        )
+
+        if not step_ramp_controller.is_running():
+
+            return {
+                "status": "ERROR",
+                "relation_id": relation_id,
+                "error": (
+                    "STEP_RAMP relation is active but its "
+                    "controller worker is not running. "
+                    f"Controller state="
+                    f"{controller_status.get('state')}."
+                ),
+            }
+
+        stop_requested = (
+            step_ramp_controller.request_stop()
+        )
+
+        if not stop_requested:
+
+            return {
+                "status": "STOPPING",
+                "relation_id": relation_id,
+            }
+
+        print(
+            "⏹ STEP_RAMP stop requested "
+            f"file={relation_id}"
+        )
+
+        return {
+            "status": "STOP_REQUESTED",
+            "relation_id": relation_id,
+        }
+
+    # ==================================================================
+    # MANUAL / native RAMP
+    #
+    # Preserve the existing synchronous behaviour.
+    # ==================================================================
+
+    try:
+
+        finalized_relation_id, n_points = (
+            _finalize_relation(
+                expected_relation_id=relation_id
+            )
+        )
+
+    except Exception as exc:
+
+        return {
+            "status": "ERROR",
+            "relation_id": relation_id,
+            "error": (
+                "RELATION finalization failed: "
+                f"{exc}"
+            ),
+        }
+
+
+    if finalized_relation_id is None:
+
+        return {
+            "status": "ERROR",
+            "relation_id": relation_id,
+            "error": (
+                "RELATION could not be finalized."
+            ),
+        }
+
+
+    return {
+        "status": "FINALIZED",
+        "relation_id": finalized_relation_id,
+        "n_points": n_points,
+    }
+
+def _step_ramp_blocks_command(
+    command: str,
+) -> bool:
+    """
+    Return True if a TCP command would interfere with an active
+    STEP_RAMP controller.
+
+    STEP_RAMP temporarily owns the Lake Shore configuration required for
+    discrete temperature stabilization and resistance measurement.
+
+    Read-only commands are not blocked here.
+    """
+
+    cmd = command.strip()
+
+    # ==================================================================
+    # Is a STEP_RAMP relation actually active?
+    # ==================================================================
+
+    with relation_lock:
+
+        step_ramp_active = (
+            RELATION_ACTIVE
+            and RELATION_RUN_ID is not None
+            and RELATION_MODE == "STEP_RAMP"
+        )
+
+        relation_id = (
+            RELATION_RUN_ID
+        )
+
+        controller = (
+            RELATION_STEP_RAMP_CONTROLLER
+        )
+
+    if not step_ramp_active:
+        return False
+
+    # A missing/mismatched controller is already an abnormal condition,
+    # but the hardware must still remain protected while the relation
+    # state says STEP_RAMP is active.
+    if (
+        controller is not None
+        and controller.relation_id != relation_id
+    ):
+        return True
+
+    # ==================================================================
+    # Commands that may change MXC control or measurement conditions.
+    # ==================================================================
+
+    blocked_prefixes = (
+        # MXC temperature control
+        "set_mxc_temperature_setpoint",
+        "set_mxc_proportional_gain",
+        "set_mxc_integral_gain",
+        "set_mxc_derivative_gain",
+        "set_mxc_heater_range",
+        "clear_mxc_pid_integrator",
+
+        # MXC input configuration
+        "set_dwell_mxc",
+        "set_pause_mxc",
+        "set_sensor_range_mxc",
+        "set_sensor_mode_mxc",
+        "set_autorange_mxc",
+        "set_curve_mxc",
+        "set_channel_mxc",
+        "reset_defaults_mxc",
+
+        # Scanner ownership
+        "set_autoscan",
+        "select_measure_channel:",
+        "recover_scan",
+
+        # Sample-channel measurement configuration
+        "set_sample_resistance_settings",
+        "set_sensor_range_ch",
+        "set_sensor_mode_ch",
+
+        # Sample-channel enable/disable state
+        "set_channel_9",
+        "set_channel_10",
+        "set_channel_11",
+        "set_channel_12",
+        "set_channel_13",
+        "set_channel_14",
+    )
+
+    return cmd.startswith(
+        blocked_prefixes
+    )
 
 def apply_default_channel_timing(channel: int) -> bool:
     """
@@ -1096,9 +1844,48 @@ current_curves = {
 }
 
 extra_excitation = {
-    ch: {"excitation_mode": None, "excitation_range": None}
-    for ch in SAMPLE_CHANNELS  # [9..15]
+    ch: {
+        "excitation_mode": None,
+        "excitation_range": None,
+        "resistance_range": None,
+        "autorange": None,
+        # Lake Shore RDGRNG convention: 0 = excitation ON, 1 = OFF.
+        "excitation": None,
+    }
+    for ch in SAMPLE_CHANNELS  # [9..14]
 }
+
+
+def _cache_sample_measurement_settings(
+    channel: int,
+    settings: dict | None,
+) -> None:
+    """Store one validated RDGRNG readback for telemetry."""
+
+    if channel not in SAMPLE_CHANNELS:
+        raise ValueError(
+            f"Invalid sample channel {channel}. "
+            f"Valid channels are: {SAMPLE_CHANNELS}"
+        )
+
+    keys = (
+        "excitation_mode",
+        "excitation_range",
+        "resistance_range",
+        "autorange",
+        "excitation",
+    )
+
+    for key in keys:
+        value = settings.get(key) if isinstance(settings, dict) else None
+
+        try:
+            extra_excitation[channel][key] = (
+                None if value is None else int(value)
+            )
+
+        except (TypeError, ValueError):
+            extra_excitation[channel][key] = None
 
 def _is_connected(sock) -> bool:
     try:
@@ -1153,6 +1940,205 @@ def handle_command(command):
 
     cmd = command.strip()
 
+    if _step_ramp_blocks_command(cmd):
+        return (
+            "❌ Command blocked while STEP_RAMP is active: "
+            f"{cmd.split(':', 1)[0]}"
+        )
+    
+    if cmd.startswith("get_channel_curve:"):
+        try:
+            channel = int(cmd.split(":", 1)[1])
+
+            if channel not in SAMPLE_CHANNELS:
+                return (
+                    f"❌ Invalid sample channel: {channel}. "
+                    f"Valid channels are: {SAMPLE_CHANNELS}"
+                )
+
+            with heater_mutex:
+                curve = ls.get_channel_curve(channel)
+
+            if curve is None:
+                return (
+                    f"❌ Could not read the curve assigned to "
+                    f"CH{channel}"
+                )
+
+            return f"CHANNEL_CURVE:CH{channel}:{curve}"
+
+        except (TypeError, ValueError, IndexError) as exc:
+            return f"❌ Invalid get_channel_curve command: {exc}"
+
+        except Exception as exc:
+            return (
+                f"❌ Error reading the curve assigned to "
+                f"the sample channel: {exc}"
+            )
+
+    if cmd.startswith("set_sample_curve_none:"):
+        try:
+            channel = int(cmd.split(":", 1)[1])
+
+            if channel not in SAMPLE_CHANNELS:
+                return (
+                    f"❌ Invalid sample channel: {channel}. "
+                    f"Valid channels are: {SAMPLE_CHANNELS}"
+                )
+
+            with heater_mutex:
+                enabled_before = ls.get_channel_status(channel)
+
+                if enabled_before is None:
+                    return (
+                        f"❌ Could not read the current state "
+                        f"of CH{channel}"
+                    )
+
+                if int(enabled_before) != 0:
+                    return (
+                        f"❌ CH{channel} must be OFF before "
+                        f"changing its curve"
+                    )
+
+                success = ls.set_channel_curve(
+                    curve_number=0,
+                    channel=channel,
+                )
+
+                curve_after = ls.get_channel_curve(channel)
+                enabled_after = ls.get_channel_status(channel)
+
+            if success is not True:
+                return (
+                    f"❌ Could not assign No Curve to "
+                    f"CH{channel}"
+                )
+
+            if curve_after != 0:
+                return (
+                    f"❌ Curve readback failed for CH{channel}: "
+                    f"expected 0, read back {curve_after!r}"
+                )
+
+            if enabled_after is None or int(enabled_after) != 0:
+                return (
+                    f"❌ CH{channel} did not remain OFF after "
+                    f"changing its curve"
+                )
+
+            return (
+                f"CHANNEL_CURVE_SET:CH{channel}:0:"
+                f"CHANNEL_REMAINED_OFF"
+            )
+
+        except (TypeError, ValueError, IndexError) as exc:
+            return (
+                f"❌ Invalid set_sample_curve_none command: "
+                f"{exc}"
+            )
+
+        except Exception as exc:
+            return (
+                f"❌ Error assigning No Curve to the "
+                f"sample channel: {exc}"
+            )
+
+    if cmd.startswith("get_mxc_control_diagnostics:"):
+        try:
+            sample_channel = int(
+                cmd.split(":", 1)[1]
+            )
+
+            if sample_channel not in SAMPLE_CHANNELS:
+                return (
+                    f"❌ Invalid sample channel: "
+                    f"{sample_channel}. "
+                    f"Valid channels are: {SAMPLE_CHANNELS}"
+                )
+
+            with heater_mutex:
+                diagnostics = (
+                    ls.get_control_diagnostics(
+                        sample_channel
+                    )
+                )
+
+            if not isinstance(diagnostics, dict):
+                return (
+                    "❌ Could not read Lake Shore "
+                    "control diagnostics"
+                )
+
+            return (
+                "MXC_CONTROL_DIAGNOSTICS:"
+                + json.dumps(
+                    diagnostics,
+                    sort_keys=True,
+                )
+            )
+
+        except (TypeError, ValueError, IndexError) as exc:
+            return (
+                "❌ Invalid control-diagnostics command: "
+                f"{exc}"
+            )
+
+        except Exception as exc:
+            return (
+                "❌ Error reading Lake Shore "
+                f"control diagnostics: {exc}"
+            )
+    if cmd == "clear_mxc_pid_integrator":
+        try:
+            with heater_mutex:
+                result = (
+                    ls.clear_pid_integrator_hold()
+                )
+
+            if not isinstance(result, dict):
+                message = (
+                    "❌ Invalid result while clearing the "
+                    "MXC PID integrator"
+                )
+                print(message)
+                return message
+
+            if result.get("ok") is not True:
+                message = (
+                    "❌ Could not clear the MXC PID "
+                    "integrator: "
+                    + json.dumps(
+                        result,
+                        sort_keys=True,
+                    )
+                )
+                print(message)
+                return message
+
+            # The driver has verified that the physical heater
+            # range remains OFF.
+            current_mxc_heater_range = "0"
+
+            message = (
+                "MXC_PID_INTEGRATOR_CLEARED:"
+                + json.dumps(
+                    result,
+                    sort_keys=True,
+                )
+            )
+
+            print(message)
+            return message
+
+        except Exception as exc:
+            message = (
+                "❌ Error clearing the MXC PID "
+                f"integrator: {exc}"
+            )
+            print(message)
+            return message
+    
     CHECK_STATUS_COMMANDS = (
         "check_bbcon",
         "check_lakeshore"
@@ -1409,6 +2395,268 @@ def handle_command(command):
         if enabled == 1:
             print("⚠️ Autoscan is ON — disable autoscan before applying control settings")
 
+    # ---! Start STEP RAMP section -------- #
+    if (
+        cmd == "start_relation_step_ramp"
+        or cmd.startswith("start_relation_step_ramp:")
+    ):
+        """
+        Start a backend-controlled stabilized STEP_RAMP.
+
+        Syntax
+        ------
+        start_relation_step_ramp:<JSON>
+
+        Required JSON fields
+        --------------------
+        channel_number
+        initial_mk
+        target_mk
+        step_mk
+        tolerance_mk
+        stable_time_s
+        stability_timeout_s
+        stability_sample_interval_s
+        autorange_max_attempts
+        resistance_n_samples
+        resistance_sample_interval_s
+        resistance_max_attempts
+
+        Optional JSON fields
+        --------------------
+        label
+        max_std_mk
+        max_slope_mk_per_min
+        point_measurement_max_attempts
+
+        The payload build in http_serve.py will be something like:
+        payload = {
+            "channel_number": channel,
+            "initial_mk": initial_mk,
+            "target_mk": target_mk,
+            "step_mk": step_mk,
+            "tolerance_mk": tolerance_mk,
+            "stable_time_s": stable_time_s,
+            "stability_timeout_s": stability_timeout_s,
+            "stability_sample_interval_s": stability_sample_interval_s,
+            "autorange_max_attempts": autorange_max_attempts,
+            "resistance_n_samples": resistance_n_samples,
+            "resistance_sample_interval_s": resistance_sample_interval_s,
+            "resistance_max_attempts": resistance_max_attempts,
+
+            # Optional:
+            "label": label,
+            "max_std_mk": max_std_mk,
+            "max_slope_mk_per_min": max_slope_mk_per_min,
+            "point_measurement_max_attempts":
+                point_measurement_max_attempts,
+        }
+
+        command = (
+            "start_relation_step_ramp:"
+            + json.dumps(payload)
+        )
+        """
+
+        # ==============================================================
+        # Extract JSON payload
+        # ==============================================================
+
+        if ":" not in cmd:
+
+            return (
+                "❌ Syntax: "
+                "start_relation_step_ramp:<JSON>"
+            )
+
+        payload_text = (
+            cmd.split(":", 1)[1].strip()
+        )
+
+        if not payload_text:
+
+            return (
+                "❌ STEP_RAMP JSON payload is empty."
+            )
+
+        # Accept both raw JSON and percent-encoded JSON so the same TCP
+        # command can later be used cleanly through http_server.py.
+        payload_text = urllib.parse.unquote(
+            payload_text
+        )
+
+        try:
+
+            payload = json.loads(
+                payload_text
+            )
+
+        except json.JSONDecodeError as exc:
+
+            return (
+                "❌ Invalid STEP_RAMP JSON payload: "
+                f"{exc}"
+            )
+
+        if not isinstance(payload, dict):
+
+            return (
+                "❌ STEP_RAMP payload must be "
+                "a JSON object."
+            )
+
+        # ==============================================================
+        # Required parameters
+        #
+        # Deliberately no physical/acquisition defaults are inserted here.
+        # ==============================================================
+
+        required_fields = (
+            "channel_number",
+            "initial_mk",
+            "target_mk",
+            "step_mk",
+            "tolerance_mk",
+            "stable_time_s",
+            "stability_timeout_s",
+            "stability_sample_interval_s",
+            "autorange_max_attempts",
+            "resistance_n_samples",
+            "resistance_sample_interval_s",
+            "resistance_max_attempts",
+        )
+
+        missing_fields = [
+            field
+            for field in required_fields
+            if field not in payload
+        ]
+
+        if missing_fields:
+
+            return (
+                "❌ Missing STEP_RAMP parameter(s): "
+                + ", ".join(missing_fields)
+            )
+
+        # ==============================================================
+        # Optional parameters
+        # ==============================================================
+
+        label = payload.get(
+            "label"
+        )
+
+        max_std_mk = payload.get(
+            "max_std_mk"
+        )
+
+        max_slope_mk_per_min = payload.get(
+            "max_slope_mk_per_min"
+        )
+
+        point_measurement_max_attempts = (
+            payload.get(
+                "point_measurement_max_attempts"
+            )
+        )
+
+        # ==============================================================
+        # Start controller
+        #
+        # Detailed numeric/type validation remains centralized in
+        # start_relation_step_ramp() and RelationStepRampController.
+        # ==============================================================
+
+        relation_id, error = (
+            start_relation_step_ramp(
+                channel_number=(
+                    payload["channel_number"]
+                ),
+
+                initial_mk=(
+                    payload["initial_mk"]
+                ),
+
+                target_mk=(
+                    payload["target_mk"]
+                ),
+
+                step_mk=(
+                    payload["step_mk"]
+                ),
+
+                tolerance_mk=(
+                    payload["tolerance_mk"]
+                ),
+
+                stable_time_s=(
+                    payload["stable_time_s"]
+                ),
+
+                stability_timeout_s=(
+                    payload[
+                        "stability_timeout_s"
+                    ]
+                ),
+
+                stability_sample_interval_s=(
+                    payload[
+                        "stability_sample_interval_s"
+                    ]
+                ),
+
+                autorange_max_attempts=(
+                    payload[
+                        "autorange_max_attempts"
+                    ]
+                ),
+
+                resistance_n_samples=(
+                    payload[
+                        "resistance_n_samples"
+                    ]
+                ),
+
+                resistance_sample_interval_s=(
+                    payload[
+                        "resistance_sample_interval_s"
+                    ]
+                ),
+
+                resistance_max_attempts=(
+                    payload[
+                        "resistance_max_attempts"
+                    ]
+                ),
+
+                label=label,
+
+                max_std_mk=max_std_mk,
+
+                max_slope_mk_per_min=(
+                    max_slope_mk_per_min
+                ),
+
+                point_measurement_max_attempts=(
+                    point_measurement_max_attempts
+                ),
+            )
+        )
+
+        if relation_id is None:
+
+            return (
+                "❌ Failed to start STEP_RAMP: "
+                f"{error}"
+            )
+
+        return (
+            "RELATION_STEP_RAMP_STARTED:"
+            f"{relation_id}"
+        )
+
+    # ---! Finish STEP RAMP section -------- #
     if (
         cmd == "start_relation_ramp"
         or cmd.startswith("start_relation_ramp:")
@@ -1488,12 +2736,58 @@ def handle_command(command):
         return f"RELATION_STARTED:{relation_id}"
 
     elif cmd == "stop_relation":
-        relation_id, n = stop_relation()
-        if relation_id is None:
+
+        result = stop_relation()
+
+        status = result.get("status")
+
+        if status == "NO_ACTIVE_RELATION":
+
             return "❌ No active relation"
-        return f"RELATION_STOPPED:{relation_id}:{n}"
+
+        if status == "STOPPING":
+
+            return (
+                "RELATION_STOPPING:"
+                f"{result['relation_id']}"
+            )
+
+        if status == "STOP_REQUESTED":
+
+            return (
+                "RELATION_STEP_RAMP_STOP_REQUESTED:"
+                f"{result['relation_id']}"
+            )
+
+        if status == "FINALIZED":
+
+            return (
+                "RELATION_STOPPED:"
+                f"{result['relation_id']}:"
+                f"{result['n_points']}"
+            )
+
+        if status == "ERROR":
+
+            return (
+                "❌ Failed to stop relation: "
+                f"{result.get('error', 'unknown error')}"
+            )
+
+        return (
+            "❌ Invalid stop_relation result: "
+            f"{result!r}"
+        )
     
     elif cmd == "get_relation_status":
+
+        # ==============================================================
+        # Snapshot of shared RELATION state.
+        #
+        # Do not call controller.get_status() while holding relation_lock.
+        # The controller has its own independent status lock.
+        # ==============================================================
+
         with relation_lock:
 
             relation_active = (
@@ -1501,40 +2795,314 @@ def handle_command(command):
                 and RELATION_RUN_ID is not None
             )
 
-            if relation_active:
+            relation_id = RELATION_RUN_ID
 
-                relation_id = RELATION_RUN_ID
+            label = (
+                RELATION_LABEL
+                if RELATION_LABEL is not None
+                else ""
+            )
 
-                label = (
-                    RELATION_LABEL
-                    if RELATION_LABEL is not None
-                    else ""
-                )
+            ch = (
+                RELATION_CHANNEL
+                if RELATION_CHANNEL is not None
+                else -1
+            )
 
-                ch = (
-                    RELATION_CHANNEL
-                    if RELATION_CHANNEL is not None
-                    else -1
-                )
+            n = len(
+                RELATION_BUFFER
+            )
 
-                n = len(RELATION_BUFFER)
+            relation_mode = RELATION_MODE
 
-                relation_mode = (
-                    RELATION_MODE
-                    if RELATION_MODE is not None
-                    else "MANUAL"
-                )
+            metadata = dict(
+                RELATION_METADATA
+            )
 
-                metadata = dict(RELATION_METADATA)
+            legacy_target_mk = (
+                RELATION_RAMP_TARGET_MK
+            )
 
-                # Legacy native-RAMP values are retained as fallback.
-                legacy_target_mk = RELATION_RAMP_TARGET_MK
-                legacy_rate_mk_per_min = (
-                    RELATION_RAMP_RATE_MK_PER_MIN
-                )
+            legacy_rate_mk_per_min = (
+                RELATION_RAMP_RATE_MK_PER_MIN
+            )
+
+            step_ramp_controller = (
+                RELATION_STEP_RAMP_CONTROLLER
+            )
+
+        # ==============================================================
+        # No active RELATION.
+        # ==============================================================
+
+        controller_status = None
 
         if not relation_active:
-            return "RELATION_STATUS:IDLE"
+
+            # ==============================================================
+            # A STEP_RAMP controller may still be alive after
+            # RELATION_ACTIVE has become False.
+            #
+            # This happens while _finalize_relation() is persisting the
+            # accepted points and releasing the RELATION globals.
+            #
+            # The controller reference is intentionally retained so its
+            # final COMPLETE / ABORTED / ERROR state can still be exposed.
+            # ==============================================================
+
+            if step_ramp_controller is None:
+
+                return "RELATION_STATUS:IDLE"
+
+            try:
+
+                controller_status = (
+                    step_ramp_controller.get_status()
+                )
+
+            except Exception as exc:
+
+                return (
+                    "RELATION_STATUS:ERROR:"
+                    "Could not read STEP_RAMP controller status: "
+                    f"{exc}"
+                )
+
+            controller_state = (
+                controller_status.get(
+                    "state"
+                )
+            )
+
+            controller_running = bool(
+                controller_status.get(
+                    "running"
+                )
+            )
+
+            controller_terminal = (
+                controller_state
+                in RelationStepRampController.TERMINAL_STATES
+            )
+
+            # A retained controller is relevant if:
+            #
+            #   - its worker is still finishing cleanup/finalization, or
+            #   - it has reached COMPLETE / ABORTED / ERROR.
+            #
+            # Otherwise it is merely a stale non-running controller.
+            if (
+                not controller_running
+                and not controller_terminal
+            ):
+
+                return "RELATION_STATUS:IDLE"
+
+            # --------------------------------------------------------------
+            # Reconstruct STEP_RAMP identity from the controller itself.
+            #
+            # RELATION_* globals may already have been reset by
+            # _finalize_relation().
+            # --------------------------------------------------------------
+
+            relation_id = (
+                controller_status.get(
+                    "relation_id"
+                )
+            )
+
+            ch = controller_status.get(
+                "channel",
+                -1,
+            )
+
+            relation_mode = "STEP_RAMP"
+
+            # If RELATION_RUN_ID has already been cleared, its buffer and label
+            # are no longer available. They are not required for terminal-state
+            # handling; the persisted file is authoritative.
+            if RELATION_RUN_ID is None:
+                label = ""
+                n = 0
+
+            # While finalization is still executing, report active=True so the
+            # frontend remains locked and does not declare the relation finished
+            # before the controller publishes its terminal state.
+            relation_active = (
+                controller_running
+            )
+
+        # ==============================================================
+        # STEP_RAMP
+        #
+        # Return a dedicated JSON payload. MANUAL and native RAMP retain
+        # their existing legacy response format below.
+        # ==============================================================
+
+        if relation_mode == "STEP_RAMP":
+
+            if step_ramp_controller is None:
+
+                return (
+                    "RELATION_STATUS:ERROR:"
+                    "STEP_RAMP controller unavailable"
+                )
+
+            if (
+                step_ramp_controller.relation_id
+                != relation_id
+            ):
+
+                return (
+                    "RELATION_STATUS:ERROR:"
+                    "STEP_RAMP controller does not match "
+                    "the active relation"
+                )
+
+            if controller_status is None:
+                try:
+
+                    controller_status = (
+                        step_ramp_controller.get_status()
+                    )
+
+                except Exception as exc:
+
+                    return (
+                        "RELATION_STATUS:ERROR:"
+                        "Could not read STEP_RAMP controller status: "
+                        f"{exc}"
+                    )
+
+            payload = {
+                # ------------------------------------------------------
+                # RELATION identity
+                # ------------------------------------------------------
+
+                "active":
+                    relation_active,
+
+                "relation_id":
+                    relation_id,
+
+                "mode":
+                    "STEP_RAMP",
+
+                "channel":
+                    ch,
+
+                "label":
+                    label,
+
+                "n_points":
+                    n,
+
+                # ------------------------------------------------------
+                # STEP_RAMP geometry
+                # ------------------------------------------------------
+
+                "initial_mk":
+                    controller_status.get(
+                        "initial_mk"
+                    ),
+
+                "target_mk":
+                    controller_status.get(
+                        "target_mk"
+                    ),
+
+                "step_mk":
+                    controller_status.get(
+                        "step_mk"
+                    ),
+
+                "current_point":
+                    controller_status.get(
+                        "current_point"
+                    ),
+
+                "total_points":
+                    controller_status.get(
+                        "total_points"
+                    ),
+
+                # ------------------------------------------------------
+                # State machine
+                # ------------------------------------------------------
+
+                "state":
+                    controller_status.get(
+                        "state"
+                    ),
+
+                "current_setpoint_mk":
+                    controller_status.get(
+                        "current_setpoint_mk"
+                    ),
+
+                "current_mxc_temperature_mk":
+                    controller_status.get(
+                        "current_mxc_temperature_mk"
+                    ),
+
+                "stable_time_s":
+                    controller_status.get(
+                        "stable_time_s"
+                    ),
+
+                # ------------------------------------------------------
+                # Resistance measurement
+                # ------------------------------------------------------
+
+                "resistance_range":
+                    controller_status.get(
+                        "resistance_range"
+                    ),
+
+                "last_resistance_ohm":
+                    controller_status.get(
+                        "last_resistance_ohm"
+                    ),
+
+                "last_resistance_std_ohm":
+                    controller_status.get(
+                        "last_resistance_std_ohm"
+                    ),
+
+                # ------------------------------------------------------
+                # Worker lifecycle
+                # ------------------------------------------------------
+
+                "abort_requested":
+                    controller_status.get(
+                        "abort_requested"
+                    ),
+
+                "running":
+                    controller_status.get(
+                        "running"
+                    ),
+
+                "error":
+                    controller_status.get(
+                        "error"
+                    ),
+            }
+
+            return (
+                "RELATION_STATUS:STEP_RAMP:"
+                + json.dumps(
+                    payload,
+                    separators=(",", ":"),
+                    allow_nan=False,
+                )
+            )
+
+        # ==============================================================
+        # Native RAMP
+        #
+        # Preserve existing behaviour and existing wire format.
+        # ==============================================================
 
         if relation_mode == "RAMP":
 
@@ -1561,8 +3129,14 @@ def handle_command(command):
             )
 
         else:
+
+            # MANUAL
             target_mk = ""
             rate_mk_per_min = ""
+
+        # ==============================================================
+        # Legacy MANUAL / RAMP response.
+        # ==============================================================
 
         return (
             "RELATION_STATUS:ACTIVE:"
@@ -1573,7 +3147,274 @@ def handle_command(command):
             f"{relation_mode}:"
             f"{target_mk}:"
             f"{rate_mk_per_min}"
-        )    
+        )
+
+    elif (
+    cmd == "get_relation_live_points"
+        or cmd.startswith("get_relation_live_points:")
+    ):
+        """
+        Return accepted points from the currently open RELATION.
+
+        Syntax
+        ------
+        get_relation_live_points
+
+            Return all currently buffered points.
+
+        get_relation_live_points:<FROM_SEQ>
+
+            Return points whose zero-based sequence number is >= FROM_SEQ.
+
+        The optional FROM_SEQ form allows the frontend to request only new
+        points after its previous poll.
+
+        Response
+        --------
+        RELATION_LIVE_POINTS:OK:<JSON>
+
+        or:
+
+        RELATION_LIVE_POINTS:IDLE
+        """
+
+        # ==============================================================
+        # Parse optional first sequence number.
+        # ==============================================================
+
+        from_seq = 0
+
+        if cmd.startswith(
+            "get_relation_live_points:"
+        ):
+
+            raw_from_seq = (
+                cmd.split(":", 1)[1].strip()
+            )
+
+            if not raw_from_seq:
+
+                return (
+                    "RELATION_LIVE_POINTS:ERROR:"
+                    "FROM_SEQ is empty"
+                )
+
+            try:
+
+                from_seq = int(
+                    raw_from_seq
+                )
+
+            except (TypeError, ValueError):
+
+                return (
+                    "RELATION_LIVE_POINTS:ERROR:"
+                    "FROM_SEQ must be an integer"
+                )
+
+            if from_seq < 0:
+
+                return (
+                    "RELATION_LIVE_POINTS:ERROR:"
+                    "FROM_SEQ must be non-negative"
+                )
+
+        # ==============================================================
+        # Snapshot RELATION state atomically.
+        #
+        # RELATION_RUN_ID is intentionally used rather than requiring
+        # RELATION_ACTIVE == True. During the short finalization interval,
+        # RELATION_ACTIVE is already False but RUN_ID and BUFFER still
+        # exist, so the frontend can still obtain the final live snapshot.
+        # ==============================================================
+
+        with relation_lock:
+
+            relation_id = (
+                RELATION_RUN_ID
+            )
+
+            if relation_id is None:
+
+                return (
+                    "RELATION_LIVE_POINTS:IDLE"
+                )
+
+            relation_active = bool(
+                RELATION_ACTIVE
+            )
+
+            relation_mode = (
+                RELATION_MODE
+                if RELATION_MODE is not None
+                else "MANUAL"
+            )
+
+            relation_channel = (
+                RELATION_CHANNEL
+                if RELATION_CHANNEL is not None
+                else -1
+            )
+
+            relation_label = (
+                RELATION_LABEL
+                if RELATION_LABEL is not None
+                else ""
+            )
+
+            total_points = len(
+                RELATION_BUFFER
+            )
+
+            # ----------------------------------------------------------
+            # If the browser supplies a sequence index greater than the
+            # current buffer length, it is normally carrying state from
+            # another/older relation. Return the whole current buffer and
+            # tell it that its incremental state must be reset.
+            # ----------------------------------------------------------
+
+            reset_required = (
+                from_seq > total_points
+            )
+
+            effective_from_seq = (
+                0
+                if reset_required
+                else from_seq
+            )
+
+            buffer_snapshot = list(
+                RELATION_BUFFER[
+                    effective_from_seq:
+                ]
+            )
+
+        # ==============================================================
+        # Serialize outside relation_lock.
+        # ==============================================================
+
+        points = []
+
+        for offset, point in enumerate(
+            buffer_snapshot
+        ):
+
+            try:
+
+                ts, tmxc_k, resistance_ohm = (
+                    point
+                )
+
+                seq = (
+                    effective_from_seq
+                    + offset
+                )
+
+                tmxc_k = float(
+                    tmxc_k
+                )
+
+                resistance_ohm = float(
+                    resistance_ohm
+                )
+
+                # STEP_RAMP points are already guaranteed finite by the
+                # controller. Keep this defensive conversion so the command
+                # also remains safe for MANUAL/RAMP buffers.
+                x = (
+                    tmxc_k
+                    if math.isfinite(tmxc_k)
+                    else None
+                )
+
+                y = (
+                    resistance_ohm
+                    if math.isfinite(
+                        resistance_ohm
+                    )
+                    else None
+                )
+
+                ts_iso = (
+                    ts.isoformat()
+                    if hasattr(ts, "isoformat")
+                    else str(ts)
+                )
+
+                points.append({
+                    "seq":
+                        seq,
+
+                    "ts_utc_iso":
+                        ts_iso,
+
+                    # Same x/y convention already used by
+                    # get_relation_file().
+                    "x":
+                        x,
+
+                    "y":
+                        y,
+                })
+
+            except Exception as exc:
+
+                return (
+                    "RELATION_LIVE_POINTS:ERROR:"
+                    "Could not serialize relation point: "
+                    f"{exc}"
+                )
+
+        # ==============================================================
+        # Build response.
+        #
+        # next_seq is the value the frontend should send as FROM_SEQ in
+        # its next request.
+        # ==============================================================
+
+        payload = {
+            "relation_id":
+                relation_id,
+
+            "active":
+                relation_active,
+
+            "stopping":
+                not relation_active,
+
+            "mode":
+                relation_mode,
+
+            "channel":
+                relation_channel,
+
+            "label":
+                relation_label,
+
+            "from_seq":
+                effective_from_seq,
+
+            "next_seq":
+                total_points,
+
+            "n_points":
+                total_points,
+
+            "reset_required":
+                reset_required,
+
+            "points":
+                points,
+        }
+
+        return (
+            "RELATION_LIVE_POINTS:OK:"
+            + json.dumps(
+                payload,
+                separators=(",", ":"),
+                allow_nan=False,
+            )
+        )
 
     elif cmd == "get_recent_relations":
         """
@@ -2009,7 +3850,7 @@ def handle_command(command):
         # Sintaxis to set the temperature setpoint for MXC: "set_temperature_setpoint_mxc:100"
         try:
             new_temperature_setpoint = float(command.split(":")[-1])
-            if 0.0 <= new_temperature_setpoint <= 800.0:
+            if 0.0 <= new_temperature_setpoint <= 900.0:
                 if (new_temperature_setpoint<10):
                     print("⚠️ Temperature setpoint under 10mK might be useless")
                 with heater_mutex:
@@ -2042,7 +3883,7 @@ def handle_command(command):
                 else:
                     message = f"❌ Failed to set temperature setpoint for MXC"
             else:
-                message = f"❌ Temperature setpoint for MXC must be between 10 mK and 800 mK"
+                message = f"❌ Temperature setpoint for MXC must be between 10 mK and 900 mK"
             print(message)
             return message
 
@@ -2794,6 +4635,7 @@ def handle_command(command):
     elif command.startswith("set_channel_14"):
         try:
             parts = command.split(":")
+
             channel_status = int(parts[1])
 
             with heater_mutex:
@@ -2828,46 +4670,6 @@ def handle_command(command):
 
         except Exception as e:
             message = f"❌ Error setting Channel 14 status: {e}"
-            print(message)
-            return message
-
-    elif command.startswith("set_channel_15"):
-        try:
-            parts = command.split(":")
-            channel_status = int(parts[1])
-
-            with heater_mutex:
-                current_status = int(ls.get_channel_status(channel=15))
-
-            time.sleep(0.5)
-            if current_status == channel_status:
-                message = f"❌ Channel 15 is already {'On' if bool(current_status) else 'Off'}"
-                print(message)
-                return message
-
-            attempts = 5
-            success = False
-            for _ in range(attempts):
-                if bool(channel_status):
-                    with heater_mutex:
-                        success = ls.set_channel_on(15)
-                else:
-                    with heater_mutex:
-                        success = ls.set_channel_off(15)
-                time.sleep(0.5)
-                if success:
-                    break
-
-            if success:
-                message = f"✅ Channel 15 is now {'On' if bool(channel_status) else 'Off'}"
-            else:
-                message = f"❌ Failed to set Channel 15 {'On' if bool(channel_status) else 'Off'}"
-
-            print(message)
-            return message
-
-        except Exception as e:
-            message = f"❌ Error setting Channel 15 status: {e}"
             print(message)
             return message
 
@@ -3131,7 +4933,7 @@ def handle_command(command):
                 print(message)
                 return message
 
-            scan_channels = sorted(set(DEFAULT_CHANNELS) | set(DEFAULT_EXTRA_CHANNELS))  
+            scan_channels = list(SUPPORTED_CHANNELS)
 
             enabled_channels = []
             with heater_mutex:
@@ -3287,15 +5089,13 @@ def handle_command(command):
     elif command.startswith("select_measure_channel:"):
         try:
             parts = command.split(":")
-            print('parts', parts)
             if len(parts) != 2:
-                return "❌ Syntax: select_measure_channel:<9-15>"
+                return f"❌ Syntax: select_measure_channel:<{min(SAMPLE_CHANNELS)}-{max(SAMPLE_CHANNELS)}>"
 
             target = int(parts[1])
             
-            print('target', target)
             if target not in SAMPLE_CHANNELS:
-                return "❌ Target must be one of 9..15"
+                return f"❌ Target must be one of {min(SAMPLE_CHANNELS)}..{max(SAMPLE_CHANNELS)}"
 
             # Shotdown all channel excepts the selected one
             with heater_mutex:
@@ -3313,6 +5113,127 @@ def handle_command(command):
             return f"❌ Error selecting measurement channel: {e}"
         
     
+    elif cmd.startswith("set_sample_resistance_settings:"):
+        try:
+            # Atomic sample-channel RDGRNG configuration:
+            # set_sample_resistance_settings:<CH>:<MODE>:<EXC_RANGE>:
+            #                                <RES_RANGE>:<AUTORANGE>
+            parts = [part.strip() for part in cmd.split(":")]
+
+            if len(parts) != 6:
+                return (
+                    "❌ Syntax: set_sample_resistance_settings:"
+                    "<channel>:<mode>:<excitation_range>:"
+                    "<resistance_range>:<autorange>"
+                )
+
+            channel = int(parts[1])
+            excitation_mode = int(parts[2])
+            excitation_range = int(parts[3])
+            resistance_range = int(parts[4])
+            autorange = int(parts[5])
+
+            if channel not in SAMPLE_CHANNELS:
+                return (
+                    f"❌ Invalid sample channel {channel}. "
+                    f"Valid channels are: {SAMPLE_CHANNELS}"
+                )
+
+            if autorange not in (0, 1):
+                return "❌ Autorange must be 0 (manual) or 1 (automatic)"
+
+            try:
+                complementary_range = (
+                    validate_resistance_measurement_combination(
+                        excitation_mode=excitation_mode,
+                        excitation_range=excitation_range,
+                        resistance_range=resistance_range,
+                    )
+                )
+
+            except (TypeError, ValueError) as exc:
+                return f"❌ Invalid CH{channel} range combination: {exc}"
+
+            with heater_mutex:
+                current_settings = (
+                    ls.get_sensor_resistance_settings(
+                        channel=channel,
+                        return_dict=True,
+                    )
+                )
+
+                if not isinstance(current_settings, dict):
+                    return (
+                        f"❌ Could not read the current RDGRNG settings "
+                        f"for CH{channel}"
+                    )
+
+                requested_settings = {
+                    **current_settings,
+                    "excitation_mode": excitation_mode,
+                    "excitation_range": excitation_range,
+                    "resistance_range": resistance_range,
+                    "autorange": autorange,
+                }
+
+                success = ls.set_sensor_resistance_settings(
+                    channel=channel,
+                    settings=requested_settings,
+                    verbose=False,
+                )
+
+                confirmed_settings = (
+                    ls.get_sensor_resistance_settings(
+                        channel=channel,
+                        return_dict=True,
+                    )
+                )
+
+            if success is not True:
+                return (
+                    f"❌ Failed to apply the resistance measurement "
+                    f"settings to CH{channel}"
+                )
+
+            if not isinstance(confirmed_settings, dict):
+                return (
+                    f"❌ CH{channel} was configured, but its RDGRNG "
+                    "readback could not be obtained"
+                )
+
+            _cache_sample_measurement_settings(
+                channel,
+                confirmed_settings,
+            )
+
+            mode_name = (
+                "current" if excitation_mode == 1 else "voltage"
+            )
+            range_control = (
+                "automatic" if autorange == 1 else "manual"
+            )
+
+            return (
+                f"✅ CH{channel} resistance measurement configured: "
+                f"mode={mode_name}, "
+                f"excitation_range={confirmed_settings['excitation_range']}, "
+                f"resistance_range={confirmed_settings['resistance_range']}, "
+                f"range_control={range_control}, "
+                f"complementary_range={complementary_range}"
+            )
+
+        except (TypeError, ValueError, IndexError) as exc:
+            return (
+                "❌ Invalid set_sample_resistance_settings command: "
+                f"{exc}"
+            )
+
+        except Exception as exc:
+            return (
+                "❌ Error configuring sample-channel resistance "
+                f"measurement: {exc}"
+            )
+
     elif cmd.startswith("set_sensor_range_ch"):
         try:
             # format: set_sensor_range_ch<CH>:<RANGE>
@@ -3321,22 +5242,41 @@ def handle_command(command):
             new_range = int(val.strip())
 
             if ch not in SAMPLE_CHANNELS:
-                return "❌ Target must be one of 9..15"
-            if not (1 <= new_range <= 8):
-                return "❌ Sensor range must be between 1 and 8"
+                return "❌ Target must be one of 9..14"
 
             with heater_mutex:
                 current_settings = ls.get_sensor_resistance_settings(channel=ch, return_dict=True)
 
-            time.sleep(0.1)
+            if not isinstance(current_settings, dict):
+                return f"❌ Could not read the current RDGRNG settings for CH{ch}"
+
+            maximum_range = (
+                12
+                if int(current_settings["excitation_mode"]) == 0
+                else 22
+            )
+
+            if not (1 <= new_range <= maximum_range):
+                return (
+                    f"❌ Excitation range must be between 1 and "
+                    f"{maximum_range} for the current CH{ch} mode"
+                )
+
             current_settings["excitation_range"] = str(new_range)
 
             with heater_mutex:
                 ok = ls.set_sensor_resistance_settings(channel=ch, settings=current_settings)
 
+                confirmed_settings = ls.get_sensor_resistance_settings(
+                    channel=ch,
+                    return_dict=True,
+                )
+
             if ok:
-                if isinstance(extra_excitation, dict) and ch in extra_excitation:
-                    extra_excitation[ch]["excitation_range"] = new_range
+                _cache_sample_measurement_settings(
+                    ch,
+                    confirmed_settings,
+                )
                 return f"✅ Sensor range for CH{ch} set to {new_range}"
             else:
                 return f"❌ Failed to set sensor range for CH{ch}"
@@ -3352,22 +5292,31 @@ def handle_command(command):
             new_mode = int(val.strip())
 
             if ch not in SAMPLE_CHANNELS:
-                return "❌ Target must be one of 9..15"
+                return f"❌ Target must be one of {min(SAMPLE_CHANNELS)}..{max(SAMPLE_CHANNELS)}"
             if new_mode not in (0, 1):
                 return "❌ Sensor mode must be 0 (Voltage) or 1 (Current)"
 
             with heater_mutex:
                 current_settings = ls.get_sensor_resistance_settings(channel=ch, return_dict=True)
 
-            time.sleep(0.1)
+            if not isinstance(current_settings, dict):
+                return f"❌ Could not read the current RDGRNG settings for CH{ch}"
+
             current_settings["excitation_mode"] = new_mode
 
             with heater_mutex:
                 ok = ls.set_sensor_resistance_settings(channel=ch, settings=current_settings)
 
+                confirmed_settings = ls.get_sensor_resistance_settings(
+                    channel=ch,
+                    return_dict=True,
+                )
+
             if ok:
-                if isinstance(extra_excitation, dict) and ch in extra_excitation:
-                    extra_excitation[ch]["excitation_mode"] = new_mode
+                _cache_sample_measurement_settings(
+                    ch,
+                    confirmed_settings,
+                )
                 mode_str = "voltage" if new_mode == 0 else "current"
                 return f"✅ Sensor mode for CH{ch} set to {mode_str}"
             else:
@@ -3510,18 +5459,25 @@ def cryocon_temperature_sensor():
     while True:
         try:
             with bbcon_mutex:
-                temperature  = bb.query_temperature()
-                setpoint     = bb.query_setpoint()
-                # resistance   = bb.query_resistance() ToDo: check problem with query_resistance()
-                heater_range = bb.query_range()
-                heater_power = bb.query_power()
-
-            # Patch check (bad reply format) -  inherited from BBCON code from sctlib library
-            if abs(heater_power - setpoint) < abs(temperature - setpoint) and float(bbcon_data["BBCON_P"]) > 1.0:
-                warning = ("⚠️ Warning: Black Body controller string in wrong format "
-                            "→ patching values...")
-                temperature = heater_power
-                heater_power = 0.0
+                try: 
+                    temperature  = bb.query_temperature()
+                    # print('Just for debug: temperature from bb.query_temperature() =', temperature)
+                    setpoint     = bb.query_setpoint()
+                    # print('Just for debug: setpoint from bb.query_setpoint() =', setpoint)
+                    # resistance   = bb.query_resistance() ToDo: check problem with query_resistance()
+                    heater_range = bb.query_range()
+                    # print('Just for debug: heater_range from bb.query_range() =', heater_range)
+                    heater_power = bb.query_power()
+                    # print('Just for debug: heater_power from bb.query_power() =', heater_power)
+                except Exception as e:
+                    warning = ("⚠️ Warning: Black Body controller string in wrong format "
+                                                "→ patching values...")
+                    print(f"❌ Error querying temperature from {BBCON_NAME}.\nReason: {e}")
+                    # Temperature value is displaced in the chain due to an non-recognised error.
+                    temperature = bb.query_power()
+                    setpoint = 0.
+                    heater_range = 'LOW'
+                    heater_power = 0.
 
             bbcon_data.update({
                 "BBCON_TEMP"       : temperature,
@@ -3531,14 +5487,14 @@ def cryocon_temperature_sensor():
                 "BBCON_POWER"      : heater_power,
             })
 
-            print("Just for debugging purposes... INSTANT BBCON DATA", bbcon_data) 
-
         except Exception as e:
             print(f"❌ Error accessing {BBCON_NAME} telemetry.\nReason: {e}")
 
         try:
             with bbcon_mutex:
                 pid = bb.query_PID(verbose = 0)
+
+            # print('Just for debug: pid from bb.query_PID() =', pid)
 
             bbcon_data.update({
                 "BBCON_P" : pid[0],
@@ -3562,28 +5518,520 @@ def lakeshore_temperature_sensor():
     This function reads the temperature from the LakeShore 370 AC device.
 
     """
+    global last_mxc_temperature_mk
+    global last_mxc_temperature_monotonic
+    global last_sensorValues
+    global last_controlParams
+    global last_sensorParams
+
     temperatures = {}
     resistances = {}
     powers = {}
 
+    def _get_step_ramp_telemetry_status():
+        """
+        Return the STEP_RAMP controller status when it currently owns
+        Lake Shore communications.
+
+        Ownership exists in two situations:
+
+            1. A STEP_RAMP RELATION is active.
+
+            2. RELATION_ACTIVE has already become False, but the retained
+            STEP_RAMP worker is still alive finishing cleanup or
+            finalization.
+
+        None means that STEP_RAMP no longer owns the Lake Shore.
+
+        A protective pseudo-state is returned whenever an active STEP_RAMP
+        cannot be resolved safely. In that case ordinary telemetry must not
+        access the instrument.
+        """
+
+        # ==============================================================
+        # Snapshot shared RELATION/controller state.
+        # ==============================================================
+
+        with relation_lock:
+
+            relation_active = bool(
+                RELATION_ACTIVE
+            )
+
+            relation_id = (
+                RELATION_RUN_ID
+            )
+
+            relation_mode = (
+                RELATION_MODE
+            )
+
+            controller = (
+                RELATION_STEP_RAMP_CONTROLLER
+            )
+
+        active_step_ramp = (
+            relation_active
+            and relation_id is not None
+            and relation_mode == "STEP_RAMP"
+        )
+
+        # ==============================================================
+        # An active STEP_RAMP must always have the matching controller.
+        #
+        # If it does not, fail closed: telemetry must not touch the
+        # Lake Shore.
+        # ==============================================================
+
+        if active_step_ramp:
+
+            if (
+                controller is None
+                or controller.relation_id
+                != relation_id
+            ):
+
+                return {
+                    "state": "__PROTECT__",
+                    "running": True,
+                }
+
+        # ==============================================================
+        # No controller exists and no active STEP_RAMP exists.
+        # ==============================================================
+
+        elif controller is None:
+
+            return None
+
+        # ==============================================================
+        # Read controller state.
+        #
+        # Do this outside relation_lock because the controller owns its
+        # independent _status_lock.
+        # ==============================================================
+
+        try:
+
+            status = controller.get_status()
+
+        except Exception:
+
+            # If the RELATION still says STEP_RAMP is active, fail closed.
+            if active_step_ramp:
+
+                return {
+                    "state": "__PROTECT__",
+                    "running": True,
+                }
+
+            # A retained controller whose state cannot be read is relevant
+            # only if its worker is still alive.
+            try:
+
+                if controller.is_running():
+
+                    return {
+                        "state": "__PROTECT__",
+                        "running": True,
+                    }
+
+            except Exception:
+
+                return {
+                    "state": "__PROTECT__",
+                    "running": True,
+                }
+
+            return None
+
+        if not isinstance(
+            status,
+            dict,
+        ):
+
+            if active_step_ramp:
+
+                return {
+                    "state": "__PROTECT__",
+                    "running": True,
+                }
+
+            return None
+
+        # ==============================================================
+        # Active STEP_RAMP.
+        #
+        # Its state is authoritative.
+        # ==============================================================
+
+        if active_step_ramp:
+
+            return status
+
+        # ==============================================================
+        # RELATION_ACTIVE may already be False while the controller worker
+        # is still executing:
+        #
+        #     CLEANUP
+        #     -> _finalize_relation()
+        #     -> terminal state
+        #
+        # Continue protecting Lake Shore until that worker actually exits.
+        # ==============================================================
+
+        controller_running = bool(
+            status.get(
+                "running"
+            )
+        )
+
+        if controller_running:
+
+            return status
+
+        # ==============================================================
+        # Retained COMPLETE / ABORTED / ERROR controller.
+        #
+        # The worker has exited, therefore it no longer owns Lake Shore.
+        # ==============================================================
+
+        return None
+
+        
     print("🌡️ LakeShore telemetry thread started")
     
     while True:
+
+        # ==============================================================
+        # STEP_RAMP telemetry ownership
+        #
+        # Full Lake Shore telemetry is permitted only in WAIT_STABLE,
+        # because that state deliberately depends on fresh MXC samples.
+        #
+        # In every other STEP_RAMP state the controller owns Lake Shore
+        # communications exclusively.
+        # ==============================================================
+
+        step_ramp_status = (
+            _get_step_ramp_telemetry_status()
+        )
+
+        if (
+            step_ramp_status is not None
+            and step_ramp_status.get("state")
+            != "WAIT_STABLE"
+        ):
+
+            # ----------------------------------------------------------
+            # Keep TCP subscribers alive without touching the Lake Shore.
+            #
+            # Use copies so that the last normal telemetry snapshot is
+            # never modified in place.
+            # ----------------------------------------------------------
+
+            if (
+                last_sensorValues is not None
+                and last_controlParams is not None
+                and last_sensorParams is not None
+            ):
+
+                sensorValues = {
+                    "temperatures":
+                        dict(
+                            last_sensorValues.get(
+                                "temperatures",
+                                {},
+                            )
+                        ),
+
+                    "resistances":
+                        dict(
+                            last_sensorValues.get(
+                                "resistances",
+                                {},
+                            )
+                        ),
+
+                    "powers":
+                        dict(
+                            last_sensorValues.get(
+                                "powers",
+                                {},
+                            )
+                        ),
+
+                    "extra_resistances":
+                        dict(
+                            last_sensorValues.get(
+                                "extra_resistances",
+                                {},
+                            )
+                        ),
+                }
+
+                controlParams = dict(
+                    last_controlParams
+                )
+
+                sensorParams = dict(
+                    last_sensorParams
+                )
+
+                sensorParams["dwell_times"] = dict(
+                    last_sensorParams.get(
+                        "dwell_times",
+                        {},
+                    )
+                )
+
+                sensorParams["pause_times"] = dict(
+                    last_sensorParams.get(
+                        "pause_times",
+                        {},
+                    )
+                )
+
+                sensorParams[
+                    "sample_channel_status"
+                ] = dict(
+                    last_sensorParams.get(
+                        "sample_channel_status",
+                        {},
+                    )
+                )
+
+                # STEP_RAMP always owns SCAN with autoscan disabled.
+                #
+                # The exact scanner channel during these short states
+                # is controller-owned and is exposed through the
+                # STEP_RAMP status endpoint, so ordinary telemetry only
+                # reports that autoscan is OFF.
+                sensorParams["autoscan"] = (
+                    "0",
+                    "0",
+                )
+
+                # ------------------------------------------------------
+                # Refresh values known directly by the controller.
+                #
+                # These do not cause Lake Shore communication.
+                # ------------------------------------------------------
+
+                current_setpoint_mk = (
+                    step_ramp_status.get(
+                        "current_setpoint_mk"
+                    )
+                )
+
+                try:
+
+                    current_setpoint_mk = float(
+                        current_setpoint_mk
+                    )
+
+                    if math.isfinite(
+                        current_setpoint_mk
+                    ):
+                        controlParams["MXCSP"] = (
+                            current_setpoint_mk
+                            / 1000.0
+                        )
+
+                except (TypeError, ValueError):
+                    pass
+
+                current_mxc_mk = (
+                    step_ramp_status.get(
+                        "current_mxc_temperature_mk"
+                    )
+                )
+
+                try:
+
+                    current_mxc_mk = float(
+                        current_mxc_mk
+                    )
+
+                    if math.isfinite(
+                        current_mxc_mk
+                    ):
+                        sensorValues[
+                            "temperatures"
+                        ]["MXC"] = (
+                            current_mxc_mk
+                            / 1000.0
+                        )
+
+                except (TypeError, ValueError):
+                    pass
+
+                try:
+
+                    broadcast_telemetry(
+                        sensorValues,
+                        controlParams,
+                        sensorParams,
+                    )
+
+                except Exception as exc:
+
+                    print(
+                        "Error broadcasting cached "
+                        "STEP_RAMP telemetry: "
+                        f"{exc}"
+                    )
+
+            # Do NOT call maybe_insert_measurements() here.
+            #
+            # That would create new DB timestamps from an intentionally
+            # cached Lake Shore snapshot.
+
+            time.sleep(1)
+            continue
+
         try:
             for index, channel in enumerate(DEFAULT_CHANNELS):
                 with heater_mutex:
                     channel_status = ls.get_channel_status(channel)
 
                 if channel_status:
-                    with heater_mutex: temperatures[DEFAULT_CHANNELS_ID[index]] = ls.get_temperature(channel)
-                    with heater_mutex: resistances[DEFAULT_CHANNELS_ID[index]] = ls.get_resistance(channel)
-                    with heater_mutex: powers[DEFAULT_CHANNELS_ID[index]] = ls.get_power(channel)
+                    with heater_mutex:
+                        channel_temperature = (
+                            ls.get_temperature(channel)
+                        )
+
+                    temperatures[
+                        DEFAULT_CHANNELS_ID[index]
+                    ] = channel_temperature
+
+                    # --------------------------------------------------------------
+                    # Publish a fresh MXC sample for STEP_RAMP.
+                    #
+                    # The timestamp is captured immediately after the actual Lake
+                    # Shore temperature query, before the remaining telemetry queries
+                    # are executed.
+                    # --------------------------------------------------------------
+
+                    if channel == 6:
+
+                        try:
+                            mxc_temperature_mk = (
+                                float(channel_temperature)
+                                * 1000.0
+                            )
+
+                        except (TypeError, ValueError):
+                            mxc_temperature_mk = None
+
+                        if (
+                            mxc_temperature_mk is not None
+                            and math.isfinite(mxc_temperature_mk)
+                        ):
+
+                            mxc_sample_monotonic = (
+                                time.monotonic()
+                            )
+
+                            """
+                            ls.get_temperature(6)
+        ↓
+                            T = 402.137 mK
+                                    ↓
+                            time.monotonic() = 123456.781
+                                    ↓
+                            cache:
+                            (402.137, 123456.781)
+
+                            Then, when _get_mxc_temperature_sample() consults temperatures:
+
+                            (402.137, 123456.781)  ← first time: new
+                            (402.137, 123456.781)  ← repeated: ignore
+                            (402.137, 123456.781)  ← repeated: ignore
+                            (402.104, 123459.226)  ← new sample: accept
+                            
+                            """
+
+                            with telemetry_lock:
+
+                                last_mxc_temperature_mk = (
+                                    mxc_temperature_mk
+                                )
+
+                                last_mxc_temperature_monotonic = (
+                                    mxc_sample_monotonic
+                                )
+                        else:
+                            # An invalid fresh MXC acquisition must also
+                            # invalidate the STEP_RAMP stability cache.
+                            #
+                            # Otherwise _wait_for_stability() could retain
+                            # an older valid sample across an invalid
+                            # measurement interval.
+                            with telemetry_lock:
+
+                                last_mxc_temperature_mk = None
+                                last_mxc_temperature_monotonic = None
+
+                        # --------------------------------------------------
+                        # The fresh MXC sample above may have completed the
+                        # controller's stability window.
+                        #
+                        # If STEP_RAMP has already left WAIT_STABLE, stop
+                        # this telemetry acquisition immediately so that
+                        # no further Lake Shore queries compete with the
+                        # controller.
+                        # --------------------------------------------------
+
+                        step_ramp_status_after_mxc = (
+                            _get_step_ramp_telemetry_status()
+                        )
+
+                        if (
+                            step_ramp_status_after_mxc is not None
+                            and step_ramp_status_after_mxc.get(
+                                "state"
+                            )
+                            != "WAIT_STABLE"
+                        ):
+                            break
+
+                    with heater_mutex:
+                        resistances[
+                            DEFAULT_CHANNELS_ID[index]
+                        ] = ls.get_resistance(channel)
+
+                    with heater_mutex:
+                        powers[
+                            DEFAULT_CHANNELS_ID[index]
+                        ] = ls.get_power(channel)
                 else: 
                     temperatures[DEFAULT_CHANNELS_ID[index]] = "OFF"
                     resistances[DEFAULT_CHANNELS_ID[index]] = "OFF"
                     powers[DEFAULT_CHANNELS_ID[index]] = "OFF"
+
         except Exception as e:
             print(f"Error reading temperature from LakeShore\nReason: {e}")
+
+        # ==============================================================
+        # _wait_for_stability() may have accepted the point immediately
+        # after the fresh MXC sample published above.
+        #
+        # If so, stop the ordinary telemetry cycle now instead of
+        # continuing with dozens of Lake Shore queries while the
+        # controller starts sample measurement.
+        # ==============================================================
+
+        step_ramp_status = (
+            _get_step_ramp_telemetry_status()
+        )
+
+        if (
+            step_ramp_status is not None
+            and step_ramp_status.get("state")
+            != "WAIT_STABLE"
+        ):
+            continue
 
         # Which channels are enabled?
         try:
@@ -3663,11 +6111,11 @@ def lakeshore_temperature_sensor():
             try:
                 with heater_mutex:
                     s = ls.get_sensor_resistance_settings(channel=ch, return_dict=True)
-                extra_excitation[ch]["excitation_mode"] = s.get("excitation_mode")
-                extra_excitation[ch]["excitation_range"] = s.get("excitation_range")
+
+                _cache_sample_measurement_settings(ch, s)
+
             except Exception:
-                extra_excitation[ch]["excitation_mode"] = None
-                extra_excitation[ch]["excitation_range"] = None
+                _cache_sample_measurement_settings(ch, None)
 
         try:
             with heater_mutex: dwell_times = ls.get_channels_dwell_time(DEFAULT_CHANNELS)
@@ -3807,7 +6255,6 @@ def lakeshore_temperature_sensor():
             'extra_resistances' : extra_resistances,
         }
         
-        global last_sensorValues, last_controlParams, last_sensorParams
         last_sensorValues = sensorValues
         last_controlParams = controlParams
         last_sensorParams = sensorParams
@@ -3976,14 +6423,12 @@ def broadcast_temperature(sensorValues, controlParams, sensorParams):
                     f"RCH12: {extra_resistances.get('CH12')}," +
                     f"RCH13: {extra_resistances.get('CH13')}," +
                     f"RCH14: {extra_resistances.get('CH14')}," +
-                    f"RCH15: {extra_resistances.get('CH15')}," +
                     f"enabledCH9: {int(ls.get_channel_status(9))}," +
                     f"enabledCH10: {int(ls.get_channel_status(10))}," +
                     f"enabledCH11: {int(ls.get_channel_status(11))}," +
                     f"enabledCH12: {int(ls.get_channel_status(12))}," +
                     f"enabledCH13: {int(ls.get_channel_status(13))}," +
                     f"enabledCH14: {int(ls.get_channel_status(14))}," +
-                    f"enabledCH15: {int(ls.get_channel_status(15))}," +
                     f"scanning_channel:{scanning_channel if sensorParams['autoscan'][1] == '1' else 0}," +
                     f"modeCH9:{extra_excitation[9]['excitation_mode']}," +
                     f"rangeCH9:{extra_excitation[9]['excitation_range']}," +
@@ -3996,9 +6441,7 @@ def broadcast_temperature(sensorValues, controlParams, sensorParams):
                     f"modeCH13:{extra_excitation[13]['excitation_mode']}," +
                     f"rangeCH13:{extra_excitation[13]['excitation_range']}," +
                     f"modeCH14:{extra_excitation[14]['excitation_mode']}," +
-                    f"rangeCH14:{extra_excitation[14]['excitation_range']}," +
-                    f"modeCH15:{extra_excitation[15]['excitation_mode']}," +
-                    f"rangeCH15:{extra_excitation[15]['excitation_range']}\n"
+                    f"rangeCH14:{extra_excitation[14]['excitation_range']}\n"
                     ).encode('utf-8')
         
     except Exception as e:
@@ -4393,7 +6836,7 @@ def broadcast_telemetry(sensorValues, controlParams, sensorParams):
     }
 
     # ------------------------------------------------------------------
-    # Add LakeShore sample channels CH9 - CH15
+    # Add LakeShore sample channels CH9 - CH14
     # ------------------------------------------------------------------
 
     for ch in SAMPLE_CHANNELS:
@@ -4412,8 +6855,33 @@ def broadcast_telemetry(sensorValues, controlParams, sensorParams):
             extra_excitation[ch].get("excitation_mode")
         )
 
+        # ``rangeCH`` is retained as a backwards-compatible alias for
+        # excitationRangeCH.  The explicit names avoid confusing the
+        # excitation range with the independently selected resistance range.
         telemetry[f"rangeCH{ch}"] = (
             extra_excitation[ch].get("excitation_range")
+        )
+
+        telemetry[f"excitationRangeCH{ch}"] = (
+            extra_excitation[ch].get("excitation_range")
+        )
+
+        telemetry[f"resistanceRangeCH{ch}"] = (
+            extra_excitation[ch].get("resistance_range")
+        )
+
+        telemetry[f"autorangeCH{ch}"] = (
+            extra_excitation[ch].get("autorange")
+        )
+
+        current_source_off = (
+            extra_excitation[ch].get("excitation")
+        )
+
+        telemetry[f"excitationOnCH{ch}"] = (
+            None
+            if current_source_off is None
+            else 1 - int(current_source_off)
         )
         
     # ------------------------------------------------------------------

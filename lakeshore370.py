@@ -5,6 +5,10 @@ import time
 import math
 
 from typing import Any
+from default_config import (DEFAULT_CHANNELS          , SUPPORTED_CHANNELS         , DEFAULT_CHANNELS_ID,
+                            MIN_RAMP_RATE_K_PER_MIN   , MAX_RAMP_RATE_K_PER_MIN    ,
+                            MIN_TARGET_TEMPERATURE_MK , MAX_TARGET_TEMPERATURE_MK  
+                            )
 
 # Shared mutex lock for safe device access
 # Changed Lock for RLock (Reentrant Lock) to allow the same thread to acquire the lock multiple times if needed
@@ -14,12 +18,6 @@ _lakeshore_mutex = threading.RLock()
 # LakeShore 370 device communication requires at least 50 ms between commands
 # Using 55 ms as safe margin
 MIN_COMMUNICATION_INTERVAL_S = 0.055
-
-# Ramp implementation for temperature control min and max rate values in Kelvin/min
-MIN_RAMP_RATE_K_PER_MIN = 0.0001
-MAX_RAMP_RATE_K_PER_MIN = 10.0
-MIN_TARGET_TEMPERATURE_MK = 10.0
-MAX_TARGET_TEMPERATURE_MK = 900.0
 
 # These reading status flags are used to identify the LakeShore 370 channel status and act accordingly
 # The flags are represented as bit masks.
@@ -35,23 +33,12 @@ READING_STATUS_FLAGS = {
     128 : "T. UNDER",   # 10000000
 }
 
-DEFAULT_CHANNELS = [1, 2, 5, 6, 9, 10, 11, 12, 13, 14, 15]
-DEFAULT_CHANNELS_ID = ["50K", "4K", "STILL", "MXC"]
-ALL_CHANNELS = range(1, 17)
-
 # Default channel settings
 # [dwell time, change pause time, curve number, temperature coefficient]
 # dwell time (seconds): from 1 to 200
 # pause time (seconds): from 3 to 200
 # curve number: 0 means no curve, from 1 to 20.
 # temperature coefficient: 1 for negative, 2 for positive.
-
-DEFAULT_SETTINGS = {
-    1: ['010, 003, 01, 2'],  # 50 K stage
-    2: ['010, 003, 02, 2'],  # 4 K stage
-    5: ['010, 003, 03, 2'],  # STILL stage
-    6: ['001, 001, 04, 2']   # MXC stage
-}
 
 DEFAULT_PID = {
     "P": 1.0,       # Proportional gain
@@ -118,12 +105,99 @@ RESISTANCE_RANGE_FULL_SCALE_OHMS = {
     22: 63.2e6,
 }
 
+
+def validate_resistance_measurement_combination(
+    excitation_mode: int,
+    excitation_range: int,
+    resistance_range: int,
+) -> int:
+    """Validate one Model 370/3716 ``RDGRNG`` range combination.
+
+    The Model 370/3716 uses the same 1-2-6.32 progression for its
+    excitation and resistance ranges.  In current mode, the selected
+    current and resistance range must produce one of the instrument's
+    twelve internal voltage ranges.  In voltage mode, the selected
+    voltage and resistance range must correspond to one of its twenty-two
+    current-source ranges.
+
+    Returns
+    -------
+    int
+        The complementary internal range number: voltage range in current
+        mode, or current range in voltage mode.
+
+    Raises
+    ------
+    TypeError
+        If any argument is not an integer.
+    ValueError
+        If an index is outside its documented limits or the combination is
+        not available on a Model 370 with a 3716/3716L scanner.
+    """
+
+    values = {
+        "excitation_mode": excitation_mode,
+        "excitation_range": excitation_range,
+        "resistance_range": resistance_range,
+    }
+
+    for name, value in values.items():
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise TypeError(f"{name} must be an integer")
+
+    if excitation_mode not in (0, 1):
+        raise ValueError("excitation_mode must be 0 (voltage) or 1 (current)")
+
+    maximum_excitation_range = 12 if excitation_mode == 0 else 22
+
+    if not 1 <= excitation_range <= maximum_excitation_range:
+        raise ValueError(
+            "excitation_range must be between 1 and "
+            f"{maximum_excitation_range} for excitation mode "
+            f"{excitation_mode}"
+        )
+
+    if resistance_range not in RESISTANCE_RANGE_FULL_SCALE_OHMS:
+        raise ValueError("resistance_range must be between 1 and 22")
+
+    if excitation_mode == 1:
+        # I-range x R-range must map to voltage range 1..12.
+        complementary_range = (
+            excitation_range
+            + resistance_range
+            - 19
+        )
+        complementary_name = "internal voltage"
+        complementary_maximum = 12
+
+    else:
+        # V-range / R-range must map to current range 1..22.
+        complementary_range = (
+            excitation_range
+            - resistance_range
+            + 19
+        )
+        complementary_name = "current-source"
+        complementary_maximum = 22
+
+    if not 1 <= complementary_range <= complementary_maximum:
+        mode_name = "current" if excitation_mode == 1 else "voltage"
+        raise ValueError(
+            f"Incompatible Model 370/3716 ranges in {mode_name} mode: "
+            f"excitation range {excitation_range} and resistance range "
+            f"{resistance_range} would require {complementary_name} range "
+            f"{complementary_range}, but the available interval is "
+            f"1-{complementary_maximum}."
+        )
+
+    return complementary_range
+
 DEFAULT_MXC_RESISTANCE_RANGE_SETTINGS = {
     "excitation_mode"  : 0,      # 0 for voltage, 1 for current
     "excitation_range" : 5,      # 5 for 200 uV and 100 pA
     "resistance_range" : 14,     # 14 for 3.15 uA R = 6.32 kOhm
     "autorange"        : 1,      # 0 for NO, 1 for YES
-    "excitation"       : 1,      # 0 for excitation on, 1 = exctiation off
+    "excitation"       : 0,      # 0 for excitation on, 1 = exctiation off
 }
 
 CURVE_NAMES = {
@@ -264,6 +338,314 @@ class LakeShore370:
                 self._when_last_communication_completed = time.monotonic()
 
     #! -- Device status Methods -- #
+    def get_control_diagnostics(
+        self,
+        sample_channel: int,
+    ) -> dict | None:
+        """
+        Read the complete Lake Shore temperature-control state without
+        modifying any instrument setting.
+        """
+
+        if sample_channel not in SUPPORTED_CHANNELS:
+            print(
+                f"Invalid sample channel: {sample_channel}. "
+                f"Valid channels are: {list(SUPPORTED_CHANNELS)}"
+            )
+            return None
+
+        commands = (
+            ("control_setup", "CSET?"),
+            ("control_mode", "CMODE?"),
+            ("control_polarity", "CPOL?"),
+            ("pid", "PID?"),
+            ("manual_output", "MOUT?"),
+            ("setpoint", "SETP?"),
+            ("ramp_configuration", "RAMP?"),
+            ("ramp_active", "RAMPST?"),
+            ("heater_range", "HTRRNG?"),
+            ("heater_output", "HTR?"),
+            ("heater_status", "HTRST?"),
+            ("scan", "SCAN?"),
+            ("mxc_input", "INSET? 6"),
+            ("mxc_reading_status", "RDGST? 6"),
+            ("mxc_temperature", "RDGK? 6"),
+            ("mxc_range", "RDGRNG? 6"),
+            ("mxc_resistance", "RDGR? 6"),
+            ("mxc_curve_header", "CRVHDR? 4"),
+            (
+                "sample_input",
+                f"INSET? {sample_channel}",
+            ),
+            (
+                "sample_range",
+                f"RDGRNG? {sample_channel}",
+            ),
+        )
+
+        diagnostics = {}
+
+        try:
+            with _lakeshore_mutex:
+                for name, command in commands:
+                    response = self._query(command)
+
+                    if not isinstance(response, str):
+                        raise RuntimeError(
+                            f"{command} returned "
+                            f"{response!r}"
+                        )
+
+                    response = response.strip()
+
+                    if not response:
+                        raise RuntimeError(
+                            f"{command} returned an empty reply"
+                        )
+
+                    diagnostics[name] = response
+
+            return diagnostics
+
+        except Exception as exc:
+            print(
+                "Reading Lake Shore control diagnostics failed."
+                f"\nReason: {exc}"
+            )
+            return None
+
+
+    def clear_pid_integrator_hold(self) -> dict:
+        """
+        Clear the Lake Shore closed-loop integrator hold memory.
+
+        The Model 370 manual documents that changing from open-loop to
+        closed-loop control copies the manual output into the closed-loop
+        integrator hold memory. This method therefore forces the heater
+        range OFF, changes to open-loop control, writes zero manual output,
+        and changes back to closed-loop PID control.
+        
+        The heater range is deliberately left OFF. Re-enabling it is a
+        separate operator action after the returned readback is checked.
+        """
+
+        def query_int(command: str) -> int:
+            response = self._query(command)
+            return int(response.strip())
+
+        def query_float(command: str) -> float:
+            response = self._query(command)
+            return float(response.strip())
+
+        def query_pid() -> tuple[float, float, float]:
+            response = self._query("PID?")
+
+            fields = [
+                field.strip()
+                for field in response.strip().split(",")
+            ]
+
+            if len(fields) != 3:
+                raise RuntimeError(
+                    f"Unexpected PID? response: {response!r}"
+                )
+
+            return tuple(
+                float(field)
+                for field in fields
+            )
+
+        try:
+            with _lakeshore_mutex:
+                initial_mode = query_int("CMODE?")
+                initial_range = query_int("HTRRNG?")
+                initial_pid = query_pid()
+                initial_setpoint = query_float("SETP?")
+
+                if initial_mode not in (1, 2, 3, 4):
+                    raise RuntimeError(
+                        "Unexpected control mode before PID "
+                        "integrator reset: "
+                        f"CMODE?={initial_mode}."
+                    )
+
+                # Heater power must remain physically disabled throughout
+                # the integrator-reset sequence.
+                self._write("HTRRNG 0")
+
+                heater_range_off = query_int("HTRRNG?")
+
+                if heater_range_off != 0:
+                    raise RuntimeError(
+                        "Could not force the MXC heater range OFF; "
+                        f"HTRRNG?={heater_range_off}."
+                    )
+
+                # Enter open-loop mode. With HTRRNG=0, the heater output
+                # copied to MOUT by the instrument must be zero.
+                self._write("CMODE 3")
+
+                open_loop_mode = query_int("CMODE?")
+
+                if open_loop_mode != 3:
+                    raise RuntimeError(
+                        "Could not enter open-loop control; "
+                        f"CMODE?={open_loop_mode}."
+                    )
+
+                self._write("MOUT 0")
+
+                open_loop_manual_output = query_float("MOUT?")
+
+                if not math.isclose(
+                    open_loop_manual_output,
+                    0.0,
+                    rel_tol=0.0,
+                    abs_tol=1e-6,
+                ):
+                    raise RuntimeError(
+                        "Could not zero the open-loop manual "
+                        "output; "
+                        f"MOUT?={open_loop_manual_output}."
+                    )
+
+                # The documented open-loop -> closed-loop transition copies
+                # MOUT into the closed-loop integrator hold memory.
+                self._write("CMODE 1")
+
+                final_mode = query_int("CMODE?")
+
+                if final_mode != 1:
+                    raise RuntimeError(
+                        "Closed-loop PID control was not restored; "
+                        f"CMODE?={final_mode}."
+                    )
+
+                # This instrument changes SETP to the instantaneous control
+                # reading during the CMODE 3 -> CMODE 1 transition. Capture
+                # that value for diagnostics, then restore the setpoint that
+                # was active before resetting the integrator.
+                setpoint_after_mode_change = query_float("SETP?")
+
+                self._write(
+                    f"SETP {initial_setpoint:.12g}"
+                )
+
+                final_manual_output = query_float("MOUT?")
+                final_range = query_int("HTRRNG?")
+                final_heater_output = query_float("HTR?")
+                final_pid = query_pid()
+                final_setpoint = query_float("SETP?")
+
+                if final_range != 0:
+                    raise RuntimeError(
+                        "MXC heater range did not remain OFF; "
+                        f"HTRRNG?={final_range}."
+                    )
+
+                if not math.isclose(
+                    final_manual_output,
+                    0.0,
+                    rel_tol=0.0,
+                    abs_tol=1e-6,
+                ):
+                    raise RuntimeError(
+                        "Manual output did not remain zero; "
+                        f"MOUT?={final_manual_output}."
+                    )
+
+                if not math.isclose(
+                    final_heater_output,
+                    0.0,
+                    rel_tol=0.0,
+                    abs_tol=0.01,
+                ):
+                    raise RuntimeError(
+                        "Heater output is non-zero with the "
+                        "range OFF; "
+                        f"HTR?={final_heater_output}."
+                    )
+
+                if any(
+                    not math.isclose(
+                        before,
+                        after,
+                        rel_tol=0.0,
+                        abs_tol=1e-9,
+                    )
+                    for before, after in zip(
+                        initial_pid,
+                        final_pid,
+                    )
+                ):
+                    raise RuntimeError(
+                        "PID values changed during integrator "
+                        "reset: "
+                        f"before={initial_pid}, "
+                        f"after={final_pid}."
+                    )
+
+                if not math.isclose(
+                    initial_setpoint,
+                    final_setpoint,
+                    rel_tol=0.0,
+                    abs_tol=1e-9,
+                ):
+                    raise RuntimeError(
+                        "Setpoint changed during integrator reset: "
+                        f"before={initial_setpoint}, "
+                        f"after={final_setpoint}."
+                    )
+
+                return {
+                    "ok": True,
+                    "initial_control_mode": initial_mode,
+                    "initial_heater_range": initial_range,
+                    "final_control_mode": final_mode,
+                    "final_manual_output": final_manual_output,
+                    "final_heater_range": final_range,
+                    "final_heater_output": final_heater_output,
+                    "setpoint_after_mode_change_k": (
+                        setpoint_after_mode_change
+                    ),
+                    "pid": {
+                        "P": final_pid[0],
+                        "I": final_pid[1],
+                        "D": final_pid[2],
+                    },
+                    "setpoint_k": final_setpoint,
+                }
+
+        except Exception as exc:
+            # Best-effort safe state. Never restore the heater range here.
+            safe_state_errors = []
+
+            with _lakeshore_mutex:
+                for command in (
+                    "HTRRNG 0",
+                    "CMODE 3",
+                    "MOUT 0",
+                ):
+                    try:
+                        self._write(command)
+
+                    except Exception as safe_exc:
+                        safe_state_errors.append(
+                            f"{command}: {safe_exc}"
+                        )
+
+            result = {
+                "ok": False,
+                "error": str(exc),
+            }
+
+            if safe_state_errors:
+                result["safe_state_errors"] = (
+                    safe_state_errors
+                )
+
+            return result
+                
     def get_reading_status(self, channel: int) -> int:
         """
         Get the reading status for a specific channel.
@@ -352,22 +734,93 @@ class LakeShore370:
             print(f"Reading channel {channel} failed.\nReason: {e}")
             return None
 
+    def _get_input_settings(self, channel: int) -> dict:
+        """Reads and validates INSET configuration of a channel"""
+
+        if isinstance(channel, bool) or not isinstance(channel, int):
+            raise TypeError("channel must be int")
+
+        if channel not in SUPPORTED_CHANNELS:
+            raise ValueError(
+                f"Channel {channel} not supported. "
+                f"Supported channels: {SUPPORTED_CHANNELS}"
+            )
+
+        with _lakeshore_mutex:
+            response = self._query(f"INSET? {channel}")
+
+        if response is None:
+            raise RuntimeError(
+                f"Lake Shore did not respond to INSET? {channel}"
+            )
+
+        fields = [field.strip() for field in response.strip().split(",")]
+
+        if len(fields) != 5:
+            raise RuntimeError(
+                f"Invalid INSET? response for CH{channel}: {response!r}. "
+                "Five fields expected."
+            )
+
+        try:
+            enabled, dwell_s, pause_s, curve, temperature_coefficient = (
+                int(field) for field in fields
+            )
+            
+        except ValueError as exc:
+            raise RuntimeError(
+                f"Invalid INSET? response for CH{channel}: {response!r}"
+            ) from exc
+
+        if enabled not in (0, 1):
+            raise RuntimeError(
+                f"Invalid INSET status for CH{channel}: {enabled}"
+            )
+
+        if not 1 <= dwell_s <= 200:
+            raise RuntimeError(
+                f"Invalid INSET dwell for CH{channel}: {dwell_s} s"
+            )
+
+        if not 3 <= pause_s <= 200:
+            print('INSET pause time', pause_s)
+            raise RuntimeError(
+                f"Invalid INSET pause for CH{channel}: {pause_s} s"
+            )
+
+        if not 0 <= curve <= 20:
+            raise RuntimeError(
+                f"Invalid INSET curve for CH{channel}: {curve}"
+            )
+
+        if temperature_coefficient not in (1, 2):
+            raise RuntimeError(
+                f"Invalid INSET temperature coefficient for CH{channel}: {temperature_coefficient}"
+            )
+
+        return {
+            "enabled": enabled,
+            "dwell_s": dwell_s,
+            "pause_s": pause_s,
+            "curve": curve,
+            "temperature_coefficient": temperature_coefficient,
+        }
+
     def get_channel_status(self, channel: int, verbose=False):
         try:
-            with _lakeshore_mutex:
-                response = self._query(f"INSET? {channel}")
-            status = int(response.split(",")[0])
-            #time.sleep(0.1)  # Wait for the device to respond
+            status = self._get_input_settings(channel)["enabled"]
+
             if verbose:
-                if status == '1':
-                    print(f"Channel {channel} is ON.")
-                else:
-                    print(f"Channel {channel} is OFF.")
+                state = "ON" if status == 1 else "OFF"
+                print(f"Channel {channel} is {state}.")
 
             return status
-                
-        except Exception as e:
-            print(f"Getting channel {channel} status failed.\nReason: {e}")
+
+        except Exception as exc:
+            print(
+                f"Getting channel {channel} status failed.\n"
+                f"Reason: {exc}"
+            )
             return None
 
     def get_channel_setpoint(self, channel: int = 6):
@@ -514,25 +967,83 @@ class LakeShore370:
             print(f"Getting pause time for channel {channel} failed.\nReason: {e}")
             return None
     
-    def get_autoscan(self) -> bool:
-        
+    def _get_scan_state(self) -> dict:
+
         """
-        Asks the lakeshore controller for the autoscan status and what channel is set in autoscan
+        Read and validate the scanner state reported by SCAN?.
         """
-        
+
+        with _lakeshore_mutex:
+            response = self._query("SCAN?")
+
+        if response is None:
+            raise RuntimeError(
+                "Lake Shore did not respond to SCAN?"
+            )
+
+        fields = [
+            field.strip()
+            for field in response.strip().split(",")
+        ]
+
+        if len(fields) != 2:
+            raise RuntimeError(
+                f"Invalid SCAN? response: {response!r}. "
+                "Two fields expected."
+            )
+
         try:
-            with _lakeshore_mutex:
-                current_status = self._query("SCAN?")
-            return current_status.split(",")
-        except Exception as e:
-            print(f"Could not read current autoscan status. Reason: {e}")
+            channel = int(fields[0])
+            autoscan = int(fields[1])
+
+        except ValueError as exc:
+            raise RuntimeError(
+                f"Non-numeric SCAN? response: {response!r}"
+            ) from exc
+
+        if not 1 <= channel <= 16:
+            raise RuntimeError(
+                f"Invalid channel in SCAN? response: {channel}"
+            )
+
+        if autoscan not in (0, 1):
+            raise RuntimeError(
+                f"Invalid autoscan state in SCAN? response: "
+                f"{autoscan}"
+            )
+
+        return {
+            "channel": channel,
+            "autoscan_enabled": bool(autoscan),
+        }
+
+    def get_autoscan(self) -> list[str] | None:
+        """
+        Return the validated scanner state in the legacy public format:
+        [channel, autoscan], with both values represented as strings.
+
+        Return None if the scanner state cannot be read or validated.
+        """
+        try:
+            state = self._get_scan_state()
+
+            return [
+                str(state["channel"]),
+                str(int(state["autoscan_enabled"])),
+            ]
+
+        except Exception as exc:
+            print(
+                "Getting scanner state failed.\n"
+                f"Reason: {exc}"
+            )
             return None
     
     #! --- Multichannel Get methods ----- #
     
     def get_channels_on(self):
         channels_on_list = []
-        for channel in ALL_CHANNELS:
+        for channel in SUPPORTED_CHANNELS:
             if bool(self.get_channel_status(channel)): channels_on_list.append(channel)
         
         return channels_on_list
@@ -657,50 +1168,204 @@ class LakeShore370:
             with _lakeshore_mutex:
                 response = self._query("HTRRNG?")
             control_heater_range = response.strip()
-            time.sleep(0.1)  # Wait for the device to respond
-            control_settings = self.get_control_settings()
-            control_heater_display = control_settings[4]
-            if control_heater_display == '1':
-                return control_heater_range
-            elif control_heater_display == '2':
-                print("Heater output display is power, not current. NOT DEFINED YET.")
-                return None
-            else:
-                print(f"Unknown heater display value: {control_heater_display}")
-                return None
+
+            if control_heater_range not in CURRENT_RANGE_LIST:
+                raise ValueError(
+                    f"Unexpected HTRRNG? response: {response!r}"
+                    )
+
+            return control_heater_range
+        
         except Exception as e:
             print(f"Getting control range failed.\nReason: {e}")
        
             return None
     
-    def get_sensor_resistance_settings(self, channel: int = 6, return_dict=False) -> str|dict:
-
+    def get_heater_status(self) -> int | None:
         """
-        Get the sensor resistance settings used for the specified channel.
-        Args:
-            channel (int): The channel number (default is 6).
-            return_dict (bool): If True, return a dictionary with the sensor resistance settings.
-        Returns:
-            str|dict: The sensor resistance settings (e.g., "2.00 uV and 1.00 pA") or a dictionary with the settings.
+        Read the Lake Shore heater hardware status.
+
+        Returns
+        -------
+        int | None
+            0: heater circuit is normal.
+            1: open-heater condition detected.
+            None: communication error or invalid response.
         """
 
-        if channel not in DEFAULT_CHANNELS:
-            print(f"Channel {channel} is not valid. Valid channels are: {DEFAULT_CHANNELS}")
-            return None
-        
         try:
             with _lakeshore_mutex:
-                response = self._query(f"RDGRNG? {channel}")
-            
-            values = response.strip().split(",")
+                response = self._query("HTRST?")
 
-            if return_dict:
-                return _translate_sensor_resistance_settings_to_dictionary(values)
-            else:
-                return values
+            heater_status = int(response.strip())
+
+            if heater_status not in (0, 1):
+                raise ValueError(
+                    f"Unexpected HTRST? response: {response!r}"
+                )
+
+            return heater_status
 
         except Exception as e:
-            print(f"Getting sensor resistance settings for channel {channel} failed.\nReason: {e}")
+            print(
+                "Getting heater status failed.\n"
+                f"Reason: {e}"
+            )
+            return None
+
+    def _get_resistance_measurement_settings(
+        self,
+        channel: int,
+    ) -> dict:
+        """
+        Read and validate the RDGRNG configuration of a channel.
+
+        The current_source_off field follows the Lake Shore convention:
+            0 = excitation ON
+            1 = excitation OFF
+        """
+
+        if isinstance(channel, bool) or not isinstance(channel, int):
+            raise TypeError("channel must be an integer")
+
+        if channel not in SUPPORTED_CHANNELS:
+            raise ValueError(
+                f"Channel {channel} is not supported. "
+                f"Supported channels: {SUPPORTED_CHANNELS}"
+            )
+
+        with _lakeshore_mutex:
+            response = self._query(f"RDGRNG? {channel}")
+
+        if response is None:
+            raise RuntimeError(
+                f"Lake Shore did not respond to RDGRNG? {channel}"
+            )
+
+        fields = [
+            field.strip()
+            for field in response.strip().split(",")
+        ]
+
+        if len(fields) != 5:
+            raise RuntimeError(
+                f"Invalid RDGRNG? response for CH{channel}: "
+                f"{response!r}. Five fields expected."
+            )
+
+        try:
+            (
+                excitation_mode,
+                excitation_range,
+                resistance_range,
+                autorange,
+                current_source_off,
+            ) = (
+                int(field)
+                for field in fields
+            )
+
+        except ValueError as exc:
+            raise RuntimeError(
+                f"Non-numeric RDGRNG? response for "
+                f"CH{channel}: {response!r}"
+            ) from exc
+
+        if excitation_mode not in (0, 1):
+            raise RuntimeError(
+                f"Invalid excitation mode for CH{channel}: "
+                f"{excitation_mode}"
+            )
+
+        maximum_excitation_range = (
+            12 if excitation_mode == 0 else 22
+        )
+
+        if not 1 <= excitation_range <= maximum_excitation_range:
+            raise RuntimeError(
+                f"Invalid excitation range for CH{channel}: "
+                f"{excitation_range}. Expected 1-"
+                f"{maximum_excitation_range} for excitation mode "
+                f"{excitation_mode}."
+            )
+
+        if resistance_range not in RESISTANCE_RANGE_FULL_SCALE_OHMS:
+            raise RuntimeError(
+                f"Invalid resistance range for CH{channel}: "
+                f"{resistance_range}"
+            )
+
+        if autorange not in (0, 1):
+            raise RuntimeError(
+                f"Invalid autorange value for CH{channel}: "
+                f"{autorange}"
+            )
+
+        if current_source_off not in (0, 1):
+            raise RuntimeError(
+                f"Invalid current-source state for CH{channel}: "
+                f"{current_source_off}"
+            )
+
+        return {
+            "excitation_mode": excitation_mode,
+            "excitation_range": excitation_range,
+            "resistance_range": resistance_range,
+            "autorange": autorange,
+            "current_source_off": current_source_off,
+        }
+
+    def get_sensor_resistance_settings(
+        self,
+        channel: int = 6,
+        return_dict: bool = False,
+    ) -> list[str] | dict | None:
+        """
+        Return the validated RDGRNG configuration of a channel.
+
+        When return_dict is True, the legacy public dictionary format is
+        preserved for compatibility with existing backend callers.
+        """
+
+        try:
+            settings = self._get_resistance_measurement_settings(
+                channel
+            )
+
+            if return_dict:
+                return {
+                    "excitation_mode":
+                        str(settings["excitation_mode"]),
+
+                    "excitation_range":
+                        str(settings["excitation_range"]),
+
+                    "resistance_range":
+                        str(settings["resistance_range"]),
+
+                    "autorange":
+                        str(settings["autorange"]),
+
+                    # Legacy key. This represents the RDGRNG "cs off"
+                    # field: 0 = excitation ON, 1 = excitation OFF.
+                    "excitation":
+                        str(settings["current_source_off"]),
+                }
+
+            return [
+                str(settings["excitation_mode"]),
+                f"{settings['excitation_range']:02d}",
+                f"{settings['resistance_range']:02d}",
+                str(settings["autorange"]),
+                str(settings["current_source_off"]),
+            ]
+
+        except Exception as exc:
+            print(
+                f"Getting resistance measurement settings for "
+                f"channel {channel} failed.\n"
+                f"Reason: {exc}"
+            )
             return None
 
 
@@ -708,8 +1373,8 @@ class LakeShore370:
         """
         Devuelve el número de curva configurado en un canal (campo 4 de INSET?).
         """
-        if channel not in DEFAULT_CHANNELS:
-            print(f"Channel {channel} is not valid. Valid channels are: {DEFAULT_CHANNELS}")
+        if channel not in SUPPORTED_CHANNELS:
+            print(f"Channel {channel} is not valid. Valid channels are: {SUPPORTED_CHANNELS}")
             return None
 
         try:
@@ -747,108 +1412,179 @@ class LakeShore370:
         except Exception as e:
             print(f"Setting temperature setpoint failed.\nReason: {e}")
 
-    def set_channel_off(self, channel: int, verbose: bool = False):
-        try:
-            parameters = self._query(f"INSET? {channel}").split(",")
-            time.sleep(0.5)  # Wait for the device to respond
-            if parameters[0] == '0':
-                print(f"Channel {channel} is already off.")
-                return False
-                
-            else:
-                dwell = parameters[1]
-                pause = parameters[2]
-                curve = parameters[3]
-                temp_coeff = parameters[4]
-                if verbose: print(f"Setting channel {channel} off.")
-                self._write(f"INSET {channel},0,{dwell},{pause},{curve},{temp_coeff}")
-                if verbose: print(f"Channel {channel} is now set off")
-                # if the other parameters are not specificied command won't work
+    def _set_channel_enabled(
+        self,
+        channel: int,
+        enabled: bool,
+        verbose: bool = False,
+    ) -> bool:
+        """
+        Enable or disable a channel while preserving the remaining
+        INSET parameters.
+        """
+
+        if not isinstance(enabled, bool):
+            raise TypeError("enabled must be a boolean")
+
+        target_status = int(enabled)
+        target_label = "ON" if enabled else "OFF"
+
+        # Keep the complete read-modify-write operation atomic.
+        with _lakeshore_mutex:
+            settings = self._get_input_settings(channel)
+
+            if settings["enabled"] == target_status:
+                if verbose:
+                    print(
+                        f"Channel {channel} is already {target_label}."
+                    )
                 return True
 
-        except Exception as e:
-            print(f"Setting channel {channel} off failed.\nReason: {e}")
-            return False
-    
-    def set_channel_on(self, channel: int, settings=None, verbose: bool = False):
-        
-        if channel not in DEFAULT_CHANNELS:
-            print(f"Channel {channel} is not valid. Valid channels are: {DEFAULT_CHANNELS}")
-            return False
-
-        if settings is None:
-            try:
-                with _lakeshore_mutex:
-                    parameters = self._query(f"INSET? {channel}").split(",")
-                time.sleep(0.5)  # Wait for the device to respond
-                dwell = parameters[1]
-                pause = parameters[2]
-                curve = parameters[3]
-                temp_coeff = parameters[4]
-                if verbose: print(f"Setting channel {channel} on.")
-                self._write(f"INSET {channel},1,{dwell},{pause},{curve},{temp_coeff}")
-                if verbose: print(f"Channel {channel} is set on with parameters: {dwell}, {pause}, {curve}, {temp_coeff}")
-                return True
-            except Exception as e:
-                print(f"Reading channel {channel} parameters failed when switching on.\nReason: {e}")
-                return False
-        else: 
-            if len(settings) != 4:
-                print("Settings must be a list of 4 elements: [dwell time, pause time, curve number, temperature coefficient]")
-                return False
-            dwell, pause, curve, temp_coeff = settings
             
-            try:
-                with _lakeshore_mutex:
-                    self._write(f"INSET {channel},1,{dwell},{pause},{curve},{temp_coeff}")
-                print(f"Channel {channel} is set on with custom parameters: {dwell}, {pause}, {curve}, {temp_coeff}")
-                return True
-            except Exception as e:
-                print(f"Setting channel {channel} on failed.\nReason: {e}")
-                return False
+            command = (
+                f"INSET {channel},{target_status},"
+                f"{settings['dwell_s']},"
+                f"{settings['pause_s']},"
+                f"{settings['curve']},"
+                f"{settings['temperature_coefficient']}"
+            )
+            print('Sent command', command)
+            self._write(command)
 
-    def set_autoscan(self, status: bool | str = "Off", channel: int = 6) -> bool:
-        
-        """
-        Set autoscan ON/OFF. Accepts bool or common string forms ("on"/"off", "1"/"0", "true"/"false", "yes"/"no").
-        Returns True if a change was made, False if already in that state or on error.
-        """
-        
-        # Normalizing status to bool
-        if isinstance(status, str):
-            s = status.strip().lower()
-            if s in {"on", "1", "true", "yes"}:
-                status_bool = True
-            elif s in {"off", "0", "false", "no"}:
-                status_bool = False
-            else:
-                raise ValueError(f"Unrecognized status string: {status!r}")
-        elif isinstance(status, bool):
-            status_bool = status
-        else:
-            raise TypeError("status must be bool or str")
+            expected_settings = settings.copy()
+            expected_settings["enabled"] = target_status
 
-        # Read current status from the instrument
+            confirmed_settings = self._get_input_settings(channel)
+
+            if confirmed_settings != expected_settings:
+                raise RuntimeError(
+                    f"Channel {channel} state verification failed. "
+                    f"Expected {expected_settings}, "
+                    f"received {confirmed_settings}."
+                )
+
+        if verbose:
+            print(
+                f"Channel {channel} has been switched {target_label}."
+            )
+
+        return True
+
+
+    def set_channel_on(
+        self,
+        channel: int,
+        verbose: bool = False,
+    ) -> bool:
+        """Enable a channel while preserving its INSET configuration."""
+
         try:
-            current_status = self._query("SCAN?")  # e.g., "... ,0" or "... ,1"
-            print(current_status)
-            current_status = current_status.strip().split(",")[-1].strip()
-            current_bool = bool(int(current_status))  # 0 -> False, 1 -> True
-        except Exception as e:
-            print(f"Could not read current autoscan status. Reason: {e}")
+            return self._set_channel_enabled(
+                channel=channel,
+                enabled=True,
+                verbose=verbose,
+            )
+
+        except Exception as exc:
+            print(
+                f"Setting channel {channel} ON failed.\n"
+                f"Reason: {exc}"
+            )
             return False
 
-        if status_bool == current_bool:
-            print(f"Autoscan is already {'ON' if current_bool else 'OFF'}")
+
+    def set_channel_off(
+        self,
+        channel: int,
+        verbose: bool = False,
+    ) -> bool:
+        """Disable a channel while preserving its INSET configuration."""
+
+        try:
+            return self._set_channel_enabled(
+                channel=channel,
+                enabled=False,
+                verbose=verbose,
+            )
+
+        except Exception as exc:
+            print(
+                f"Setting channel {channel} OFF failed.\n"
+                f"Reason: {exc}"
+            )
+            return False
+        
+    def set_autoscan(
+        self,
+        status: bool | str = "Off",
+        channel: int = 6,
+    ) -> bool:
+        """
+        Set autoscan and explicitly request the specified scanner channel.
+
+        Every call sends a SCAN command; this is not a passive wait.
+        Return True after verification, or False on an instrument error.
+        Invalid arguments raise TypeError or ValueError.
+        """
+        if isinstance(status, bool):
+            autoscan_enabled = status
+
+        elif isinstance(status, str):
+            normalized = status.strip().lower()
+
+            if normalized in {"on", "1", "true", "yes"}:
+                autoscan_enabled = True
+            elif normalized in {"off", "0", "false", "no"}:
+                autoscan_enabled = False
+            else:
+                raise ValueError(
+                    f"Unrecognized status string: {status!r}"
+                )
+
+        else:
+            raise TypeError(
+                "status must be a boolean or a string"
+            )
+
+        if isinstance(channel, bool) or not isinstance(channel, int):
+            raise TypeError("channel must be an integer")
+
+        if channel not in SUPPORTED_CHANNELS:
+            raise ValueError(
+                f"Unsupported channel: {channel}. "
+                f"Supported channels: {SUPPORTED_CHANNELS}"
+            )
+
+        try:
+            if not autoscan_enabled:
+                # Observe the requested channel even during PID alternation.
+                return self.select_scan_channel(
+                    channel,
+                    autoscan=False,
+                )
+
+            with _lakeshore_mutex:
+                self._write(f"SCAN {channel},1")
+                state = self._get_scan_state()
+
+            # The active channel may have advanced after enabling autoscan.
+            if not state["autoscan_enabled"]:
+                raise RuntimeError(
+                    "Scanner verification failed: requested autoscan=1, "
+                    f"received state={state!r}"
+                )
+
             return True
-        else:
-            try:
-                self._write(f"SCAN {int(channel)},{int(status_bool)}")
-                return True
-            except Exception as e:
-                print(f"Could not set autoscan {'ON' if current_bool else 'OFF'}.\nReason: {e}")
-                return False
-            
+
+        except Exception as exc:
+            print(
+                f"Setting autoscan "
+                f"{'ON' if autoscan_enabled else 'OFF'} "
+                f"on channel {channel} failed.\n"
+                f"Reason: {exc}"
+            )
+            return False
+                
     def recover_scan(self) -> bool:
         """
         Reinitialize the Lake Shore scan and verify the final state.
@@ -861,121 +1597,311 @@ class LakeShore370:
             with _lakeshore_mutex:
                 self._write("SCAN 6,0")
                 self._write("SCAN 1,1")
-                response = self._query("SCAN?")
+                state = self._get_scan_state()
 
-            fields = [
-                field.strip()
-                for field in response.strip().split(",")
-            ]
-
-            if len(fields) < 2:
-                print(
-                    "Unexpected SCAN? response after recovery: "
-                    f"{response!r}"
+            # Autoscan and PID may change the active channel after the command.
+            if not state["autoscan_enabled"]:
+                raise RuntimeError(
+                    "Scan recovery verification failed: autoscan is OFF. "
+                    f"Received state={state!r}"
                 )
-                return False
 
-            channel = int(fields[0])
-            autoscan_enabled = int(fields[1])
-
-            if channel == 1 and autoscan_enabled == 1:
-                print(
-                    "Scan recovered: autoscan ON "
-                    "starting at channel 1"
-                )
-                return True
+            current_channel = state["channel"]
 
             print(
-                "Scan recovery verification failed: "
-                f"SCAN? returned channel={channel}, "
-                f"autoscan={autoscan_enabled}"
+                "Scan recovered: autoscan ON; "
+                f"current channel={current_channel}"
             )
-            return False
+            return True
 
-        except Exception as e:
+        except Exception as exc:
             print(
                 "Scan recovery failed.\n"
-                f"Reason: {e}"
+                f"Reason: {exc}"
             )
             return False
 
-    def select_scan_channel(self, channel: int, autoscan: bool = False) -> bool:
-
+    def select_scan_channel(
+        self,
+        channel: int,
+        autoscan: bool = False,
+        verification_timeout_s: float = 20.0,
+        verification_poll_interval_s: float = 0.20,
+    ) -> bool:
         """
-        Select a scanner channel and explicitly set the autoscan state.
+        Request a scanner channel and wait until SCAN? reports that channel.
 
-        The SCAN command is always sent, even if the requested autoscan state
-        appears to be already active. The resulting configuration is verified
-        using SCAN?.
+        During closed-loop control with a scanner, the Model 370 firmware
+        alternates automatically between the control channel and the requested
+        measurement channel. Therefore, SCAN? must not be expected to remain
+        permanently on the requested channel.
 
-        This method does not wait for the measurement to settle after changing
-        channel. That delay must be handled by the caller.
+        Verification succeeds when the requested channel is observed with the
+        requested autoscan state at least once before the timeout expires.
+
+        This function confirms scanner selection, but it does not guarantee
+        that the corresponding resistance reading has completed its settling
+        time. Measurement settling must be handled by the caller.
 
         Parameters
         ----------
-        channel : int
-            Scanner channel to select (1–16).
-        autoscan : bool, optional
-            True enables autoscan; False disables it. Default is False.
+        channel
+            Scanner channel to request; must belong to SUPPORTED_CHANNELS.
+
+        autoscan
+            Requested autoscan state.
+
+        verification_timeout_s
+            Maximum time allowed to observe the requested channel.
+
+        verification_poll_interval_s
+            Delay between consecutive SCAN? queries.
 
         Returns
         -------
         bool
-            True when both the selected channel and autoscan state are verified.
+            True when the requested channel and autoscan state are observed.
 
         Raises
         ------
         TypeError
-            If channel is not an integer or autoscan is not a boolean.
+            If an argument has an invalid type.
+
         ValueError
-            If channel is outside the valid range.
+            If an argument is outside its valid range.
+
         RuntimeError
-            If SCAN? returns an invalid response or the requested configuration
-            cannot be verified.
+            If SCAN? returns an invalid response or the requested state is
+            not observed before the timeout.
         """
-        
+
         if isinstance(channel, bool) or not isinstance(channel, int):
             raise TypeError("channel must be an integer")
 
-        if not 1 <= channel <= 16:
-            raise ValueError("channel must be between 1 and 16")
+        if channel not in SUPPORTED_CHANNELS:
+            raise ValueError(
+                f"Unsupported channel: {channel}. "
+                f"Supported channels: {SUPPORTED_CHANNELS}"
+            )
 
         if not isinstance(autoscan, bool):
             raise TypeError("autoscan must be a boolean")
 
+        if (
+            isinstance(verification_timeout_s, bool)
+            or not isinstance(verification_timeout_s, (int, float))
+        ):
+            raise TypeError(
+                "verification_timeout_s must be numeric"
+            )
+
+        if (
+            isinstance(verification_poll_interval_s, bool)
+            or not isinstance(
+                verification_poll_interval_s,
+                (int, float),
+            )
+        ):
+            raise TypeError(
+                "verification_poll_interval_s must be numeric"
+            )
+
+        verification_timeout_s = float(
+            verification_timeout_s
+        )
+
+        verification_poll_interval_s = float(
+            verification_poll_interval_s
+        )
+
+        if (
+            not math.isfinite(verification_timeout_s)
+            or verification_timeout_s <= 0
+        ):
+            raise ValueError(
+                "verification_timeout_s must be finite "
+                "and greater than zero"
+            )
+
+        if (
+            not math.isfinite(verification_poll_interval_s)
+            or verification_poll_interval_s <= 0
+        ):
+            raise ValueError(
+                "verification_poll_interval_s must be finite "
+                "and greater than zero"
+            )
+
         requested_autoscan = int(autoscan)
+        last_state = None
 
         with _lakeshore_mutex:
             self._write(f"SCAN {channel},{requested_autoscan}")
-            reply = self._query("SCAN?").strip()
 
-        fields = [field.strip() for field in reply.split(",")]
-
-        if len(fields) != 2:
-            raise RuntimeError(f"Invalid SCAN? reply: {reply!r}")
-
-        try:
-            actual_channel = int(fields[0])
-            actual_autoscan = int(fields[1])
-        except ValueError as exc:
-            raise RuntimeError(
-                f"Non-numeric content in SCAN? reply: {reply!r}"
-            ) from exc
-
-        if actual_autoscan not in (0, 1):
-            raise RuntimeError(f"Invalid autoscan value in SCAN? reply: {reply!r}")
-
-        if (
-            actual_channel != channel
-            or actual_autoscan != requested_autoscan
-        ):
-            raise RuntimeError(
-                "Scanner configuration verification failed: "
-                f"requested channel={channel}, autoscan={requested_autoscan}; "
-                f"received channel={actual_channel}, autoscan={actual_autoscan}"
+            deadline = (
+                time.monotonic() + verification_timeout_s
             )
 
-        return True
+            while True:
+                if time.monotonic() >= deadline:
+                    break
+
+                state = self._get_scan_state()
+                last_state = state
+
+                if time.monotonic() >= deadline:
+                    break
+
+                if (
+                    state["channel"] == channel
+                    and state["autoscan_enabled"] == autoscan
+                ):
+                    return True
+
+                remaining_s = deadline - time.monotonic()
+
+                if remaining_s <= 0:
+                    break
+
+                time.sleep(
+                    min(
+                        verification_poll_interval_s,
+                        remaining_s,
+                    )
+                )
+
+        raise RuntimeError(
+            "Requested scanner channel was not observed before timeout: "
+            f"requested channel={channel}, "
+            f"autoscan={requested_autoscan}; "
+            f"last SCAN? state={last_state!r}"
+        )
+
+    def wait_for_scan_channel(
+        self,
+        channel: int,
+        autoscan: bool = False,
+        timeout_s: float = 20.0,
+        poll_interval_s: float = 0.20,
+    ) -> bool:
+        """
+        Wait until SCAN? reports the requested active channel.
+
+        Unlike select_scan_channel(), this method does not send a SCAN
+        command. It only observes the scanner state. This is required during
+        closed-loop control because the Model 370 alternates automatically
+        between the control channel and the requested measurement channel.
+
+        This method confirms that the channel became active, but does not
+        guarantee that its measurement has completed settling.
+
+        Parameters
+        ----------
+        channel
+            Scanner channel to observe; must belong to SUPPORTED_CHANNELS.
+
+        autoscan
+            Autoscan state that SCAN? must report.
+
+        timeout_s
+            Maximum waiting time.
+
+        poll_interval_s
+            Delay between SCAN? queries.
+
+        Returns
+        -------
+        bool
+            True when the requested channel and autoscan state are observed.
+
+        Raises
+        ------
+        TypeError
+            If an argument has an invalid type.
+
+        ValueError
+            If an argument is outside its valid range.
+
+        RuntimeError
+            If SCAN? is invalid or the channel is not observed before timeout.
+        """
+
+        if isinstance(channel, bool) or not isinstance(channel, int):
+            raise TypeError("channel must be an integer")
+
+        if channel not in SUPPORTED_CHANNELS:
+            raise ValueError(
+                f"Unsupported channel: {channel}. "
+                f"Supported channels: {SUPPORTED_CHANNELS}"
+            )
+
+        if not isinstance(autoscan, bool):
+            raise TypeError("autoscan must be a boolean")
+
+        if (
+            isinstance(timeout_s, bool)
+            or not isinstance(timeout_s, (int, float))
+        ):
+            raise TypeError("timeout_s must be numeric")
+
+        if (
+            isinstance(poll_interval_s, bool)
+            or not isinstance(poll_interval_s, (int, float))
+        ):
+            raise TypeError("poll_interval_s must be numeric")
+
+        timeout_s = float(timeout_s)
+        poll_interval_s = float(poll_interval_s)
+
+        if not math.isfinite(timeout_s) or timeout_s <= 0:
+            raise ValueError(
+                "timeout_s must be finite and greater than zero"
+            )
+
+        if (
+            not math.isfinite(poll_interval_s)
+            or poll_interval_s <= 0
+        ):
+            raise ValueError(
+                "poll_interval_s must be finite "
+                "and greater than zero"
+            )
+
+        requested_autoscan = int(autoscan)
+        deadline = time.monotonic() + timeout_s
+        last_state = None
+
+        while True:
+            if time.monotonic() >= deadline:
+                break
+
+            state = self._get_scan_state()
+            last_state = state
+
+            if time.monotonic() >= deadline:
+                break
+
+            if (
+                state["channel"] == channel
+                and state["autoscan_enabled"] == autoscan
+            ):
+                return True
+
+            remaining_s = deadline - time.monotonic()
+
+            if remaining_s <= 0:
+                break
+
+            time.sleep(
+                min(poll_interval_s, remaining_s)
+            )
+
+        raise RuntimeError(
+            "Requested active scanner channel was not observed before timeout: "
+            f"channel={channel}, "
+            f"autoscan={requested_autoscan}; "
+            f"last SCAN? state={last_state!r}"
+        )
 
     def get_filter_settings(self, channel: int) -> dict:
         """
@@ -1053,49 +1979,24 @@ class LakeShore370:
         excitation_on: bool = True,
     ) -> bool:
         """
-        Set the resistance measurement range of a channel while preserving
-        its excitation mode and excitation range.
+        Configure the resistance range while preserving excitation mode
+        and excitation range.
 
-        Parameters
-        ----------
-        channel : int
-            Scanner channel to configure (1–16).
-        resistance_range : int
-            Lake Shore resistance-range code (1–22).
-        autorange : bool, optional
-            Enable or disable the Lake Shore internal autorange.
-            Default is False.
-        excitation_on : bool, optional
-            Leave the channel excitation on or off. Default is True.
-
-        Returns
-        -------
-        bool
-            True when the requested configuration has been verified.
-
-        Raises
-        ------
-        TypeError
-            If any argument has an invalid type.
-        ValueError
-            If channel or resistance_range is outside its valid range.
-        RuntimeError
-            If RDGRNG? returns an invalid response or verification fails.
+        The operation is idempotent and verified with RDGRNG?.
         """
-        if isinstance(channel, bool) or not isinstance(channel, int):
-            raise TypeError("channel must be an integer")
-
-        if not 1 <= channel <= 16:
-            raise ValueError("channel must be between 1 and 16")
 
         if (
             isinstance(resistance_range, bool)
             or not isinstance(resistance_range, int)
         ):
-            raise TypeError("resistance_range must be an integer")
+            raise TypeError(
+                "resistance_range must be an integer"
+            )
 
         if resistance_range not in RESISTANCE_RANGE_FULL_SCALE_OHMS:
-            raise ValueError("resistance_range must be between 1 and 22")
+            raise ValueError(
+                "resistance_range must be between 1 and 22"
+            )
 
         if not isinstance(autorange, bool):
             raise TypeError("autorange must be a boolean")
@@ -1103,124 +2004,87 @@ class LakeShore370:
         if not isinstance(excitation_on, bool):
             raise TypeError("excitation_on must be a boolean")
 
-        def parse_rdgrng_reply(reply: str) -> tuple[int, int, int, int, int]:
-            fields = [
-                field.strip()
-                for field in reply.strip().split(",")
-            ]
-
-            if len(fields) != 5:
-                raise RuntimeError(
-                    f"Invalid RDGRNG? reply: {reply!r}"
-                )
-
-            try:
-                values = tuple(int(field) for field in fields)
-            except ValueError as exc:
-                raise RuntimeError(
-                    f"Non-numeric content in RDGRNG? reply: {reply!r}"
-                ) from exc
-
-            (
-                excitation_mode,
-                excitation_range,
-                reported_resistance_range,
-                reported_autorange,
-                reported_cs_off,
-            ) = values
-
-            if excitation_mode not in (0, 1):
-                raise RuntimeError(
-                    f"Invalid excitation mode in RDGRNG? reply: {reply!r}"
-                )
-
-            maximum_excitation_range = (
-                12 if excitation_mode == 0 else 22
-            )
-
-            if not 1 <= excitation_range <= maximum_excitation_range:
-                raise RuntimeError(
-                    f"Invalid excitation range in RDGRNG? reply: {reply!r}"
-                )
-
-            if reported_resistance_range not in (
-                RESISTANCE_RANGE_FULL_SCALE_OHMS
-            ):
-                raise RuntimeError(
-                    f"Invalid resistance range in RDGRNG? reply: {reply!r}"
-                )
-
-            if reported_autorange not in (0, 1):
-                raise RuntimeError(
-                    f"Invalid autorange value in RDGRNG? reply: {reply!r}"
-                )
-
-            if reported_cs_off not in (0, 1):
-                raise RuntimeError(
-                    f"Invalid excitation state in RDGRNG? reply: {reply!r}"
-                )
-
-            return values
-
         requested_autorange = int(autorange)
 
         # RDGRNG uses "current source off":
-        # 0 means excitation ON and 1 means excitation OFF.
-        requested_cs_off = 0 if excitation_on else 1
+        #     0 = excitation ON
+        #     1 = excitation OFF
+        requested_current_source_off = (
+            0 if excitation_on else 1
+        )
 
         # Keep read-modify-write-verification atomic.
         with _lakeshore_mutex:
-            current_reply = self._query(f"RDGRNG? {channel}")
+            current = (
+                self._get_resistance_measurement_settings(
+                    channel
+                )
+            )
 
-            (
-                excitation_mode,
-                excitation_range,
-                _,
-                _,
-                _,
-            ) = parse_rdgrng_reply(current_reply)
+            range_matches = (
+                autorange
+                or current["resistance_range"] == resistance_range
+            )
+
+            configuration_matches = (
+                range_matches
+                and current["autorange"] == requested_autorange
+                and current["current_source_off"]
+                == requested_current_source_off
+            )
+
+            if configuration_matches:
+                return True
 
             command = (
                 f"RDGRNG {channel},"
-                f"{excitation_mode},"
-                f"{excitation_range:02d},"
+                f"{current['excitation_mode']},"
+                f"{current['excitation_range']:02d},"
                 f"{resistance_range:02d},"
                 f"{requested_autorange},"
-                f"{requested_cs_off}"
+                f"{requested_current_source_off}"
             )
 
             self._write(command)
 
-            verification_reply = self._query(f"RDGRNG? {channel}")
-            actual = parse_rdgrng_reply(verification_reply)
-
-        expected = (
-            excitation_mode,
-            excitation_range,
-            resistance_range,
-            requested_autorange,
-            requested_cs_off,
-        )
-
-        # When autorange is enabled, the instrument may immediately select
-        # another resistance range. The remaining fields must still match.
-        configuration_matches = (
-            actual[0] == expected[0]
-            and actual[1] == expected[1]
-            and actual[3] == expected[3]
-            and actual[4] == expected[4]
-        )
-
-        if not autorange:
-            configuration_matches = (
-                configuration_matches
-                and actual[2] == expected[2]
+            confirmed = (
+                self._get_resistance_measurement_settings(
+                    channel
+                )
             )
 
-        if not configuration_matches:
+        confirmed_matches = (
+            confirmed["excitation_mode"]
+            == current["excitation_mode"]
+
+            and confirmed["excitation_range"]
+            == current["excitation_range"]
+
+            and confirmed["autorange"]
+            == requested_autorange
+
+            and confirmed["current_source_off"]
+            == requested_current_source_off
+        )
+
+        # With internal autorange enabled, the Lake Shore may change the
+        # resistance range immediately. With autorange disabled, the
+        # requested range must match exactly.
+        if not autorange:
+            confirmed_matches = (
+                confirmed_matches
+                and confirmed["resistance_range"]
+                == resistance_range
+            )
+
+        if not confirmed_matches:
             raise RuntimeError(
-                "Resistance measurement range verification failed: "
-                f"requested={expected}, received={actual}"
+                "Resistance measurement settings verification failed. "
+                f"Requested resistance_range={resistance_range}, "
+                f"autorange={requested_autorange}, "
+                f"current_source_off="
+                f"{requested_current_source_off}; "
+                f"received={confirmed}."
             )
 
         return True
@@ -1318,6 +2182,95 @@ class LakeShore370:
             "status_flags": self.describe_reading_status(status_code),
         }
     
+
+    def read_temperature_with_status(self, channel: int = 6) -> dict:
+        """
+        Read temperature in kelvin bracketed by two RDGST? queries.
+
+        Keep RDGST? -> RDGK? -> RDGST? atomic against other driver I/O.
+        A valid reading requires both statuses to be zero and a finite,
+        positive temperature. RDGK? returns zero if no curve is assigned.
+
+        Malformed or non-finite replies raise RuntimeError.
+        Status errors and non-positive temperatures return valid=False.
+
+        This method does not select channels or ensure reading freshness.
+        The caller must handle scanner synchronization and settling.
+        """
+        if isinstance(channel, bool) or not isinstance(channel, int):
+            raise TypeError("channel must be an integer.")
+
+        if channel not in SUPPORTED_CHANNELS:
+            raise ValueError(
+                f"Channel {channel} is not supported. "
+                f"Supported channels: {SUPPORTED_CHANNELS}."
+            )
+
+        def parse_status_reply(reply: str) -> int:
+            if not isinstance(reply, str) or not reply.strip():
+                raise RuntimeError(f"Missing or invalid RDGST? reply: {reply!r}.")
+
+            try:
+                status = int(reply.strip())
+            except ValueError as exc:
+                raise RuntimeError(
+                    f"Non-integer RDGST? reply: {reply!r}."
+                ) from exc
+
+            if not 0 <= status <= 255:
+                raise RuntimeError(
+                    f"RDGST? status is outside 0 through 255: {reply!r}."
+                )
+
+            return status
+
+        with _lakeshore_mutex:
+            status_before_reply = self._query(f"RDGST? {channel}")
+            temperature_reply = self._query(f"RDGK? {channel}")
+            status_after_reply = self._query(f"RDGST? {channel}")
+
+        status_before = parse_status_reply(status_before_reply)
+        status_after = parse_status_reply(status_after_reply)
+
+        if not isinstance(temperature_reply, str) or not temperature_reply.strip():
+            raise RuntimeError(
+                f"Missing or invalid RDGK? reply: {temperature_reply!r}."
+            )
+
+        try:
+            raw_temperature_k = float(temperature_reply.strip())
+        except ValueError as exc:
+            raise RuntimeError(
+                f"Non-numeric RDGK? reply: {temperature_reply!r}."
+            ) from exc
+
+        if not math.isfinite(raw_temperature_k):
+            raise RuntimeError(
+                f"Non-finite RDGK? reply: {temperature_reply!r}."
+            )
+
+        status_code = status_before | status_after
+
+        if status_code != 0:
+            invalid_reason = "reading_status_error"
+        elif raw_temperature_k <= 0:
+            invalid_reason = "non_positive_temperature"
+        else:
+            invalid_reason = None
+
+        valid = invalid_reason is None
+
+        return {
+            "valid": valid,
+            "temperature_k": raw_temperature_k if valid else None,
+            "raw_temperature_k": raw_temperature_k,
+            "status_before": status_before,
+            "status_after": status_after,
+            "status_code": status_code,
+            "status_flags": self.describe_reading_status(status_code),
+            "invalid_reason": invalid_reason,
+        }
+
     def set_channel_setpoint(
         self,
         value: float,
@@ -1360,11 +2313,11 @@ class LakeShore370:
         if not (
             MIN_TARGET_TEMPERATURE_MK
             <= value_mk
-            <= 800.0
+            <= 900.0
         ):
             print(
                 "Temperature setpoint must be between "
-                "10 mK and 800 mK."
+                "10 mK and 900 mK."
             )
             return False
 
@@ -2099,8 +3052,8 @@ class LakeShore370:
             bool: True if the operation was successful, False otherwise.
         """
 
-        if channel not in DEFAULT_CHANNELS:
-            print(f"Channel {channel} is not valid. Valid channels are: {DEFAULT_CHANNELS}")
+        if channel not in SUPPORTED_CHANNELS:
+            print(f"Channel {channel} is not valid. Valid channels are: {SUPPORTED_CHANNELS}")
             return False 
 
         if curve_number is None:
@@ -2114,25 +3067,110 @@ class LakeShore370:
             return False 
 
         try:
+            target_curve = int(curve_number)
+
             with _lakeshore_mutex:
-                parameters = self._query(f"INSET? {channel}").split(",")
-            current_curve = parameters[3]
-            if int(current_curve) == int(curve_number):
-                print(f"Curve number {int(curve_number)} is already set to channel {int(channel)}")
-                return True
-            dwell = parameters[1]
-            pause = parameters[2]
-            temp_coeff = parameters[4]
-            self._write(f"INSET {channel},1,{dwell},{pause},{int(curve_number)},{temp_coeff}")
-            print(f"Curve #{int(curve_number)} succesfully set to channel {channel}.")
+                parameters = [
+                    value.strip()
+                    for value in self._query(
+                        f"INSET? {channel}"
+                    ).strip().split(",")
+                ]
+
+                if len(parameters) != 5:
+                    raise RuntimeError(
+                        f"Invalid INSET? response for CH{channel}: "
+                        f"{parameters!r}"
+                    )
+
+                (
+                    enabled,
+                    dwell,
+                    pause,
+                    current_curve,
+                    temp_coeff,
+                ) = (
+                    int(value)
+                    for value in parameters
+                )
+
+                if current_curve == target_curve:
+                    print(
+                        f"Curve {target_curve} is already assigned "
+                        f"to CH{channel}."
+                    )
+                    return True
+
+                self._write(
+                    f"INSET {channel},{enabled},{dwell},{pause},"
+                    f"{target_curve},{temp_coeff}"
+                )
+
+                readback = [
+                    value.strip()
+                    for value in self._query(
+                        f"INSET? {channel}"
+                    ).strip().split(",")
+                ]
+
+            if len(readback) != 5:
+                raise RuntimeError(
+                    f"Invalid INSET? readback for CH{channel}: "
+                    f"{readback!r}"
+                )
+
+            (
+                readback_enabled,
+                readback_dwell,
+                readback_pause,
+                readback_curve,
+                readback_temp_coeff,
+            ) = (
+                int(value)
+                for value in readback
+            )
+
+            if readback_curve != target_curve:
+                raise RuntimeError(
+                    f"Curve readback mismatch for CH{channel}: "
+                    f"requested {target_curve}, "
+                    f"read back {readback_curve}"
+                )
+
+            before_without_curve = (
+                enabled,
+                dwell,
+                pause,
+                temp_coeff,
+            )
+
+            after_without_curve = (
+                readback_enabled,
+                readback_dwell,
+                readback_pause,
+                readback_temp_coeff,
+            )
+
+            if after_without_curve != before_without_curve:
+                raise RuntimeError(
+                    f"INSET settings other than the curve changed "
+                    f"for CH{channel}: before="
+                    f"{before_without_curve!r}, after="
+                    f"{after_without_curve!r}"
+                )
+
+            print(
+                f"Curve {target_curve} successfully assigned "
+                f"to CH{channel}; channel state and timing preserved."
+            )
             return True
 
-        except Exception as e:
-            print(f"Setting curve for channel {channel} failed.\nReason: {e}")
+        except Exception as exc:
+            print(
+                f"Setting curve for CH{channel} failed.\n"
+                f"Reason: {exc}"
+            )
             return False
-
-        return False
-
 
     def set_control_settings(self, settings: list, verbose: bool = True) -> bool:
 
@@ -2226,78 +3264,217 @@ class LakeShore370:
                 print(f"Setting control channel to {channel} failed.\nReason: {e}")
                 return False
 
-    def set_sensor_resistance_settings(self, channel: int = 6, settings: dict | None = None, verbose: bool = True) -> bool:
-        
+    def set_sensor_resistance_settings(
+        self,
+        channel: int = 6,
+        settings: dict | None = None,
+        verbose: bool = True,
+    ) -> bool:
         """
-        Set the sensor resistance settings for the specified channel.
-        Args:
-            channel (int): The channel number (default is 6).
-            settings (dict): A dictionary containing the sensor resistance settings.
-                Example: {"excitation_mode": 0, "excitation_range": 5, "resistance_range": 3, "autorange": 1, "excitation": 1}
-            verbose (bool): If True, prints confirmation messages.
-        Returns:
-            bool: True if the operation was successful, False otherwise.
+        Set and verify the complete RDGRNG configuration.
+
+        The legacy public key "excitation" represents the RDGRNG
+        "current source off" field:
+            0 = excitation ON
+            1 = excitation OFF
         """
 
-        if channel not in DEFAULT_CHANNELS:
-            print(f"Channel {channel} is not valid. Valid channels are: {DEFAULT_CHANNELS}")
+        if settings is not None and not isinstance(settings, dict):
+            print("settings must be a dictionary or None")
             return False
 
         base = DEFAULT_MXC_RESISTANCE_RANGE_SETTINGS.copy()
+
         if settings is None:
             merged = base
+
         else:
-            allowed_keys = set(base.keys())
-            unknown = set(settings.keys()) - allowed_keys
-            if unknown:
-                print(f"Unknown setting keys: {sorted(unknown)}. Allowed: {sorted(allowed_keys)}")
+            allowed_keys = set(base)
+            unknown_keys = set(settings) - allowed_keys
+
+            if unknown_keys:
+                print(
+                    f"Unknown setting keys: {sorted(unknown_keys)}. "
+                    f"Allowed keys: {sorted(allowed_keys)}"
+                )
                 return False
 
-            merged = {**base, **settings}
-        
-        try:
-            excitation_mode = int(merged['excitation_mode'])
-            excitation_range = _i2s(merged['excitation_range'])
-            resistance_range = int(merged['resistance_range'])
-            autorange = _b2i(merged['autorange'])
-            excitation = _b2i(merged['excitation'])
-        except KeyError as e:
-            print(f"Missing required key in settings/defaults: {e}")
-            return False
-        except (TypeError, ValueError) as e:
-            print(f"Invalid value type in settings: {e}")
-            return False
-        
-        cmd = (
-            f"RDGRNG {channel},"
-            f"{excitation_mode},"
-            f"{excitation_range},"
-            f"{resistance_range},"
-            f"{autorange},"
-            f"{excitation},"
-        )
-        
-        print(cmd)
-        
-        try:
-            with _lakeshore_mutex:
-                self._write(cmd)
-            if verbose: 
-                print(f"Sensor resistance settings for channel {channel} set to: {settings}")
-            return True
-        except Exception as e:
-            print(f"Setting sensor resistance settings for channel {channel} failed.\nReason: {e}")
-            return False
+            merged = {
+                **base,
+                **settings,
+            }
 
-    # ! -- Device control Methods -- #
-    def close(self):
         try:
+            excitation_mode = int(
+                merged["excitation_mode"]
+            )
+
+            excitation_range = int(
+                merged["excitation_range"]
+            )
+
+            resistance_range = int(
+                merged["resistance_range"]
+            )
+
+            autorange = int(
+                merged["autorange"]
+            )
+
+            current_source_off = int(
+                merged["excitation"]
+            )
+
+            if excitation_mode not in (0, 1):
+                raise ValueError(
+                    "excitation_mode must be 0 or 1"
+                )
+
+            maximum_excitation_range = (
+                12 if excitation_mode == 0 else 22
+            )
+
+            if not (
+                1
+                <= excitation_range
+                <= maximum_excitation_range
+            ):
+                raise ValueError(
+                    "excitation_range must be between 1 and "
+                    f"{maximum_excitation_range} for excitation "
+                    f"mode {excitation_mode}"
+                )
+
+            if (
+                resistance_range
+                not in RESISTANCE_RANGE_FULL_SCALE_OHMS
+            ):
+                raise ValueError(
+                    "resistance_range must be between 1 and 22"
+                )
+
+            validate_resistance_measurement_combination(
+                excitation_mode=excitation_mode,
+                excitation_range=excitation_range,
+                resistance_range=resistance_range,
+            )
+
+            if autorange not in (0, 1):
+                raise ValueError(
+                    "autorange must be 0 or 1"
+                )
+
+            if current_source_off not in (0, 1):
+                raise ValueError(
+                    "excitation must be 0 or 1"
+                )
+
+            target = {
+                "excitation_mode": excitation_mode,
+                "excitation_range": excitation_range,
+                "resistance_range": resistance_range,
+                "autorange": autorange,
+                "current_source_off": current_source_off,
+            }
+
             with _lakeshore_mutex:
-                self.device.close()
-            print("Device connection closed.")
+                current = (
+                    self._get_resistance_measurement_settings(
+                        channel
+                    )
+                )
+
+                range_matches = (
+                    autorange == 1
+                    or current["resistance_range"]
+                    == resistance_range
+                )
+
+                configuration_matches = (
+                    current["excitation_mode"]
+                    == excitation_mode
+
+                    and current["excitation_range"]
+                    == excitation_range
+
+                    and range_matches
+
+                    and current["autorange"]
+                    == autorange
+
+                    and current["current_source_off"]
+                    == current_source_off
+                )
+
+                if configuration_matches:
+                    if verbose:
+                        print(
+                            f"Resistance measurement settings for "
+                            f"channel {channel} are already applied."
+                        )
+                    return True
+
+                command = (
+                    f"RDGRNG {channel},"
+                    f"{excitation_mode},"
+                    f"{excitation_range:02d},"
+                    f"{resistance_range:02d},"
+                    f"{autorange},"
+                    f"{current_source_off}"
+                )
+
+                self._write(command)
+
+                confirmed = (
+                    self._get_resistance_measurement_settings(
+                        channel
+                    )
+                )
+
+            confirmed_matches = (
+                confirmed["excitation_mode"]
+                == excitation_mode
+
+                and confirmed["excitation_range"]
+                == excitation_range
+
+                and confirmed["autorange"]
+                == autorange
+
+                and confirmed["current_source_off"]
+                == current_source_off
+            )
+
+            # Internal autorange may immediately modify the resistance
+            # range selected by the instrument.
+            if autorange == 0:
+                confirmed_matches = (
+                    confirmed_matches
+                    and confirmed["resistance_range"]
+                    == resistance_range
+                )
+
+            if not confirmed_matches:
+                raise RuntimeError(
+                    "Resistance measurement settings verification "
+                    f"failed for channel {channel}. "
+                    f"Requested={target}, received={confirmed}."
+                )
+
+            if verbose:
+                print(
+                    f"Resistance measurement settings for "
+                    f"channel {channel} were successfully applied."
+                )
+
             return True
-        except Exception as e:
-            print(f"Failed to close device connection.\nReason: {e}")
+
+        except Exception as exc:
+            print(
+                f"Setting resistance measurement settings for "
+                f"channel {channel} failed.\n"
+                f"Reason: {exc}"
+            )
             return False
         
 def _translate_control_settings_to_dictionary(control_params: list) -> dict:
@@ -2320,43 +3497,4 @@ def _translate_control_settings_to_dictionary(control_params: list) -> dict:
         "heater_resistance": heater_resistance,
     }
     
-    return control_settings
-
-def _translate_sensor_resistance_settings_to_dictionary(values: list) -> dict:
-
-    """
-    Translate the sensor resistance settings from a list to a dictionary.
-    Args:
-        values (list): A list containing the sensor resistance settings.
-    Returns:
-        dict: A dictionary with the translated sensor resistance settings.
-    """
-
-    excitation_mode = values[0]         # 0 for voltage, 1 for current
-    excitation_range = str(int(values[1]))        # check SENSOR_RESISTANCE_RANGE_LIST for range values
-    resistance_range = str(int(values[2]))        # check RESISTANCE_RANGE_LIST for range values
-    autorange = values[3]
-    excitation = values[4]
-
-    sensor_resistance_settings = {
-                "excitation_mode": excitation_mode,
-                "excitation_range": excitation_range,
-                "resistance_range": resistance_range,
-                "autorange": autorange,
-                "excitation": excitation
-    }
-
-    return sensor_resistance_settings
-
-def _b2i(x):
-    " Normalize bool-like fields to ints "
-    return int(x) if isinstance(x, (bool, int)) else x
-
-def _i2s(x):
-    "Normalize to range format"
-    x = str(x)
-    if len(x) == 1: x = "0" + x
-    elif len(x) == 2: x = x
-    else: raise("Excitation range format wrong. Only permited str or int.")
-    return x
-    
+    return control_settings    

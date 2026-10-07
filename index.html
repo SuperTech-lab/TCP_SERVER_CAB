@@ -2634,95 +2634,6 @@
                 </details>
               </div>
 
-              <div class="control-row">
-                <div style="display: flex; align-items: center; width: 75px">
-                  <label style="width: auto; margin: 0; font-size: 14px"
-                    >Ch 15</label
-                  >
-                  <div
-                    id="statusCircleCH15"
-                    class="status-indicator-circle"
-                  ></div>
-                </div>
-                <span
-                  class="rch-box"
-                  id="currentRCH15"
-                  style="margin-left: auto; margin-right: 10px"
-                  >--</span
-                >
-                <label class="switch">
-                  <input
-                    type="checkbox"
-                    id="toggleExtraChannel15"
-                    onchange="globalToggleChannel('15')"
-                  />
-                  <span class="slider round"></span>
-                </label>
-                <details
-                  class="channel-dropdown"
-                  style="position: relative; margin-left: 10px"
-                >
-                  <summary
-                    class="channel-dropdown-summary"
-                    style="min-width: 100px; padding: 4px 8px"
-                  >
-                    <strong>Settings</strong>
-                    <span class="channel-dropdown-arrow">▾</span>
-                  </summary>
-                  <div class="channel-dropdown-menu" style="min-width: 320px">
-                    <div class="control-row">
-                      <label
-                        for="sensorRangeCH15"
-                        style="width: auto; margin-right: 8px"
-                        >Excitation:</label
-                      >
-                      <select
-                        id="sensorRangeCH15"
-                        class="control-input"
-                        style="width: 160px; margin-left: 0"
-                      >
-                        <option value="1">2.00 uV and 1.00 pA</option>
-                        <option value="2">6.32 uV and 3.16 pA</option>
-                        <option value="3">20.0 uV and 10.0 pA</option>
-                        <option value="4">63.2 uV and 31.6 pA</option>
-                        <option value="5">200 uV and 100 pA</option>
-                        <option value="6">632 uV and 316 pA</option>
-                        <option value="7">2.00 mV and 1.00 nA</option>
-                        <option value="8">6.32 mV and 3.16 nA</option>
-                      </select>
-                    </div>
-                    <div class="control-row">
-                      <label
-                        for="sensorModeCH15"
-                        style="width: auto; margin-right: 8px"
-                        >Mode:</label
-                      >
-                      <select
-                        id="sensorModeCH15"
-                        class="control-input"
-                        style="width: 90px; margin-left: 0"
-                      >
-                        <option value="0">Voltage</option>
-                        <option value="1">Current</option>
-                      </select>
-                    </div>
-                    <div class="control-row" style="margin-top: 10px">
-                      <button
-                        onclick="writeSettingsExtraChannel15()"
-                        class="inline-button"
-                      >
-                        Write Settings
-                      </button>
-                    </div>
-                    <div id="progressContainerCH15" style="display: none; margin-top: 8px">
-                      <div style="width: 100%; background-color: #eee">
-                        <div id="progressBarCH15" style="width: 0%; height: 12px; background-color: #4caf50"></div>
-                      </div>
-                      <div id="progressTextCH15" style="font-size: 11px; margin-top: 4px">Processing...</div>
-                    </div>
-                  </div>
-                </details>
-              </div>
             </div>
           </details>
 
@@ -2758,10 +2669,11 @@
               <select
                 id="relationModeSelect"
                 class="styled-select"
-                style="width: 120px"
+                style="width: 140px"
               >
                 <option value="MANUAL">Manual</option>
                 <option value="RAMP">Ramp</option>
+                <option value="STEP_RAMP">Step Ramp</option>
               </select>
             </div>
 
@@ -2796,6 +2708,323 @@
                 <span style="margin-left: 6px">mK/min</span>
               </div>
             </div>
+            
+            <div
+              id="relationStepRampControls"
+              style="
+                display: none;
+                margin-top: 14px;
+                padding: 12px;
+                border: 1px solid #d1d5db;
+                border-radius: 8px;
+                background: #f9fafb;
+              "
+            >
+              <div
+                style="
+                  font-weight: 700;
+                  margin-bottom: 12px;
+                  color: #374151;
+                "
+              >
+                Step Ramp parameters
+              </div>
+
+              <!-- ============================================================
+                  Main STEP_RAMP parameters
+
+                  Organisation (to help)
+                  <div class="control-row">
+                    Initial
+                  </div>
+
+                  <div class="control-row">
+                    Target
+                  </div>
+
+                  <div class="control-row">
+                    Step
+                  </div>
+
+                  All these fields must have a JavaScript field.
+
+                  For example:
+                      const stepTargetInput = document.getElementById(
+                        "relationStepTargetInput",
+                      );
+                  ============================================================ -->
+
+
+              <div class="control-row">
+                <label style="width: 150px">
+                  Initial:
+                </label>
+
+                <input
+                  id="relationStepInitialInput"
+                  type="number"
+                  min="10"
+                  max="800"
+                  step="0.1"
+                  placeholder="required"
+                  style="width: 90px; height: 32px"
+                />
+
+                <span style="margin-left: 6px">mK</span>
+              </div>
+              <div class="control-row">
+                <label style="width: 150px">
+                  Target:
+                </label>
+
+                <input
+                  id="relationStepTargetInput"
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  placeholder="required"
+                  style="width: 90px; height: 32px"
+                />
+
+                <span style="margin-left: 6px">mK</span>
+              </div>
+
+              <div class="control-row">
+                <label style="width: 150px">
+                  Step:
+                </label>
+
+                <input
+                  id="relationStepSizeInput"
+                  type="number"
+                  min="0.001"
+                  step="0.1"
+                  placeholder="required"
+                  style="width: 90px; height: 32px"
+                />
+
+                <span style="margin-left: 6px">mK</span>
+              </div>
+
+              <div class="control-row">
+                <label style="width: 150px">
+                  Tolerance:
+                </label>
+
+                <input
+                  id="relationStepToleranceInput"
+                  type="number"
+                  min="0.001"
+                  step="0.01"
+                  placeholder="required"
+                  style="width: 90px; height: 32px"
+                />
+
+                <span style="margin-left: 6px">mK</span>
+              </div>
+
+              <div class="control-row">
+                <label style="width: 150px">
+                  Stable time:
+                </label>
+
+                <input
+                  id="relationStepStableTimeInput"
+                  type="number"
+                  min="0.001"
+                  step="1"
+                  placeholder="required"
+                  style="width: 90px; height: 32px"
+                />
+
+                <span style="margin-left: 6px">s</span>
+              </div>
+
+              <div class="control-row">
+                <label style="width: 150px">
+                  Stability timeout:
+                </label>
+
+                <input
+                  id="relationStepTimeoutInput"
+                  type="number"
+                  min="0.001"
+                  step="1"
+                  placeholder="required"
+                  style="width: 90px; height: 32px"
+                />
+
+                <span style="margin-left: 6px">s</span>
+              </div>
+
+              <div class="control-row">
+                <label style="width: 150px">
+                  R samples:
+                </label>
+
+                <input
+                  id="relationStepResistanceSamplesInput"
+                  type="number"
+                  min="1"
+                  step="1"
+                  placeholder="required"
+                  style="width: 90px; height: 32px"
+                />
+              </div>
+
+              <!-- ============================================================
+                  Acquisition parameters required by the backend
+                  ============================================================ -->
+
+              <details
+                style="margin-top: 12px"
+                ontoggle="updateRelationRampControls()"
+              >
+                <summary
+                  style="
+                    cursor: pointer;
+                    font-weight: 700;
+                    color: #4b5563;
+                  "
+                >
+                  Advanced acquisition parameters
+                </summary>
+
+                <div style="margin-top: 12px">
+
+                  <div class="control-row">
+                    <label style="width: 190px">
+                      Stability sample interval:
+                    </label>
+
+                    <input
+                      id="relationStepStabilityIntervalInput"
+                      type="number"
+                      min="0.001"
+                      step="0.1"
+                      placeholder="required"
+                      style="width: 90px; height: 32px"
+                    />
+
+                    <span style="margin-left: 6px">s</span>
+                  </div>
+
+                  <div class="control-row">
+                    <label style="width: 190px">
+                      Autorange max attempts:
+                    </label>
+
+                    <input
+                      id="relationStepAutorangeAttemptsInput"
+                      type="number"
+                      min="1"
+                      step="1"
+                      placeholder="required"
+                      style="width: 90px; height: 32px"
+                    />
+                  </div>
+
+                  <div class="control-row">
+                    <label style="width: 190px">
+                      R sample interval:
+                    </label>
+
+                    <input
+                      id="relationStepResistanceIntervalInput"
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      placeholder="required"
+                      style="width: 90px; height: 32px"
+                    />
+
+                    <span style="margin-left: 6px">s</span>
+                  </div>
+
+                  <div class="control-row">
+                    <label style="width: 190px">
+                      R max attempts:
+                    </label>
+
+                    <input
+                      id="relationStepResistanceAttemptsInput"
+                      type="number"
+                      min="1"
+                      step="1"
+                      placeholder="required"
+                      style="width: 90px; height: 32px"
+                    />
+                  </div>
+
+                  <!-- ==========================================================
+                      Optional stability / retry limits
+                      ========================================================== -->
+
+                  <div
+                    style="
+                      margin-top: 14px;
+                      margin-bottom: 8px;
+                      font-weight: 700;
+                      color: #6b7280;
+                    "
+                  >
+                    Optional limits
+                  </div>
+
+                  <div class="control-row">
+                    <label style="width: 190px">
+                      Max T std:
+                    </label>
+
+                    <input
+                      id="relationStepMaxStdInput"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="optional"
+                      style="width: 90px; height: 32px"
+                    />
+
+                    <span style="margin-left: 6px">mK</span>
+                  </div>
+
+                  <div class="control-row">
+                    <label style="width: 190px">
+                      Max T slope:
+                    </label>
+
+                    <input
+                      id="relationStepMaxSlopeInput"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="optional"
+                      style="width: 90px; height: 32px"
+                    />
+
+                    <span style="margin-left: 6px">
+                      mK/min
+                    </span>
+                  </div>
+
+                  <div class="control-row">
+                    <label style="width: 190px">
+                      Point max attempts:
+                    </label>
+
+                    <input
+                      id="relationStepPointAttemptsInput"
+                      type="number"
+                      min="1"
+                      step="1"
+                      placeholder="optional"
+                      style="width: 90px; height: 32px"
+                    />
+                  </div>
+
+                </div>
+              </details>
+            </div>
 
             <div
               class="control-row"
@@ -2815,13 +3044,12 @@
                 <option value="CH12">CH12</option>
                 <option value="CH13">CH13</option>
                 <option value="CH14">CH14</option>
-                <option value="CH15">CH15</option>
               </select>
 
               <input
                 id="relationLabelInput"
                 type="text"
-                placeholder="Etiqueta"
+                placeholder="Label"
                 style="margin-left: 10px; width: 160px"
               />
             </div>
@@ -2850,7 +3078,7 @@
           <canvas id="relationChart"></canvas>
         </div>
       </div>
-      <!-- Progress bar for Extra channels (CH9..CH15) -->
+      <!-- Progress bar for sample channels (CH9..CH14) -->
       <div id="progressContainerEXTRA" style="display: none; margin-top: 10px">
         <div style="width: 100%; background-color: #ddd">
           <div id="progressBarEXTRA" style="width: 0%; height: 20px; background-color: #4caf50"></div>
@@ -2887,15 +3115,18 @@
       const RELATION_LIVE_POINTS = 400;
       let currentActiveRunId = null;
       let relationRunning = false;
+      let relationStepRampLiveRelationId = null;
+      let relationStepRampLiveNextSeq = 0;
+      let relationStepRampLiveChannel = null;
+      let relationStepRampLiveFetchInProgress = false;
 
       const relationDataStore = {
-        CH9: [],
+        CH9 : [],
         CH10: [],
         CH11: [],
         CH12: [],
         CH13: [],
         CH14: [],
-        CH15: [],
       };
 
       const relationFilesSelect = document.getElementById(
@@ -2905,8 +3136,487 @@
         "relationFilesRefreshButton",
       );
 
-      const SAMPLE_CHANNELS = [9, 10, 11, 12, 13, 14, 15];
+      const SAMPLE_CHANNELS = [9, 10, 11, 12, 13, 14];
       const pendingSampleToggle = {};
+      let relationStepRampDefaultsLoaded = false;
+
+      const SAMPLE_VOLTAGE_EXCITATION_RANGES = [
+        [1, "2.00 µV"],
+        [2, "6.32 µV"],
+        [3, "20.0 µV"],
+        [4, "63.2 µV"],
+        [5, "200 µV"],
+        [6, "632 µV"],
+        [7, "2.00 mV"],
+        [8, "6.32 mV"],
+        [9, "20.0 mV"],
+        [10, "63.2 mV"],
+        [11, "200 mV"],
+        [12, "632 mV"],
+      ];
+
+      const SAMPLE_CURRENT_EXCITATION_RANGES = [
+        [1, "1.00 pA"],
+        [2, "3.16 pA"],
+        [3, "10.0 pA"],
+        [4, "31.6 pA"],
+        [5, "100 pA"],
+        [6, "316 pA"],
+        [7, "1.00 nA"],
+        [8, "3.16 nA"],
+        [9, "10.0 nA"],
+        [10, "31.6 nA"],
+        [11, "100 nA"],
+        [12, "316 nA"],
+        [13, "1.00 µA"],
+        [14, "3.16 µA"],
+        [15, "10.0 µA"],
+        [16, "31.6 µA"],
+        [17, "100 µA"],
+        [18, "316 µA"],
+        [19, "1.00 mA"],
+        [20, "3.16 mA"],
+        [21, "10.0 mA"],
+        [22, "31.6 mA"],
+      ];
+
+      const SAMPLE_RESISTANCE_RANGES = [
+        [1, "2.00 mΩ"],
+        [2, "6.32 mΩ"],
+        [3, "20.0 mΩ"],
+        [4, "63.2 mΩ"],
+        [5, "200 mΩ"],
+        [6, "632 mΩ"],
+        [7, "2.00 Ω"],
+        [8, "6.32 Ω"],
+        [9, "20.0 Ω"],
+        [10, "63.2 Ω"],
+        [11, "200 Ω"],
+        [12, "632 Ω"],
+        [13, "2.00 kΩ"],
+        [14, "6.32 kΩ"],
+        [15, "20.0 kΩ"],
+        [16, "63.2 kΩ"],
+        [17, "200 kΩ"],
+        [18, "632 kΩ"],
+        [19, "2.00 MΩ"],
+        [20, "6.32 MΩ"],
+        [21, "20.0 MΩ"],
+        [22, "63.2 MΩ"],
+      ];
+
+      function sampleRangeCombinationIsValid(
+        excitationMode,
+        excitationRange,
+        resistanceRange,
+      ) {
+        if (excitationMode === 1) {
+          const internalVoltageRange =
+            excitationRange + resistanceRange - 19;
+          return internalVoltageRange >= 1 && internalVoltageRange <= 12;
+        }
+
+        const currentSourceRange =
+          excitationRange - resistanceRange + 19;
+        return currentSourceRange >= 1 && currentSourceRange <= 22;
+      }
+
+      function optionLabel(options, value) {
+        return options.find(([index]) => index === value)?.[1] ?? `#${value}`;
+      }
+
+      function markSampleSettingsDirty(channel) {
+        const details = document
+          .getElementById(`sensorModeCH${channel}`)
+          ?.closest("details");
+
+        if (details) details.dataset.settingsDirty = "true";
+      }
+
+      function populateSampleExcitationOptions(channel, preferredRange = null) {
+        const modeSelect = document.getElementById(`sensorModeCH${channel}`);
+        const excitationSelect = document.getElementById(
+          `sensorRangeCH${channel}`,
+        );
+        const resistanceSelect = document.getElementById(
+          `resistanceRangeCH${channel}`,
+        );
+
+        if (!modeSelect || !excitationSelect || !resistanceSelect) return;
+
+        const mode = Number(modeSelect.value);
+        const resistanceRange = Number(resistanceSelect.value);
+        const previousRange = Number(
+          preferredRange ?? excitationSelect.value,
+        );
+        const ranges =
+          mode === 1
+            ? SAMPLE_CURRENT_EXCITATION_RANGES
+            : SAMPLE_VOLTAGE_EXCITATION_RANGES;
+
+        const validRanges = ranges.filter(([rangeIndex]) =>
+          sampleRangeCombinationIsValid(
+            mode,
+            rangeIndex,
+            resistanceRange,
+          ),
+        );
+
+        excitationSelect.replaceChildren(
+          ...validRanges.map(([rangeIndex, label]) => {
+            const option = document.createElement("option");
+            option.value = String(rangeIndex);
+            option.textContent = `${rangeIndex} - ${label}`;
+            return option;
+          }),
+        );
+
+        if (validRanges.some(([rangeIndex]) => rangeIndex === previousRange)) {
+          excitationSelect.value = String(previousRange);
+        }
+      }
+
+      function createSampleSettingRow(labelText, selectId, options) {
+        const row = document.createElement("div");
+        row.className = "control-row";
+
+        const label = document.createElement("label");
+        label.htmlFor = selectId;
+        label.style.width = "145px";
+        label.style.marginRight = "8px";
+        label.textContent = labelText;
+
+        const select = document.createElement("select");
+        select.id = selectId;
+        select.className = "control-input";
+        select.style.width = "170px";
+        select.style.marginLeft = "0";
+
+        options.forEach(([value, text]) => {
+          const option = document.createElement("option");
+          option.value = String(value);
+          option.textContent = `${value} - ${text}`;
+          select.appendChild(option);
+        });
+
+        row.append(label, select);
+        return row;
+      }
+
+      function initializeSampleChannelControls() {
+        SAMPLE_CHANNELS.forEach((channel) => {
+          const modeSelect = document.getElementById(`sensorModeCH${channel}`);
+          const excitationSelect = document.getElementById(
+            `sensorRangeCH${channel}`,
+          );
+
+          if (!modeSelect || !excitationSelect) return;
+
+          const menu = modeSelect.closest(".channel-dropdown-menu");
+          const modeRow = modeSelect.closest(".control-row");
+          const excitationRow = excitationSelect.closest(".control-row");
+          const buttonRow = menu?.querySelector("button")?.closest(".control-row");
+
+          if (!menu || !modeRow || !excitationRow || !buttonRow) return;
+
+          menu.style.minWidth = "380px";
+          menu.insertBefore(modeRow, excitationRow);
+
+          const modeLabel = modeRow.querySelector("label");
+          const excitationLabel = excitationRow.querySelector("label");
+
+          if (modeLabel) modeLabel.style.width = "145px";
+          if (excitationLabel) {
+            excitationLabel.style.width = "145px";
+            excitationLabel.textContent = "Excitation range:";
+          }
+
+          excitationSelect.style.width = "170px";
+
+          const resistanceRow = createSampleSettingRow(
+            "Resistance range:",
+            `resistanceRangeCH${channel}`,
+            SAMPLE_RESISTANCE_RANGES,
+          );
+
+          const rangeControlRow = createSampleSettingRow(
+            "Range control:",
+            `autorangeCH${channel}`,
+            [
+              [0, "Manual"],
+              [1, "Autorange"],
+            ],
+          );
+
+          const readback = document.createElement("div");
+          readback.id = `sampleConfigReadbackCH${channel}`;
+          readback.style.fontSize = "11px";
+          readback.style.margin = "8px 0";
+          readback.style.color = "#555";
+          readback.textContent = "Actual: waiting for controller readback...";
+
+          menu.insertBefore(resistanceRow, excitationRow);
+          menu.insertBefore(rangeControlRow, buttonRow);
+          menu.insertBefore(readback, buttonRow);
+
+          const resistanceSelect = document.getElementById(
+            `resistanceRangeCH${channel}`,
+          );
+          const autorangeSelect = document.getElementById(
+            `autorangeCH${channel}`,
+          );
+
+          // Sensible initial manual range for the approximately 3 Ω samples.
+          modeSelect.value = "1";
+          resistanceSelect.value = "8";
+          autorangeSelect.value = "0";
+          populateSampleExcitationOptions(channel, 15);
+
+          [modeSelect, excitationSelect, resistanceSelect, autorangeSelect]
+            .forEach((select) => {
+              select.addEventListener("change", () => {
+                markSampleSettingsDirty(channel);
+
+                if (select === modeSelect || select === resistanceSelect) {
+                  populateSampleExcitationOptions(channel);
+                }
+              });
+            });
+        });
+      }
+
+      function syncSampleChannelControls(channel) {
+        const mode = currentParameters[`modeCH${channel}`];
+        const excitationRange =
+          currentParameters[`excitationRangeCH${channel}`]
+          ?? currentParameters[`rangeCH${channel}`];
+        const resistanceRange =
+          currentParameters[`resistanceRangeCH${channel}`];
+        const autorange = currentParameters[`autorangeCH${channel}`];
+        const excitationOn = currentParameters[`excitationOnCH${channel}`];
+        const details = document
+          .getElementById(`sensorModeCH${channel}`)
+          ?.closest("details");
+        const readback = document.getElementById(
+          `sampleConfigReadbackCH${channel}`,
+        );
+
+        if (readback) {
+          if (
+            mode == null
+            || excitationRange == null
+            || resistanceRange == null
+            || autorange == null
+          ) {
+            readback.textContent = "Actual: waiting for controller readback...";
+          } else {
+            const excitationOptions =
+              mode === 1
+                ? SAMPLE_CURRENT_EXCITATION_RANGES
+                : SAMPLE_VOLTAGE_EXCITATION_RANGES;
+            const stateText = excitationOn === 0 ? " · excitation OFF" : "";
+
+            readback.textContent =
+              `Actual: ${mode === 1 ? "Current" : "Voltage"}`
+              + ` · ${optionLabel(excitationOptions, excitationRange)}`
+              + ` · ${optionLabel(SAMPLE_RESISTANCE_RANGES, resistanceRange)}`
+              + ` · ${autorange === 1 ? "Autorange" : "Manual"}`
+              + stateText;
+          }
+        }
+
+        if (details?.dataset.settingsDirty === "true") return;
+
+        const modeSelect = document.getElementById(`sensorModeCH${channel}`);
+        const resistanceSelect = document.getElementById(
+          `resistanceRangeCH${channel}`,
+        );
+        const autorangeSelect = document.getElementById(
+          `autorangeCH${channel}`,
+        );
+
+        if (modeSelect && mode != null) modeSelect.value = String(mode);
+        if (resistanceSelect && resistanceRange != null) {
+          resistanceSelect.value = String(resistanceRange);
+        }
+        if (autorangeSelect && autorange != null) {
+          autorangeSelect.value = String(autorange);
+        }
+
+        populateSampleExcitationOptions(channel, excitationRange);
+      }
+
+      async function loadRelationStepRampDefaults() {
+        /*
+        * Defaults are loaded only once per page.
+        *
+        * Do not alter the configuration form while an active relation
+        * is owned by the backend.
+        */
+        if (
+          relationStepRampDefaultsLoaded
+          || relationRunning
+        ) {
+          return relationStepRampDefaultsLoaded;
+        }
+
+        try {
+          const response = await fetch(
+            "/get-step-ramp-defaults",
+            {
+              cache: "no-store",
+            },
+          );
+
+          let payload;
+
+          try {
+            payload = await response.json();
+          } catch {
+            throw new Error(
+              `Invalid defaults response `
+              + `(HTTP ${response.status})`,
+            );
+          }
+
+          if (
+            !response.ok
+            || !payload.ok
+          ) {
+            throw new Error(
+              payload.error
+              || `HTTP ${response.status}`,
+            );
+          }
+
+          const defaults = payload.defaults;
+
+          if (
+            defaults === null
+            || typeof defaults !== "object"
+            || Array.isArray(defaults)
+          ) {
+            throw new Error(
+              "Invalid STEP_RAMP defaults payload.",
+            );
+          }
+
+          const inputIds = {
+            initial_mk:
+              "relationStepInitialInput",
+
+            target_mk:
+              "relationStepTargetInput",
+
+            step_mk:
+              "relationStepSizeInput",
+
+            tolerance_mk:
+              "relationStepToleranceInput",
+
+            stable_time_s:
+              "relationStepStableTimeInput",
+
+            stability_timeout_s:
+              "relationStepTimeoutInput",
+
+            stability_sample_interval_s:
+              "relationStepStabilityIntervalInput",
+
+            autorange_max_attempts:
+              "relationStepAutorangeAttemptsInput",
+
+            resistance_n_samples:
+              "relationStepResistanceSamplesInput",
+
+            resistance_sample_interval_s:
+              "relationStepResistanceIntervalInput",
+
+            resistance_max_attempts:
+              "relationStepResistanceAttemptsInput",
+
+            max_std_mk:
+              "relationStepMaxStdInput",
+
+            max_slope_mk_per_min:
+              "relationStepMaxSlopeInput",
+
+            point_measurement_max_attempts:
+              "relationStepPointAttemptsInput",
+          };
+
+          for (
+            const [parameterName, inputId]
+            of Object.entries(inputIds)
+          ) {
+            const input = document.getElementById(
+              inputId
+            );
+
+            if (!input) {
+              throw new Error(
+                `STEP_RAMP input not found: ${inputId}.`,
+              );
+            }
+
+            const value = defaults[
+              parameterName
+            ];
+
+            /*
+            * YAML null keeps an optional frontend field empty.
+            */
+            if (
+              value === null
+              || value === undefined
+            ) {
+              continue;
+            }
+
+            if (
+              typeof value !== "number"
+              || !Number.isFinite(value)
+            ) {
+              throw new Error(
+                `Invalid STEP_RAMP default: `
+                + `${parameterName}.`,
+              );
+            }
+
+            /*
+            * Never overwrite a value already restored by the backend
+            * or entered by the user.
+            */
+            if (input.value.trim() === "") {
+              input.value = String(
+                value
+              );
+            }
+          }
+
+          relationStepRampDefaultsLoaded = true;
+
+          console.info(
+            "STEP_RAMP defaults loaded.",
+            defaults,
+          );
+
+          return true;
+
+        } catch (error) {
+          console.error(
+            "Could not load STEP_RAMP defaults:",
+            error,
+          );
+
+          addLogEntry(
+            `❌ STEP_RAMP defaults: ${error.message}`,
+            "received",
+          );
+
+          return false;
+        }
+      }
 
       async function initRelationStateFromServer() {
         const startButton = document.getElementById(
@@ -2924,12 +3634,26 @@
         const modeSelect = document.getElementById(
           "relationModeSelect",
         );
+
         const targetInput = document.getElementById(
           "relationTargetInput",
         );
         const rateInput = document.getElementById(
           "relationRateInput",
         );
+
+        const stepInitialInput = document.getElementById(
+          "relationStepInitialInput",
+        );
+
+        const stepTargetInput = document.getElementById(
+          "relationStepTargetInput",
+        );
+        const stepSizeInput = document.getElementById(
+          "relationStepSizeInput",
+        );
+
+        const wasRunning = relationRunning;
 
         function setRelationUiIdle() {
           relationRunning = false;
@@ -2945,137 +3669,318 @@
         }
 
         try {
-          const raw = await sendCommandToServer(
-            "get_relation_status",
+          const response = await fetch(
+            "/get-relation-status",
+            {
+              cache: "no-store",
+            },
           );
 
-          let response = (raw ?? "").toString().trim();
-          const prefix = "Command received - ";
+          let payload;
 
-          if (response.startsWith(prefix)) {
-            response = response
-              .slice(prefix.length)
-              .trim();
+          try {
+            payload = await response.json();
+          } catch {
+            throw new Error(
+              `Invalid status response `
+              + `(HTTP ${response.status})`,
+            );
           }
 
-          const marker = "RELATION_STATUS:";
-          const idx = response.indexOf(marker);
+          if (!response.ok || !payload.ok) {
+            throw new Error(
+              payload.error
+              || `HTTP ${response.status}`,
+            );
+          }
 
-          if (idx === -1) {
+          // ================================================================
+          // No active RELATION
+          // ================================================================
+
+          if (!payload.active) {
+            const isStepRamp =
+              payload.mode === "STEP_RAMP";
+
+            const stepRampState =
+              isStepRamp
+                ? payload.state
+                : null;
+
+            if (
+              wasRunning
+              && isStepRamp
+            ) {
+              /*
+              * First try to consume any final in-memory
+              * points still exposed by the TCP backend.
+              */
+              await fetchRelationStepRampLivePoints();
+
+              /*
+              * Then replace the live curve with the
+              * definitive persisted .dat.
+              */
+              await reconcileRelationStepRampFromFile();
+            }
+
             setRelationUiIdle();
 
-            addLogEntry(
-              `❌ get_relation_status: no RELATION_STATUS en "${raw}"`,
-              "received",
-            );
+            if (wasRunning) {
+
+              await loadRelationStepRampDefaults();
+
+              if (isStepRamp) {
+
+                if (stepRampState === "COMPLETE") {
+
+                  addLogEntry(
+                    "✅ STEP_RAMP completed.",
+                    "status",
+                  );
+
+                } else if (stepRampState === "ABORTED") {
+
+                  addLogEntry(
+                    "⏹ STEP_RAMP aborted.",
+                    "status",
+                  );
+
+                } else if (stepRampState === "ERROR") {
+
+                  const errorMessage =
+                    payload.error
+                    || "Unknown STEP_RAMP error.";
+
+                  addLogEntry(
+                    `❌ STEP_RAMP failed: ${errorMessage}`,
+                    "status",
+                  );
+
+                } else {
+
+                  /*
+                  * Defensive fallback. A non-active STEP_RAMP should
+                  * normally expose one of its terminal states.
+                  */
+                  addLogEntry(
+                    `⚠ STEP_RAMP finished with state `
+                    + `${stepRampState ?? "UNKNOWN"}.`,
+                    "status",
+                  );
+                }
+
+              } else {
+
+                /*
+                * Preserve existing MANUAL / native RAMP behaviour.
+                */
+                addLogEntry(
+                  "✅ Relation finished.",
+                  "status",
+                );
+              }
+
+              await refreshRelationFiles();
+            }
+
             return;
           }
 
-          const payload = response.slice(idx).trim();
+          // ================================================================
+          // Active RELATION
+          // ================================================================
+
+          const channelNumber = Number(
+            payload.channel,
+          );
 
           if (
-            payload.startsWith(
-              "RELATION_STATUS:ACTIVE:",
+            !Number.isInteger(channelNumber)
+            || !SAMPLE_CHANNELS.includes(
+              channelNumber,
             )
           ) {
-            const parts = payload.split(":");
-
-            const relationRunId = parts[2] || null;
-            const chNum = parts[3] || null;
-            const labelEnc = parts[4] || "";
-            const n = parts[5] || "0";
-
-            /*
-            * Los campos 6–8 son los añadidos para
-            * restaurar el control de la rampa.
-            *
-            * Si se recibe el formato antiguo,
-            * se interpreta como MANUAL.
-            */
-            const relationMode =
-              parts[6] === "RAMP"
-                ? "RAMP"
-                : "MANUAL";
-
-            const targetMk = parts[7] ?? "";
-            const rateMkPerMin = parts[8] ?? "";
-
-            if (!chNum) {
-              /*
-              * El servidor indica ACTIVE, pero no podemos
-              * reconstruir la relación. Bloqueamos Start
-              * para evitar iniciar otra relación encima.
-              */
-              relationRunning = true;
-
-              startButton.disabled = true;
-              stopButton.disabled = false;
-              channelSelect.disabled = true;
-              labelInput.disabled = true;
-              modeSelect.disabled = true;
-
-              updateRelationRampControls();
-
-              addLogEntry(
-                `❌ RELATION_STATUS ACTIVE malformado: "${payload}"`,
-                "received",
-              );
-              return;
-            }
-
-            const chStr = `CH${chNum}`;
-
-            let decodedLabel = "";
-
-            try {
-              decodedLabel = decodeURIComponent(
-                labelEnc,
-              );
-            } catch {
-              decodedLabel = labelEnc;
-            }
-
-            channelSelect.value = chStr;
-            labelInput.value = decodedLabel;
-            modeSelect.value = relationMode;
-
-            if (relationMode === "RAMP") {
-              targetInput.value = targetMk;
-              rateInput.value = rateMkPerMin;
-            }
-
-            currentRelationChannel = chStr;
-            relationRunning = true;
-
-            startButton.disabled = true;
-            stopButton.disabled = false;
-            channelSelect.disabled = true;
-            labelInput.disabled = true;
-            modeSelect.disabled = true;
-
-            updateRelationLabelVisibility();
-            updateRelationRampControls();
-
-            const modeDetails =
-              relationMode === "RAMP"
-                ? `, target=${targetMk} mK, rate=${rateMkPerMin} mK/min`
-                : "";
-
-            addLogEntry(
-              `🔁 Relation activa recuperada: `
-                + `relation_run_id=${relationRunId ?? "?"} `
-                + `(CH${chNum}, n=${n}, mode=${relationMode}`
-                + `${modeDetails})`,
-              "status",
+            throw new Error(
+              "Active relation has an invalid channel.",
             );
-
-            return;
           }
 
-          setRelationUiIdle();
+          const mode = payload.mode;
+
+          if (
+            mode !== "MANUAL"
+            && mode !== "RAMP"
+            && mode !== "STEP_RAMP"
+          ) {
+            throw new Error(
+              `Unknown relation mode: ${mode}`,
+            );
+          }
+
+          const channelName =
+            `CH${channelNumber}`;
+
+          channelSelect.value = channelName;
+          currentRelationChannel = channelName;
+
+          labelInput.value =
+            payload.label ?? "";
+
+          modeSelect.value = mode;
+
+          // ================================================================
+          // Restore mode-specific values exposed by the backend
+          // ================================================================
+
+          if (mode === "RAMP") {
+            if (
+              Number.isFinite(
+                Number(payload.target_mk),
+              )
+            ) {
+              targetInput.value =
+                payload.target_mk;
+            }
+
+            if (
+              Number.isFinite(
+                Number(payload.rate_mk_per_min),
+              )
+            ) {
+              rateInput.value =
+                payload.rate_mk_per_min;
+            }
+          }
+
+          if (mode === "STEP_RAMP") {
+            
+            if (
+              payload.initial_mk !== null
+              && payload.initial_mk !== undefined
+              && Number.isFinite(
+                Number(payload.initial_mk),
+              )
+            ) {
+              stepInitialInput.value =
+                payload.initial_mk;
+            }
+
+            if (
+              Number.isFinite(
+                Number(payload.target_mk),
+              )
+            ) {
+              stepTargetInput.value =
+                payload.target_mk;
+            }
+
+            if (
+              Number.isFinite(
+                Number(payload.step_mk),
+              )
+            ) {
+              stepSizeInput.value =
+                payload.step_mk;
+            }
+
+            const restoredRelationId =
+              payload.relation_id === null
+              || payload.relation_id === undefined
+                ? null
+                : String(payload.relation_id);
+
+            if (!restoredRelationId) {
+              throw new Error(
+                "Active STEP_RAMP relation_id is missing.",
+              );
+            }
+
+            const trackingChanged =
+              relationStepRampLiveRelationId
+                !== restoredRelationId
+              || relationStepRampLiveChannel
+                !== channelName;
+
+            if (trackingChanged) {
+              relationDataStore[channelName].length = 0;
+
+              relationStepRampLiveRelationId =
+                restoredRelationId;
+
+              relationStepRampLiveNextSeq = 0;
+
+              relationStepRampLiveChannel =
+                channelName;
+            }
+          }
+
+          // ================================================================
+          // Lock UI while backend owns the relation
+          // ================================================================
+
+          relationRunning = true;
+
+          startButton.disabled = true;
+
+          /*
+          * During asynchronous STEP_RAMP shutdown,
+          * do not allow a second Stop request.
+          */
+          stopButton.disabled =
+            mode === "STEP_RAMP"
+            && (
+              payload.abort_requested === true
+              || payload.running === false
+            );
+
+          channelSelect.disabled = true;
+          labelInput.disabled = true;
+          modeSelect.disabled = true;
+
+          updateRelationLabelVisibility();
+          updateRelationRampControls();
+
+          // ================================================================
+          // Log only when an active relation is discovered/restored.
+          // Do not produce one log entry per poll.
+          // ================================================================
+
+          if (!wasRunning) {
+            if (mode === "STEP_RAMP") {
+              addLogEntry(
+                `🔁 STEP_RAMP activa recuperada: `
+                + `CH${channelNumber}, `
+                + `state=${payload.state ?? "?"}, `
+                + `point=${payload.current_point ?? "?"}`
+                + `/${payload.total_points ?? "?"}`,
+                "status",
+              );
+            } else {
+              addLogEntry(
+                `🔁 Relation activa recuperada: `
+                + `CH${channelNumber}, `
+                + `mode=${mode}`,
+                "status",
+              );
+            }
+          }
+
         } catch (error) {
+          /*
+          * A communication/status error is not proof that the
+          * backend relation has ended.
+          *
+          * If the frontend already believed a relation was active,
+          * keep the controls locked.
+          */
+          if (!wasRunning) {
+            setRelationUiIdle();
+          }
+
           addLogEntry(
-            `❌ Error get_relation_status: ${error.message}`,
+            `❌ Error get_relation_status: `
+            + `${error.message}`,
             "received",
           );
         }
@@ -3086,7 +3991,7 @@
         const input = document.getElementById("relationLabelInput");
 
         if (
-          ["CH9", "CH10", "CH11", "CH12", "CH13", "CH14", "CH15"].includes(ch)
+          ["CH9", "CH10", "CH11", "CH12", "CH13", "CH14"].includes(ch)
         ) {
           input.style.display = "inline-block";
         } else {
@@ -3108,6 +4013,9 @@
         const rampControls = document.getElementById(
           "relationRampControls",
         );
+        const stepRampControls = document.getElementById(
+          "relationStepRampControls",
+        );
         const targetInput = document.getElementById(
           "relationTargetInput",
         );
@@ -3115,9 +4023,14 @@
           "relationRateInput",
         );
 
-        const isRamp = modeSelect.value === "RAMP";
+        const isRamp     = modeSelect.value === "RAMP";
+        const isStepRamp = modeSelect.value === "STEP_RAMP";
 
         rampControls.style.display = isRamp
+          ? "block"
+          : "none";
+
+        stepRampControls.style.display = isStepRamp
           ? "block"
           : "none";
 
@@ -3125,6 +4038,28 @@
           !isRamp || relationRunning;
         rateInput.disabled =
           !isRamp || relationRunning;
+
+        stepRampControls
+          .querySelectorAll("input")
+          .forEach((input) => {
+            input.disabled =
+              !isStepRamp || relationRunning;
+          });
+
+        const relationSection =
+            modeSelect.closest(".section-content");
+
+          if (
+            relationSection
+            && !relationSection.classList.contains(
+              "collapsed",
+            )
+          ) {
+            requestAnimationFrame(() => {
+              relationSection.style.maxHeight =
+                relationSection.scrollHeight + "px";
+            });
+          }
       }
 
       document
@@ -3135,6 +4070,348 @@
         );
 
       updateRelationRampControls();
+
+
+      function buildRelationStepRampPayload(
+        channelNumber,
+        label,
+      ) {
+        // ================================================================
+        // Local input readers
+        // ================================================================
+
+        function requiredNumber(id, name) {
+          const element = document.getElementById(id);
+          const raw = element.value.trim();
+
+          if (raw === "") {
+            throw new Error(
+              `${name} is required.`,
+            );
+          }
+
+          const value = Number(raw);
+
+          if (!Number.isFinite(value)) {
+            throw new Error(
+              `${name} must be a finite number.`,
+            );
+          }
+
+          return value;
+        }
+
+        function requiredInteger(id, name) {
+          const value = requiredNumber(
+            id,
+            name,
+          );
+
+          if (!Number.isInteger(value)) {
+            throw new Error(
+              `${name} must be an integer.`,
+            );
+          }
+
+          return value;
+        }
+
+        function optionalNumber(id, name) {
+          const element = document.getElementById(id);
+          const raw = element.value.trim();
+
+          if (raw === "") {
+            return null;
+          }
+
+          const value = Number(raw);
+
+          if (!Number.isFinite(value)) {
+            throw new Error(
+              `${name} must be a finite number.`,
+            );
+          }
+
+          return value;
+        }
+
+        function optionalInteger(id, name) {
+          const element = document.getElementById(id);
+          const raw = element.value.trim();
+
+          if (raw === "") {
+            return null;
+          }
+
+          const value = Number(raw);
+
+          if (
+            !Number.isFinite(value)
+            || !Number.isInteger(value)
+          ) {
+            throw new Error(
+              `${name} must be an integer.`,
+            );
+          }
+
+          return value;
+        }
+
+        // ================================================================
+        // Channel
+        // ================================================================
+
+        const channel = Number(channelNumber);
+
+        if (
+          !Number.isInteger(channel)
+          || !SAMPLE_CHANNELS.includes(channel)
+        ) {
+          throw new Error(
+            "Invalid STEP_RAMP sample channel.",
+          );
+        }
+
+        // ================================================================
+        // Required parameters
+        // ================================================================
+
+        const initialMk = requiredNumber(
+          "relationStepInitialInput",
+          "Initial",
+        );
+
+        const targetMk = requiredNumber(
+          "relationStepTargetInput",
+          "Target",
+        );
+
+        const stepMk = requiredNumber(
+          "relationStepSizeInput",
+          "Step",
+        );
+
+        const toleranceMk = requiredNumber(
+          "relationStepToleranceInput",
+          "Tolerance",
+        );
+
+        const stableTimeS = requiredNumber(
+          "relationStepStableTimeInput",
+          "Stable time",
+        );
+
+        const stabilityTimeoutS = requiredNumber(
+          "relationStepTimeoutInput",
+          "Stability timeout",
+        );
+
+        const stabilitySampleIntervalS =
+          requiredNumber(
+            "relationStepStabilityIntervalInput",
+            "Stability sample interval",
+          );
+
+        const autorangeMaxAttempts =
+          requiredInteger(
+            "relationStepAutorangeAttemptsInput",
+            "Autorange max attempts",
+          );
+
+        const resistanceNSamples =
+          requiredInteger(
+            "relationStepResistanceSamplesInput",
+            "R samples",
+          );
+
+        const resistanceSampleIntervalS =
+          requiredNumber(
+            "relationStepResistanceIntervalInput",
+            "R sample interval",
+          );
+
+        const resistanceMaxAttempts =
+          requiredInteger(
+            "relationStepResistanceAttemptsInput",
+            "R max attempts",
+          );
+
+        // ================================================================
+        // Required-parameter validation
+        // ================================================================
+        
+        if (
+          initialMk < 10
+          || initialMk > 800
+        ) {
+          throw new Error(
+            "Initial must be between 10 and 800 mK.",
+          );
+        }
+
+        if (targetMk < 0) {
+          throw new Error(
+            "Target must be non-negative.",
+          );
+        }
+
+        if (stepMk <= 0) {
+          throw new Error(
+            "Step must be greater than zero.",
+          );
+        }
+
+        if (toleranceMk <= 0) {
+          throw new Error(
+            "Tolerance must be greater than zero.",
+          );
+        }
+
+        if (stableTimeS <= 0) {
+          throw new Error(
+            "Stable time must be greater than zero.",
+          );
+        }
+
+        if (stabilityTimeoutS <= stableTimeS) {
+          throw new Error(
+            "Stability timeout must be greater "
+            + "than stable time.",
+          );
+        }
+
+        if (stabilitySampleIntervalS <= 0) {
+          throw new Error(
+            "Stability sample interval must be "
+            + "greater than zero.",
+          );
+        }
+
+        if (autorangeMaxAttempts <= 0) {
+          throw new Error(
+            "Autorange max attempts must be "
+            + "greater than zero.",
+          );
+        }
+
+        if (resistanceNSamples <= 0) {
+          throw new Error(
+            "R samples must be greater than zero.",
+          );
+        }
+
+        if (resistanceSampleIntervalS < 0) {
+          throw new Error(
+            "R sample interval must be non-negative.",
+          );
+        }
+
+        if (resistanceMaxAttempts <= 0) {
+          throw new Error(
+            "R max attempts must be greater than zero.",
+          );
+        }
+
+        if (
+          resistanceMaxAttempts
+          < resistanceNSamples
+        ) {
+          throw new Error(
+            "R max attempts must be greater than "
+            + "or equal to R samples.",
+          );
+        }
+
+        // ================================================================
+        // Optional parameters
+        // ================================================================
+
+        const maxStdMk = optionalNumber(
+          "relationStepMaxStdInput",
+          "Max T std",
+        );
+
+        const maxSlopeMkPerMin = optionalNumber(
+          "relationStepMaxSlopeInput",
+          "Max T slope",
+        );
+
+        const pointMeasurementMaxAttempts =
+          optionalInteger(
+            "relationStepPointAttemptsInput",
+            "Point max attempts",
+          );
+
+        if (
+          maxStdMk !== null
+          && maxStdMk < 0
+        ) {
+          throw new Error(
+            "Max T std must be non-negative.",
+          );
+        }
+
+        if (
+          maxSlopeMkPerMin !== null
+          && maxSlopeMkPerMin < 0
+        ) {
+          throw new Error(
+            "Max T slope must be non-negative.",
+          );
+        }
+
+        if (
+          pointMeasurementMaxAttempts !== null
+          && pointMeasurementMaxAttempts <= 0
+        ) {
+          throw new Error(
+            "Point max attempts must be "
+            + "greater than zero.",
+          );
+        }
+
+        // ================================================================
+        // Build payload expected by tcp_server.py
+        // ================================================================
+
+        const payload = {
+          channel_number              : channel,
+          initial_mk                  : initialMk,
+          target_mk                   : targetMk,
+          step_mk                     : stepMk,
+          tolerance_mk                : toleranceMk,
+          stable_time_s               : stableTimeS,
+          stability_timeout_s         : stabilityTimeoutS,
+          stability_sample_interval_s : stabilitySampleIntervalS,
+          autorange_max_attempts:
+            autorangeMaxAttempts,
+          resistance_n_samples:
+            resistanceNSamples,
+          resistance_sample_interval_s:
+            resistanceSampleIntervalS,
+          resistance_max_attempts:
+            resistanceMaxAttempts,
+          label: label,
+        };
+
+        if (maxStdMk !== null) {
+          payload.max_std_mk = maxStdMk;
+        }
+
+        if (maxSlopeMkPerMin !== null) {
+          payload.max_slope_mk_per_min =
+            maxSlopeMkPerMin;
+        }
+
+        if (
+          pointMeasurementMaxAttempts !== null
+        ) {
+          payload.point_measurement_max_attempts =
+            pointMeasurementMaxAttempts;
+        }
+
+        return payload;
+      }
 
       document
         .getElementById("relationStartButton")
@@ -3164,6 +4441,7 @@
 
           let startCmd;
           let successMarker;
+          let stepRampPayload = null;
 
           if (mode === "RAMP") {
             const targetMk = Number(
@@ -3202,6 +4480,24 @@
               + encodeURIComponent(label);
 
             successMarker = "RELATION_RAMP_STARTED:";
+          } else if (mode === "STEP_RAMP") {
+            try {
+              stepRampPayload =
+                buildRelationStepRampPayload(
+                  chNum,
+                  label,
+                );
+            } catch (error) {
+              addLogEntry(
+                `❌ STEP_RAMP: ${error.message}`,
+                "received",
+              );
+              return;
+            }
+
+            successMarker =
+              "RELATION_STEP_RAMP_STARTED:";
+
           } else {
             startCmd =
               `start_relation:${chNum}:`
@@ -3209,57 +4505,110 @@
 
             successMarker = "RELATION_STARTED:";
           }
-
           startButton.disabled = true;
 
+          
           try {
-            const selectCmd =
-              `select_measure_channel:${chNum}`;
+            if (mode !== "STEP_RAMP") {
+              const selectCmd =
+                `select_measure_channel:${chNum}`;
 
-            addLogEntry(
-              `Sending: ${selectCmd}`,
-              "sent",
-            );
+              addLogEntry(
+                `Sending: ${selectCmd}`,
+                "sent",
+              );
 
-            const respSel = await sendCommandToServer(
-              selectCmd,
-            );
+              const respSel = await sendCommandToServer(
+                selectCmd,
+              );
 
-            addLogEntry(
-              `Server response: ${respSel}`,
-              "received",
-            );
+              addLogEntry(
+                `Server response: ${respSel}`,
+                "received",
+              );
 
-            if (
-              (respSel ?? "")
-                .toString()
-                .includes("❌")
-            ) {
-              throw new Error(respSel);
+              if (
+                (respSel ?? "")
+                  .toString()
+                  .includes("❌")
+              ) {
+                throw new Error(respSel);
+              }
+
+              clearPendingExtraChannelsForSampleChannels();
+
+              await new Promise(
+                (resolve) => setTimeout(resolve, 300),
+              );
+
+              await fetchSensorData(true);
             }
 
-            clearPendingExtraChannelsForSampleChannels();
+            let response;
 
-            await new Promise(
-              (resolve) => setTimeout(resolve, 300),
-            );
+            if (mode === "STEP_RAMP") {
+              addLogEntry(
+                "Sending STEP_RAMP start request",
+                "sent",
+              );
 
-            await fetchSensorData(true);
+              const httpResponse = await fetch(
+                "/start-relation-step-ramp",
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify(
+                    stepRampPayload,
+                  ),
+                },
+              );
 
-            addLogEntry(
-              `Sending command: ${startCmd}`,
-              "sent",
-            );
+              let result;
 
-            const response = await sendCommandToServer(
-              startCmd,
-            );
+              try {
+                result = await httpResponse.json();
+              } catch {
+                throw new Error(
+                  `Invalid HTTP response `
+                  + `(${httpResponse.status})`,
+                );
+              }
 
-            addLogEntry(
-              `Server response: ${response}`,
-              "received",
-            );
+              response =
+                result.status
+                ?? result.error
+                ?? "";
 
+              addLogEntry(
+                `Server response: ${response}`,
+                "received",
+              );
+
+              if (!httpResponse.ok) {
+                throw new Error(
+                  response
+                  || `HTTP ${httpResponse.status}`,
+                );
+              }
+
+            } else {
+              addLogEntry(
+                `Sending command: ${startCmd}`,
+                "sent",
+              );
+
+              response = await sendCommandToServer(
+                startCmd,
+              );
+
+              addLogEntry(
+                `Server response: ${response}`,
+                "received",
+              );
+            }
+              
             const responseText = (response ?? "")
               .toString()
               .trim();
@@ -3269,6 +4618,37 @@
                 responseText
                 || "Empty response from TCP server",
               );
+            }
+            
+            if (mode === "STEP_RAMP") {
+              const markerIndex =
+                responseText.indexOf(successMarker);
+
+              const relationId =
+                responseText.slice(
+                  markerIndex + successMarker.length,
+                ).trim();
+
+              if (!relationId) {
+                throw new Error(
+                  "STEP_RAMP relation_id is missing "
+                  + "from start response.",
+                );
+              }
+
+              /*
+              * A new STEP_RAMP owns a new curve.
+              * Do not retain points from the previous relation
+              * on the same sample channel.
+              */
+              relationDataStore[ch].length = 0;
+
+              relationStepRampLiveRelationId =
+                relationId;
+              relationStepRampLiveNextSeq = 0;
+              relationStepRampLiveChannel = ch;
+
+              redrawRelationChart();
             }
 
             relationRunning = true;
@@ -3319,16 +4699,119 @@
             "relationModeSelect",
           );
 
-          const command = "stop_relation";
+          const mode = modeSelect.value;
 
           stopButton.disabled = true;
 
-          addLogEntry(
-            `Sending command: ${command}`,
-            "sent",
-          );
-
           try {
+            // ============================================================
+            // STEP_RAMP
+            //
+            // Stop is asynchronous. The controller receives the abort
+            // request and performs cleanup before finalizing the relation.
+            // ============================================================
+
+            if (mode === "STEP_RAMP") {
+              addLogEntry(
+                "Sending STEP_RAMP stop request",
+                "sent",
+              );
+
+              const httpResponse = await fetch(
+                "/stop-relation",
+                {
+                  method: "POST",
+                },
+              );
+
+              let result;
+
+              try {
+                result = await httpResponse.json();
+              } catch {
+                throw new Error(
+                  `Invalid HTTP response `
+                  + `(${httpResponse.status})`,
+                );
+              }
+
+              addLogEntry(
+                `Server response: ${result.status ?? result.error ?? ""}`,
+                "received",
+              );
+
+              if (!httpResponse.ok) {
+                throw new Error(
+                  result.error
+                  || result.status
+                  || `HTTP ${httpResponse.status}`,
+                );
+              }
+
+              if (result.status === "STOPPED") {
+                /*
+                * Rare but valid: relation was finalized
+                * synchronously before returning.
+                */
+                relationRunning = false;
+
+                startButton.disabled = false;
+                stopButton.disabled = true;
+                channelSelect.disabled = false;
+                labelInput.disabled = false;
+                modeSelect.disabled = false;
+
+                updateRelationRampControls();
+
+                return;
+              }
+
+              if (
+                result.status === "STOP_REQUESTED"
+                || result.status === "STOPPING"
+              ) {
+                /*
+                * The relation is still active while the worker performs
+                * cleanup. Do NOT mark it idle yet.
+                *
+                * 19E will poll /get-relation-status and release the UI
+                * only when the backend reports that the relation is gone.
+                */
+                relationRunning = true;
+
+                startButton.disabled = true;
+                stopButton.disabled = true;
+                channelSelect.disabled = true;
+                labelInput.disabled = true;
+                modeSelect.disabled = true;
+
+                updateRelationRampControls();
+
+                addLogEntry(
+                  "⏳ STEP_RAMP stop requested; waiting for cleanup.",
+                  "status",
+                );
+
+                return;
+              }
+
+              throw new Error(
+                `Unexpected STEP_RAMP stop status: `
+                + `${result.status ?? "unknown"}`,
+              );
+            }
+
+            // ============================================================
+            // Existing MANUAL / RAMP behaviour
+            // ============================================================
+
+            const command = "stop_relation";
+
+            addLogEntry(
+              `Sending command: ${command}`,
+              "sent",
+            );
+
             const response = await sendCommandToServer(
               command,
             );
@@ -3362,10 +4845,11 @@
             modeSelect.disabled = false;
 
             updateRelationRampControls();
+
           } catch (error) {
             /*
-            * Si la parada no ha sido confirmada,
-            * consideramos que la relación continúa activa.
+            * Stop was not confirmed.
+            * Keep the relation treated as active.
             */
             relationRunning = true;
 
@@ -3383,7 +4867,7 @@
             );
           }
         });
-
+        
       function updateRunUI() {
         const playBtn = document.getElementById("runPlayButton");
         const stopBtn = document.getElementById("runStopButton");
@@ -3787,7 +5271,6 @@
         12: false,
         13: false,
         14: false,
-        15: false,
       };
 
       // Variables to store temperature data and timestamps
@@ -3863,14 +5346,12 @@
         RCH12: null,
         RCH13: null,
         RCH14: null,
-        RCH15: null,
         enabledCH9: null,
         enabledCH10: null,
         enabledCH11: null,
         enabledCH12: null,
         enabledCH13: null,
         enabledCH14: null,
-        enabledCH15: null,
         scanning_channel: null,
         modeCH9: null,
         rangeCH9: null,
@@ -3884,8 +5365,6 @@
         rangeCH13: null,
         modeCH14: null,
         rangeCH14: null,
-        modeCH15: null,
-        rangeCH15: null,
       };
 
       // Track last sent values
@@ -4034,7 +5513,7 @@
         });
       }
       function clearPendingExtraChannelsForSampleChannels() {
-        [9, 10, 11, 12, 13, 14, 15].forEach((ch) => {
+        SAMPLE_CHANNELS.forEach((ch) => {
           if (pendingExtraChannels && pendingExtraChannels[ch] !== undefined) {
             pendingExtraChannels[ch] = false;
           }
@@ -5546,18 +7025,15 @@
             currentParameters.RCH13 = parseFloat(data.RCH13);
           if (data.RCH14 !== undefined)
             currentParameters.RCH14 = parseFloat(data.RCH14);
-          if (data.RCH15 !== undefined)
-            currentParameters.RCH15 = parseFloat(data.RCH15);
-
-          for (let i = 9; i <= 15; i++) {
-            if (data[`enabledCH${i}`] !== undefined) {
-              currentParameters[`enabledCH${i}`] = normalizeEnabled(
-                data[`enabledCH${i}`],
+          SAMPLE_CHANNELS.forEach((channel) => {
+            if (data[`enabledCH${channel}`] !== undefined) {
+              currentParameters[`enabledCH${channel}`] = normalizeEnabled(
+                data[`enabledCH${channel}`],
               )
                 ? 1
                 : 0;
             }
-          }
+          });
           if (data.scanning_channel !== undefined) {
             currentParameters.scanning_channel = parseInt(
               data.scanning_channel,
@@ -5565,20 +7041,44 @@
             updateScanningChannel(data.scanning_channel);
           }
 
-          for (let i = 9; i <= 15; i++) {
-            if (data[`modeCH${i}`] !== undefined) {
-              currentParameters[`modeCH${i}`] =
-                data[`modeCH${i}`] === null
+          SAMPLE_CHANNELS.forEach((channel) => {
+            if (data[`modeCH${channel}`] !== undefined) {
+              currentParameters[`modeCH${channel}`] =
+                data[`modeCH${channel}`] === null
                   ? null
-                  : parseInt(data[`modeCH${i}`]);
+                  : parseInt(data[`modeCH${channel}`]);
             }
-            if (data[`rangeCH${i}`] !== undefined) {
-              currentParameters[`rangeCH${i}`] =
-                data[`rangeCH${i}`] === null
+
+            const excitationRangeKey = `excitationRangeCH${channel}`;
+            const legacyRangeKey = `rangeCH${channel}`;
+            const excitationRangeValue =
+              data[excitationRangeKey] ?? data[legacyRangeKey];
+
+            if (excitationRangeValue !== undefined) {
+              currentParameters[excitationRangeKey] =
+                excitationRangeValue === null
                   ? null
-                  : parseInt(data[`rangeCH${i}`]);
+                  : parseInt(excitationRangeValue);
+
+              // Keep the old key populated for older code paths.
+              currentParameters[legacyRangeKey] =
+                currentParameters[excitationRangeKey];
             }
-          }
+
+            ["resistanceRange", "autorange", "excitationOn"].forEach(
+              (prefix) => {
+                const key = `${prefix}CH${channel}`;
+
+                if (data[key] !== undefined) {
+                  currentParameters[key] =
+                    data[key] === null ? null : parseInt(data[key]);
+                }
+              },
+            );
+          });
+
+          SAMPLE_CHANNELS.forEach(syncSampleChannelControls);
+
           // Update UI controls if parameters changed every minute
           // (or the time specified in parameterBoxUpdateInterval variable)
           const now = Date.now();
@@ -5850,8 +7350,14 @@
             }
           }
 
-          updateRelationStore();
-          redrawRelationChart();
+          const relationMode = document.getElementById(
+            "relationModeSelect",
+          )?.value;
+
+          if (relationMode !== "STEP_RAMP") {
+            updateRelationStore();
+            redrawRelationChart();
+          }
 
           if (tcpConnectionStatus === false) {
             await updateConnectionStatus();
@@ -5868,6 +7374,7 @@
       document.addEventListener("DOMContentLoaded", async function () {
         // Set up collapsible sections
         setupCollapsibleSections();
+        initializeSampleChannelControls();
 
         charts["BB"] = createTemperatureChart(
           "temperatureChartBB",
@@ -5924,6 +7431,10 @@
 
       // Fetch data every 1 seconds
       setInterval(fetchSensorData, 1000);
+      setInterval(
+        initRelationStateFromServer,
+        1000,
+      );
 
       async function toggleChannel50K() {
         const checkbox = document.getElementById("toggle50KGlobal");
@@ -6408,9 +7919,9 @@
         const commands = [];
 
         if (!isNaN(values.MXCSP)) {
-          if (values.MXCSP < 0 || values.MXCSP > 500) {
+          if (values.MXCSP < 0 || values.MXCSP > 1000) {
             addLogEntry(
-              "Error: MXC Setpoint must be between 0.0 and 500.0 K",
+              "Error: MXC Setpoint must be between 0.0 and 1.0 K",
               "received",
             );
             return;
@@ -6881,57 +8392,84 @@
         return Number.isFinite(ch) ? ch : null;
       }
 
-      async function writeSettingsExtraChannel() {
+      async function writeSettingsExtraChannel(requestedChannel = null) {
         if (tcpConnectionStatus === false) {
           addLogEntry(
-            "Cannot send Extra channel command: No connection to TCP server",
+            "Cannot send sample-channel command: No connection to TCP server",
             "status",
           );
           return;
         }
 
-        const ch = getSelectedExtraChannel();
-        if (!ch || ch < 9 || ch > 15) {
-          addLogEntry("Error: Extra channel must be CH9..CH15", "received");
+        const ch = requestedChannel ?? getSelectedExtraChannel();
+        if (!SAMPLE_CHANNELS.includes(ch)) {
+          addLogEntry("Error: sample channel must be CH9..CH14", "received");
           return;
         }
 
-        // Read per-channel inputs (sensorRangeCHx / sensorModeCHx)
-        const rangeEl = document.getElementById(`sensorRangeCH${ch}`);
-        const modeEl = document.getElementById(`sensorModeCH${ch}`);
-        const range = rangeEl ? parseInt(rangeEl.value, 10) : NaN;
-        const mode = modeEl ? parseInt(modeEl.value, 10) : NaN;
+        const mode = Number(
+          document.getElementById(`sensorModeCH${ch}`)?.value,
+        );
+        const excitationRange = Number(
+          document.getElementById(`sensorRangeCH${ch}`)?.value,
+        );
+        const resistanceRange = Number(
+          document.getElementById(`resistanceRangeCH${ch}`)?.value,
+        );
+        const autorange = Number(
+          document.getElementById(`autorangeCH${ch}`)?.value,
+        );
 
-        const commands = [];
-
-        if (!isNaN(range)) {
-          if (range < 1 || range > 8) {
-            addLogEntry(
-              "Error: Sensor Range must be between 1 and 8",
-              "received",
-            );
-            return;
-          }
-          commands.push(`set_sensor_range_ch${ch}:${range}`);
-        }
-
-        if (!isNaN(mode)) {
-          if (mode !== 0 && mode !== 1) {
-            addLogEntry(
-              "Error: Sensor Mode must be 0 (Voltage) or 1 (Current)",
-              "received",
-            );
-            return;
-          }
-          commands.push(`set_sensor_mode_ch${ch}:${mode}`);
-        }
-
-        if (commands.length === 0) {
-          addLogEntry("No Extra channel parameter changes detected", "status");
+        if (
+          ![mode, excitationRange, resistanceRange, autorange]
+            .every(Number.isInteger)
+        ) {
+          addLogEntry(
+            `Error: incomplete resistance settings for CH${ch}`,
+            "received",
+          );
           return;
         }
 
-        // Prefer per-channel small progress bar inside the channel box
+        if (mode !== 0 && mode !== 1) {
+          addLogEntry("Error: mode must be Voltage or Current", "received");
+          return;
+        }
+
+        if (resistanceRange < 1 || resistanceRange > 22) {
+          addLogEntry(
+            "Error: resistance range must be between 1 and 22",
+            "received",
+          );
+          return;
+        }
+
+        if (autorange !== 0 && autorange !== 1) {
+          addLogEntry(
+            "Error: range control must be Manual or Autorange",
+            "received",
+          );
+          return;
+        }
+
+        if (
+          !sampleRangeCombinationIsValid(
+            mode,
+            excitationRange,
+            resistanceRange,
+          )
+        ) {
+          addLogEntry(
+            `Error: incompatible excitation and resistance ranges for CH${ch}`,
+            "received",
+          );
+          return;
+        }
+
+        const command =
+          `set_sample_resistance_settings:${ch}:${mode}`
+          + `:${excitationRange}:${resistanceRange}:${autorange}`;
+
         let progressContainer = document.getElementById(`progressContainerCH${ch}`);
         let progressBar = document.getElementById(`progressBarCH${ch}`);
         let progressText = document.getElementById(`progressTextCH${ch}`);
@@ -6947,67 +8485,69 @@
           progressContainer.style.display = "block";
         }
         if (progressBar) progressBar.style.width = "0%";
-        if (progressText) progressText.textContent = `Processing CH${ch} settings...`;
-
-        for (let i = 0; i < commands.length; i++) {
-          const cmd = commands[i];
-          try {
-            addLogEntry(`Sending CH${ch} command: ${cmd}`, "sent");
-            const response = await sendCommandToServer(cmd);
-            addLogEntry(`Server response: ${response}`, "received");
-          } catch (error) {
-            addLogEntry(
-              `Error sending CH${ch} command ${cmd}: ${error.message}`,
-              "received",
-            );
-          }
-
-          const progress = ((i + 1) / commands.length) * 100;
-          if (progressBar) progressBar.style.width = `${progress}%`;
-          if (progressText) progressText.textContent = `Processing CH${ch} settings... ${Math.round(progress)}%`;
-          await sleep(150);
+        if (progressText) {
+          progressText.textContent = `Applying CH${ch} settings atomically...`;
         }
 
-        setTimeout(() => {
-          if (progressContainer) progressContainer.style.display = "none";
-        }, 1000);
+        try {
+          addLogEntry(`Sending CH${ch} command: ${command}`, "sent");
+          const response = await sendCommandToServer(command);
+          addLogEntry(`Server response: ${response}`, "received");
+
+          if (String(response).includes("❌")) {
+            throw new Error(response);
+          }
+
+          if (progressBar) progressBar.style.width = "100%";
+          if (progressText) progressText.textContent = `CH${ch} settings applied`;
+
+          const details = document
+            .getElementById(`sensorModeCH${ch}`)
+            ?.closest("details");
+          if (details) details.dataset.settingsDirty = "false";
+
+          await sleep(350);
+          await fetchSensorData(true);
+
+        } catch (error) {
+          if (progressText) progressText.textContent = `CH${ch} settings failed`;
+          addLogEntry(
+            `Error applying CH${ch} settings: ${error.message}`,
+            "received",
+          );
+
+        } finally {
+          setTimeout(() => {
+            if (progressContainer) progressContainer.style.display = "none";
+          }, 1000);
+        }
       }
 
-      // Wrapper functions for individual extra channels
+      // Wrapper functions retained for the existing per-channel buttons.
       async function writeSettingsExtraChannel9() {
-        document.getElementById("relationChannelSelect").value = "CH9";
-        await writeSettingsExtraChannel();
+        await writeSettingsExtraChannel(9);
       }
 
       async function writeSettingsExtraChannel10() {
-        document.getElementById("relationChannelSelect").value = "CH10";
-        await writeSettingsExtraChannel();
+        await writeSettingsExtraChannel(10);
       }
 
       async function writeSettingsExtraChannel11() {
-        document.getElementById("relationChannelSelect").value = "CH11";
-        await writeSettingsExtraChannel();
+        await writeSettingsExtraChannel(11);
       }
 
       async function writeSettingsExtraChannel12() {
-        document.getElementById("relationChannelSelect").value = "CH12";
-        await writeSettingsExtraChannel();
+        await writeSettingsExtraChannel(12);
       }
 
       async function writeSettingsExtraChannel13() {
-        document.getElementById("relationChannelSelect").value = "CH13";
-        await writeSettingsExtraChannel();
+        await writeSettingsExtraChannel(13);
       }
 
       async function writeSettingsExtraChannel14() {
-        document.getElementById("relationChannelSelect").value = "CH14";
-        await writeSettingsExtraChannel();
+        await writeSettingsExtraChannel(14);
       }
 
-      async function writeSettingsExtraChannel15() {
-        document.getElementById("relationChannelSelect").value = "CH15";
-        await writeSettingsExtraChannel();
-      }
     </script>
 
     <script>
@@ -7048,7 +8588,7 @@
             break;
         }
 
-        const match = String(channel).match(/^(?:CH)?(9|10|11|12|13|14|15)$/);
+        const match = String(channel).match(/^(?:CH)?(9|10|11|12|13|14)$/);
         if (match) return toggleSampleChannelGlobal(parseInt(match[1], 10));
 
         console.warn("Unknown channel in globalToggleChannel:", channel);
@@ -7218,8 +8758,6 @@
             return currentParameters.RCH13;
           case "CH14":
             return currentParameters.RCH14;
-          case "CH15":
-            return currentParameters.RCH15;
           default:
             return null;
         }
@@ -7320,16 +8858,559 @@
         pushRelationPointFor("CH12");
         pushRelationPointFor("CH13");
         pushRelationPointFor("CH14");
-        pushRelationPointFor("CH15");
       }
 
+
+      async function fetchRelationStepRampLivePoints(
+        forceFullReload = false,
+      ) {
+        const modeSelect = document.getElementById(
+          "relationModeSelect",
+        );
+
+        if (
+          !relationRunning
+          || !modeSelect
+          || modeSelect.value !== "STEP_RAMP"
+        ) {
+          return;
+        }
+
+        /*
+        * Avoid overlapping HTTP requests if one poll takes
+        * longer than the polling interval.
+        */
+        if (relationStepRampLiveFetchInProgress) {
+          return;
+        }
+
+        relationStepRampLiveFetchInProgress = true;
+
+        try {
+          async function requestFrom(fromSeq) {
+            const response = await fetch(
+              "/get-relation-live-points"
+              + `?from_seq=${encodeURIComponent(fromSeq)}`,
+              {
+                cache: "no-store",
+              },
+            );
+
+            let payload;
+
+            try {
+              payload = await response.json();
+            } catch {
+              throw new Error(
+                `Invalid live-points response `
+                + `(HTTP ${response.status})`,
+              );
+            }
+
+            if (!response.ok || !payload.ok) {
+              throw new Error(
+                payload.error
+                || `HTTP ${response.status}`,
+              );
+            }
+
+            return payload;
+          }
+
+          let requestedFromSeq =
+            forceFullReload
+              ? 0
+              : relationStepRampLiveNextSeq;
+
+          let payload = await requestFrom(
+            requestedFromSeq,
+          );
+
+          /*
+          * Status polling is responsible for changing the UI
+          * to idle. Nothing should be appended when no relation
+          * is active.
+          */
+          if (
+            payload.relation_id === null
+            || payload.relation_id === undefined
+          ) {
+            return;
+          }
+
+          if (payload.mode !== "STEP_RAMP") {
+            throw new Error(
+              `Unexpected live-points mode: `
+              + `${payload.mode ?? "null"}`,
+            );
+          }
+
+          let channelNumber = Number(
+            payload.channel,
+          );
+
+          if (
+            !Number.isInteger(channelNumber)
+            || !SAMPLE_CHANNELS.includes(
+              channelNumber,
+            )
+          ) {
+            throw new Error(
+              "Invalid STEP_RAMP live-points channel.",
+            );
+          }
+
+          let channelName =
+            `CH${channelNumber}`;
+
+          let relationId =
+            payload.relation_id === null
+            || payload.relation_id === undefined
+              ? null
+              : String(payload.relation_id);
+
+          if (!relationId) {
+            throw new Error(
+              "STEP_RAMP live-points relation_id is missing.",
+            );
+          }
+
+          /*
+          * If the browser still carries the sequence number of
+          * a previous STEP_RAMP, and the new relation already
+          * contains enough points that reset_required was not
+          * triggered by the backend, relation_id still lets us
+          * detect the change.
+          *
+          * In that case request the whole new relation again
+          * from sequence zero.
+          */
+          const relationChanged =
+            relationStepRampLiveRelationId !== null
+            && relationStepRampLiveRelationId
+              !== relationId;
+
+          const channelChanged =
+            relationStepRampLiveChannel !== null
+            && relationStepRampLiveChannel
+              !== channelName;
+
+          if (
+            (relationChanged || channelChanged)
+            && requestedFromSeq !== 0
+          ) {
+            requestedFromSeq = 0;
+
+            payload = await requestFrom(0);
+
+            if (
+              payload.relation_id === null
+              || payload.relation_id === undefined
+              || payload.mode !== "STEP_RAMP"
+            ) {
+              return;
+            }
+
+            channelNumber = Number(
+              payload.channel,
+            );
+
+            if (
+              !Number.isInteger(channelNumber)
+              || !SAMPLE_CHANNELS.includes(
+                channelNumber,
+              )
+            ) {
+              throw new Error(
+                "Invalid STEP_RAMP live-points channel.",
+              );
+            }
+
+            channelName =
+              `CH${channelNumber}`;
+
+            relationId =
+              payload.relation_id === null
+              || payload.relation_id === undefined
+                ? null
+                : String(payload.relation_id);
+
+            if (!relationId) {
+              throw new Error(
+                "STEP_RAMP live-points relation_id is missing.",
+              );
+            }
+          }
+
+          const mustResetLocalStore =
+            forceFullReload
+            || payload.reset_required === true
+            || relationStepRampLiveRelationId
+              !== relationId
+            || relationStepRampLiveChannel
+              !== channelName;
+
+          if (mustResetLocalStore) {
+            relationDataStore[channelName].length = 0;
+
+            relationStepRampLiveNextSeq = 0;
+            relationStepRampLiveRelationId =
+              relationId;
+            relationStepRampLiveChannel =
+              channelName;
+          }
+
+          if (!Array.isArray(payload.points)) {
+            throw new Error(
+              "Invalid STEP_RAMP live-points array.",
+            );
+          }
+
+          /*
+          * Append strictly in sequence/acquisition order.
+          * No temperature sorting is done here.
+          */
+          for (const point of payload.points) {
+            const seq = Number(point.seq);
+            const x = Number(point.x);
+            const y = Number(point.y);
+
+            if (
+              !Number.isInteger(seq)
+              || seq < 0
+              || !Number.isFinite(x)
+              || !Number.isFinite(y)
+            ) {
+              throw new Error(
+                "Invalid STEP_RAMP live point.",
+              );
+            }
+
+            /*
+            * A repeated request cannot duplicate points.
+            */
+            if (
+              seq < relationStepRampLiveNextSeq
+            ) {
+              continue;
+            }
+
+            /*
+            * A sequence gap should never occur. Do not silently
+            * draw an incomplete relation.
+            */
+            if (
+              seq !== relationStepRampLiveNextSeq
+            ) {
+              throw new Error(
+                `STEP_RAMP sequence gap: expected `
+                + `${relationStepRampLiveNextSeq}, `
+                + `received ${seq}.`,
+              );
+            }
+
+            relationDataStore[channelName].push({
+              x: x,
+              y: y,
+              seq: seq,
+              ts_utc_iso:
+                point.ts_utc_iso ?? null,
+            });
+
+            relationStepRampLiveNextSeq =
+              seq + 1;
+          }
+
+          const backendNextSeq = Number(
+            payload.next_seq,
+          );
+
+          if (
+            !Number.isInteger(backendNextSeq)
+            || backendNextSeq < 0
+          ) {
+            throw new Error(
+              "Invalid STEP_RAMP next_seq.",
+            );
+          }
+
+          if (
+            relationStepRampLiveNextSeq
+            !== backendNextSeq
+          ) {
+            throw new Error(
+              `STEP_RAMP sequence mismatch: local `
+              + `${relationStepRampLiveNextSeq}, `
+              + `backend ${backendNextSeq}.`,
+            );
+          }
+
+          /*
+          * Same memory protection already used by the existing
+          * relation store.
+          */
+          const HARD_CAP = 20000;
+
+          if (
+            relationDataStore[channelName].length
+            > HARD_CAP
+          ) {
+            relationDataStore[channelName].splice(
+              0,
+              relationDataStore[channelName].length
+                - HARD_CAP,
+            );
+          }
+
+          if (
+            currentRelationChannel
+            === channelName
+          ) {
+            redrawRelationChart();
+          }
+
+        } catch (error) {
+          /*
+          * Do not fill the visible log every second if the
+          * endpoint temporarily fails.
+          */
+          console.error(
+            "STEP_RAMP live-points error:",
+            error,
+          );
+        } finally {
+          relationStepRampLiveFetchInProgress =
+            false;
+        }
+      }
+
+      setInterval(
+        fetchRelationStepRampLivePoints,
+        1000,
+      );
+
+      async function reconcileRelationStepRampFromFile() {
+        const relationId =
+          relationStepRampLiveRelationId;
+
+        const channelName =
+          relationStepRampLiveChannel;
+
+        if (
+          !relationId
+          || !channelName
+        ) {
+          return false;
+        }
+
+        if (
+          !Object.prototype.hasOwnProperty.call(
+            relationDataStore,
+            channelName,
+          )
+        ) {
+          console.error(
+            "STEP_RAMP reconciliation: "
+            + `invalid local channel ${channelName}`,
+          );
+
+          return false;
+        }
+
+        /*
+        * _finalize_relation() sets RELATION_ACTIVE=False
+        * before the PostgreSQL write is completed.
+        *
+        * Therefore /get-relation-status may report IDLE
+        * slightly before the final .dat is available.
+        */
+        const MAX_ATTEMPTS = 6;
+        const RETRY_DELAY_MS = 250;
+
+        for (
+          let attempt = 1;
+          attempt <= MAX_ATTEMPTS;
+          attempt++
+        ) {
+          try {
+            const response = await fetch(
+              "/get-relation-file"
+              + `?file_name=${encodeURIComponent(relationId)}`,
+              {
+                cache: "no-store",
+              },
+            );
+
+            let payload;
+
+            try {
+              payload = await response.json();
+            } catch {
+              throw new Error(
+                `Invalid relation-file response `
+                + `(HTTP ${response.status})`,
+              );
+            }
+
+            if (!response.ok || !payload.ok) {
+              throw new Error(
+                payload.error
+                || `HTTP ${response.status}`,
+              );
+            }
+
+            if (
+              String(payload.file_name)
+              !== relationId
+            ) {
+              throw new Error(
+                "Returned relation file does not match "
+                + "the active STEP_RAMP relation_id.",
+              );
+            }
+
+            const channelNumber = Number(
+              payload.channel_number,
+            );
+
+            const expectedChannel =
+              Number(
+                channelName.replace("CH", ""),
+              );
+
+            if (
+              !Number.isInteger(channelNumber)
+              || channelNumber !== expectedChannel
+            ) {
+              throw new Error(
+                "Returned relation file has "
+                + "an unexpected channel.",
+              );
+            }
+
+            if (!Array.isArray(payload.points)) {
+              throw new Error(
+                "Invalid relation-file points array.",
+              );
+            }
+
+            const finalPoints = [];
+
+            for (
+              let i = 0;
+              i < payload.points.length;
+              i++
+            ) {
+              const point = payload.points[i];
+
+              const x = Number(point.x);
+              const y = Number(point.y);
+
+              if (
+                !Number.isFinite(x)
+                || !Number.isFinite(y)
+              ) {
+                throw new Error(
+                  `Invalid point ${i} in final relation file.`,
+                );
+              }
+
+              /*
+              * get_relation_file currently exposes x/y only.
+              * Recreate seq locally from persisted acquisition order.
+              */
+              finalPoints.push({
+                x: x,
+                y: y,
+                seq: i,
+              });
+            }
+
+            const declaredPoints = Number(
+              payload.n_points,
+            );
+
+            if (
+              Number.isInteger(declaredPoints)
+              && declaredPoints >= 0
+              && declaredPoints
+                !== finalPoints.length
+            ) {
+              throw new Error(
+                `Final relation point-count mismatch: `
+                + `metadata=${declaredPoints}, `
+                + `parsed=${finalPoints.length}.`,
+              );
+            }
+
+            /*
+            * Replace, do not append.
+            *
+            * The persisted .dat is now the definitive
+            * representation of the completed STEP_RAMP.
+            */
+            relationDataStore[channelName] =
+              finalPoints;
+
+            relationStepRampLiveNextSeq =
+              finalPoints.length;
+
+            if (
+              currentRelationChannel
+              === channelName
+            ) {
+              redrawRelationChart();
+            }
+
+            console.log(
+              `✅ STEP_RAMP reconciled from ${relationId}: `
+              + `${finalPoints.length} points`,
+            );
+
+            return true;
+
+          } catch (error) {
+            if (attempt === MAX_ATTEMPTS) {
+              console.error(
+                "STEP_RAMP final reconciliation failed:",
+                error,
+              );
+
+              return false;
+            }
+
+            await new Promise(
+              (resolve) => setTimeout(
+                resolve,
+                RETRY_DELAY_MS,
+              ),
+            );
+          }
+        }
+
+        return false;
+      }
+        
       function redrawRelationChart() {
         if (!relationChart) return;
 
-        const pts = relationDataStore[currentRelationChannel] || [];
-        const windowPts = pts
-          .slice(-RELATION_LIVE_POINTS)
-          .sort((a, b) => a.x - b.x);
+        const pts =
+          relationDataStore[currentRelationChannel] || [];
+
+        const recentPts = pts.slice(
+          -RELATION_LIVE_POINTS,
+        );
+
+        const relationMode = document.getElementById(
+          "relationModeSelect",
+        )?.value;
+
+        const windowPts =
+          relationMode === "STEP_RAMP"
+            ? recentPts
+            : recentPts
+                .slice()
+                .sort((a, b) => a.x - b.x);
 
         relationChart.data.datasets[0].data = windowPts;
         relationChart.data.datasets[0].label = `R(${currentRelationChannel}) vs T(MXC)`;
@@ -7342,7 +9423,7 @@
         const sel = document.getElementById("relationChannelSelect");
         if (!sel) return;
 
-        currentRelationChannel = sel.value; // "CH9".."CH15"
+        currentRelationChannel = sel.value; // "CH9".."CH14"
 
         updateRelationLabelVisibility();
         redrawRelationChart();
@@ -7352,9 +9433,12 @@
       document.addEventListener("DOMContentLoaded", async () => {
         const sel = document.getElementById("relationChannelSelect");
         if (sel) currentRelationChannel = sel.value;
-
+        
         await initRelationStateFromServer();
 
+        if (!relationRunning) {
+          await loadRelationStepRampDefaults();
+        }
         relationChart = createRelationChart();
         redrawRelationChart();
       });

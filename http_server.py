@@ -8,14 +8,24 @@ import time
 import uuid
 import io
 import base64
+import yaml
+from pathlib import Path
 from datetime import datetime
 from urllib.parse import urlparse, parse_qs, quote, unquote
 import matplotlib.pyplot as plt
 
+from default_config import (SAMPLE_CHANNELS)
+
 
 # Configuration for the TCP socket server
 TCP_HOST = '192.168.38.3'      #Replace with the Raspberry Pi's IP address: 192.168.38.3
-TCP_PORT = 65432 
+TCP_PORT = 65432
+
+# STEP_RAMP defaults are stored next to http_server.py.
+STEP_RAMP_DEFAULTS_PATH = (
+    Path(__file__).resolve().parent
+    / "step_ramp_defaults.yaml"
+)
 
 # Shared plot history is stored in memory while http_server.py is running.
 # This history survives when browser reloads, but is lost when http_server.py is restarted.
@@ -104,14 +114,12 @@ current_RCH11 = None
 current_RCH12 = None
 current_RCH13 = None
 current_RCH14 = None
-current_RCH15 = None
 current_enabled_CH9  = None
 current_enabled_CH10 = None
 current_enabled_CH11 = None
 current_enabled_CH12 = None
 current_enabled_CH13 = None
 current_enabled_CH14 = None
-current_enabled_CH15 = None
 current_scanning_channel= None
 current_modeCH9 = current_rangeCH9 = None
 current_modeCH10 = current_rangeCH10 = None
@@ -119,7 +127,21 @@ current_modeCH11 = current_rangeCH11 = None
 current_modeCH12 = current_rangeCH12 = None
 current_modeCH13 = current_rangeCH13 = None
 current_modeCH14 = current_rangeCH14 = None
-current_modeCH15 = current_rangeCH15 = None
+
+# Complete per-sample-channel RDGRNG readback.  ``rangeCHx`` above is kept
+# for compatibility and means excitation range; the explicit fields below
+# also expose resistance range and autorange without ambiguity.
+current_sample_measurement_settings = {
+    channel: {
+        "excitation_mode": None,
+        "excitation_range": None,
+        "resistance_range": None,
+        "autorange": None,
+        "excitation_on": None,
+    }
+    for channel in SAMPLE_CHANNELS
+}
+
 current_sample_timestamp_ms = None
 
 # --- CryoCon Model 32 variables
@@ -236,6 +258,228 @@ def _temperature_buffer_payload():
         "channels": channels,
     }
 
+def load_step_ramp_defaults() -> dict:
+    """
+    Read and structurally validate the STEP_RAMP frontend defaults.
+
+    Physical limits and cross-parameter validation remain the
+    responsibility of index.html, tcp_server.py and
+    RelationStepRampController.
+
+    Returns
+    -------
+    dict
+        STEP_RAMP defaults ready to be serialized as JSON.
+
+    Raises
+    ------
+    RuntimeError
+        If the YAML file cannot be read or parsed.
+
+    ValueError
+        If the YAML structure, keys or value types are invalid.
+    """
+
+    required_keys = (
+        "initial_mk",
+        "target_mk",
+        "step_mk",
+        "tolerance_mk",
+        "stable_time_s",
+        "stability_timeout_s",
+        "stability_sample_interval_s",
+        "autorange_max_attempts",
+        "resistance_n_samples",
+        "resistance_sample_interval_s",
+        "resistance_max_attempts",
+    )
+
+    optional_keys = (
+        "max_std_mk",
+        "max_slope_mk_per_min",
+        "point_measurement_max_attempts",
+    )
+
+    integer_keys = {
+        "autorange_max_attempts",
+        "resistance_n_samples",
+        "resistance_max_attempts",
+        "point_measurement_max_attempts",
+    }
+
+    # ==============================================================
+    # Read YAML
+    # ==============================================================
+
+    try:
+
+        with STEP_RAMP_DEFAULTS_PATH.open(
+            "r",
+            encoding="utf-8",
+        ) as config_file:
+
+            loaded = yaml.safe_load(
+                config_file
+            )
+
+    except FileNotFoundError as exc:
+
+        raise RuntimeError(
+            "STEP_RAMP defaults file was not found: "
+            f"{STEP_RAMP_DEFAULTS_PATH}"
+        ) from exc
+
+    except yaml.YAMLError as exc:
+
+        raise RuntimeError(
+            "Could not parse STEP_RAMP defaults YAML: "
+            f"{exc}"
+        ) from exc
+
+    except OSError as exc:
+
+        raise RuntimeError(
+            "Could not read STEP_RAMP defaults file: "
+            f"{exc}"
+        ) from exc
+
+    # ==============================================================
+    # Validate mapping and keys
+    # ==============================================================
+
+    if not isinstance(loaded, dict):
+        raise ValueError(
+            "STEP_RAMP defaults YAML must contain "
+            "a top-level mapping."
+        )
+
+    allowed_keys = (
+        set(required_keys)
+        | set(optional_keys)
+    )
+
+    missing_keys = [
+        key
+        for key in required_keys
+        if key not in loaded
+    ]
+
+    if missing_keys:
+        raise ValueError(
+            "Missing required STEP_RAMP default(s): "
+            + ", ".join(missing_keys)
+        )
+
+    unknown_keys = (
+        set(loaded)
+        - allowed_keys
+    )
+
+    if unknown_keys:
+        raise ValueError(
+            "Unknown STEP_RAMP default(s): "
+            + ", ".join(
+                sorted(
+                    str(key)
+                    for key in unknown_keys
+                )
+            )
+        )
+
+    # ==============================================================
+    # Validate required numeric values
+    # ==============================================================
+
+    defaults = {}
+
+    for key in required_keys:
+
+        value = loaded[key]
+
+        if key in integer_keys:
+
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, int)
+            ):
+                raise ValueError(
+                    f"{key} must be an integer "
+                    "in the STEP_RAMP defaults YAML."
+                )
+
+        elif (
+            isinstance(value, bool)
+            or not isinstance(
+                value,
+                (int, float),
+            )
+        ):
+            raise ValueError(
+                f"{key} must be numeric "
+                "in the STEP_RAMP defaults YAML."
+            )
+
+        if not math.isfinite(
+            float(value)
+        ):
+            raise ValueError(
+                f"{key} must be finite "
+                "in the STEP_RAMP defaults YAML."
+            )
+
+        defaults[key] = value
+
+    # ==============================================================
+    # Validate optional values
+    #
+    # Missing optional keys and explicit YAML null both become None.
+    # ==============================================================
+
+    for key in optional_keys:
+
+        value = loaded.get(
+            key
+        )
+
+        if value is None:
+            defaults[key] = None
+            continue
+
+        if key in integer_keys:
+
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, int)
+            ):
+                raise ValueError(
+                    f"{key} must be an integer or null "
+                    "in the STEP_RAMP defaults YAML."
+                )
+
+        elif (
+            isinstance(value, bool)
+            or not isinstance(
+                value,
+                (int, float),
+            )
+        ):
+            raise ValueError(
+                f"{key} must be numeric or null "
+                "in the STEP_RAMP defaults YAML."
+            )
+
+        if not math.isfinite(
+            float(value)
+        ):
+            raise ValueError(
+                f"{key} must be finite or null "
+                "in the STEP_RAMP defaults YAML."
+            )
+
+        defaults[key] = value
+
+    return defaults
+
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
@@ -250,6 +494,58 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         elif path == '/SCTLab_logo.png':
             with open('/home/SuperTech/TCP_SERVER_CAB/SCTLab_logo.png', 'rb') as file:
                 _respond_browser(self, 'image/png', file.read())
+        
+        elif path == '/get-step-ramp-defaults':
+            # ==============================================================
+            # Return the STEP_RAMP frontend defaults stored in YAML.
+            #
+            # http_server.py validates only the YAML structure and types.
+            # Physical validation remains in the frontend and TCP backend.
+            # ==============================================================
+
+            try:
+
+                defaults = (
+                    load_step_ramp_defaults()
+                )
+
+            except (
+                RuntimeError,
+                ValueError,
+            ) as exc:
+
+                error_message = str(
+                    exc
+                )
+
+                print(
+                    "❌ Could not load STEP_RAMP defaults: "
+                    f"{error_message}"
+                )
+
+                _respond_browser(
+                    self,
+                    'application/json; charset=utf-8',
+                    json.dumps({
+                        "ok": False,
+                        "error": error_message,
+                    }),
+                    status_code=500,
+                )
+
+                return
+
+            _respond_browser(
+                self,
+                'application/json; charset=utf-8',
+                json.dumps({
+                    "ok": True,
+                    "defaults": defaults,
+                }),
+            )
+
+            return
+
 
         elif path == '/get-data':
 
@@ -371,7 +667,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
                 "runID" : current_RUNID,
 
                 # ==============================================================
-                # LakeShore - sample channels CH9 - CH15
+                # LakeShore - sample channels CH9 - CH14
                 # ==============================================================
 
                 "RCH9"  : current_RCH9,
@@ -380,7 +676,6 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
                 "RCH12" : current_RCH12,
                 "RCH13" : current_RCH13,
                 "RCH14" : current_RCH14,
-                "RCH15" : current_RCH15,
 
                 "enabledCH9"  : current_enabled_CH9,
                 "enabledCH10" : current_enabled_CH10,
@@ -388,7 +683,6 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
                 "enabledCH12" : current_enabled_CH12,
                 "enabledCH13" : current_enabled_CH13,
                 "enabledCH14" : current_enabled_CH14,
-                "enabledCH15" : current_enabled_CH15,
 
                 "modeCH9"  : current_modeCH9,
                 "rangeCH9" : current_rangeCH9,
@@ -408,8 +702,37 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
                 "modeCH14"  : current_modeCH14,
                 "rangeCH14" : current_rangeCH14,
 
-                "modeCH15"  : current_modeCH15,
-                "rangeCH15" : current_rangeCH15,
+                **{
+                    f"excitationRangeCH{channel}":
+                        current_sample_measurement_settings[channel][
+                            "excitation_range"
+                        ]
+                    for channel in SAMPLE_CHANNELS
+                },
+
+                **{
+                    f"resistanceRangeCH{channel}":
+                        current_sample_measurement_settings[channel][
+                            "resistance_range"
+                        ]
+                    for channel in SAMPLE_CHANNELS
+                },
+
+                **{
+                    f"autorangeCH{channel}":
+                        current_sample_measurement_settings[channel][
+                            "autorange"
+                        ]
+                    for channel in SAMPLE_CHANNELS
+                },
+
+                **{
+                    f"excitationOnCH{channel}":
+                        current_sample_measurement_settings[channel][
+                            "excitation_on"
+                        ]
+                    for channel in SAMPLE_CHANNELS
+                },
 
                 # ==============================================================
                 # Cryo-Con Model 32
@@ -1009,6 +1332,74 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
 
             html = self.render_run_plot_html(run_payload)
             _respond_browser(self, 'text/html; charset=utf-8', html)
+        
+        elif path == '/get-relation-file':
+            # ==============================================================
+            # Return one persisted RELATION file as JSON.
+            #
+            # This reuses get_relation_payload(), which already talks to
+            # tcp_server.py through:
+            #
+            #   get_relation_file:<file_name>
+            #
+            # The endpoint is used by the frontend to reconcile the final
+            # STEP_RAMP graph with the persisted .dat after finalization.
+            # ==============================================================
+
+            file_vals = query.get(
+                "file_name"
+            )
+
+            if not file_vals:
+
+                _respond_browser(
+                    self,
+                    'application/json; charset=utf-8',
+                    json.dumps({
+                        "ok": False,
+                        "error": "Missing file_name",
+                    }),
+                    status_code=400,
+                )
+
+                return
+
+            file_name = file_vals[0]
+
+            relation_payload = (
+                self.get_relation_payload(
+                    file_name
+                )
+            )
+
+            if relation_payload is None:
+
+                _respond_browser(
+                    self,
+                    'application/json; charset=utf-8',
+                    json.dumps({
+                        "ok": False,
+                        "error": (
+                            "Could not retrieve RELATION_FILE"
+                        ),
+                        "file_name": file_name,
+                    }),
+                    status_code=404,
+                )
+
+                return
+
+            relation_payload["ok"] = True
+
+            _respond_browser(
+                self,
+                'application/json; charset=utf-8',
+                json.dumps(
+                    relation_payload
+                ),
+            )
+
+            return
 
         elif path == '/plot_relation':
             file_vals = query.get("file_name")
@@ -1173,10 +1564,14 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
                 "RELATION_STEP_RAMP_STOP_REQUESTED:"
             )
 
-            if raw.startswith(prefix):
+            idx = raw.find(
+                prefix
+            )
+
+            if idx != -1:
 
                 relation_id = raw[
-                    len(prefix):
+                    idx + len(prefix):
                 ].strip()
 
                 _respond_browser(
@@ -1201,10 +1596,14 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
 
             prefix = "RELATION_STOPPING:"
 
-            if raw.startswith(prefix):
+            idx = raw.find(
+                prefix
+            )
+
+            if idx != -1:
 
                 relation_id = raw[
-                    len(prefix):
+                    idx + len(prefix):
                 ].strip()
 
                 _respond_browser(
@@ -1229,10 +1628,14 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
 
             prefix = "RELATION_STOPPED:"
 
-            if raw.startswith(prefix):
+            idx = raw.find(
+                prefix
+            )
+
+            if idx != -1:
 
                 remainder = raw[
-                    len(prefix):
+                    idx + len(prefix):
                 ].strip()
 
                 try:
@@ -1283,7 +1686,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
             # Nothing to stop.
             # ==============================================================
 
-            if raw == "❌ No active relation":
+            if "❌ No active relation" in raw:
 
                 _respond_browser(
                     self,
@@ -1683,6 +2086,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
     def render_relation_plot_html(self, relation_payload: dict) -> str:
         import io, base64
         import matplotlib.pyplot as plt
+        import numpy as np
 
         file_name = relation_payload.get("file_name", "relation")
         ch = relation_payload.get("channel_number", "?")
@@ -1704,8 +2108,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
                 except Exception:
                     continue
 
-        fig = plt.figure(figsize=(10.5, 5.5))
-        ax = fig.add_subplot(111)
+        figure, ax = plt.subplots(figsize = (9, 6), dpi = 400, constrained_layout = True)
 
         if len(xs) == 0:
             ax.set_title(f"Relation CH{ch} — {file_name}")
@@ -1713,6 +2116,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
             ax.set_xlim(0, 1)
             ax.set_ylim(0, 1)
             ax.grid(True, alpha=0.3)
+
         else:
             # orden por T
             order = sorted(range(len(xs)), key=lambda i: xs[i])
@@ -1724,20 +2128,33 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
                 ttl += f" — {label}"
             ax.set_title(ttl)
 
-            ax.plot(xs, ys)
-            ax.set_xlabel("T(MXC) [K]")
-            ax.set_ylabel(f"R(CH{ch}) [Ohm]")
+            ax.scatter(xs, ys, marker='o', color='white', edgecolor='black', s=50)
+            ax.set_xlabel(r"$T_{\mathrm{MXC}}$ [K]", fontsize=18)
+            ax.set_ylabel(fr"$R_{{\mathrm{{CH}}{{{ch}}}}}$ [$\Omega$]", fontsize=18)
+            ax.tick_params(direction='in', which='both')
             ax.grid(True, alpha=0.3)
+
+            max_resistance   = float(max(ys))
+            half_resistance  = max_resistance / 2
+            half_temperature = xs[np.where(np.array(ys) <= half_resistance)[0][-1]]
+            # ax.axvline(x = half_temperature, linewidth = 1.0, ls = '--', color = 'tomato', alpha = 0.2)
+            upper_distance_from_tc = max(xs) - half_temperature
+            lower_distance_from_tc = half_temperature - min(xs)
+
+            if upper_distance_from_tc > lower_distance_from_tc:
+                ax.set_xlim(min(xs), half_temperature + lower_distance_from_tc)
+            elif upper_distance_from_tc < lower_distance_from_tc:
+                ax.set_xlim(half_temperature - upper_distance_from_tc, max(xs))
 
         meta = f"{file_name}"
         if created:
             meta += f" | {created}"
-        fig.suptitle(meta, fontsize=10, y=0.98)
+        figure.suptitle(meta, fontsize=10, y=0.98)
 
         buf = io.BytesIO()
-        fig.tight_layout()
-        fig.savefig(buf, format="png", dpi=130)
-        plt.close(fig)
+        figure.tight_layout()
+        figure.savefig(buf, format="png", dpi=130)
+        plt.close(figure)
 
         img_b64 = base64.b64encode(buf.getvalue()).decode("ascii")
 
@@ -1833,7 +2250,6 @@ def receive_tcp_telemetry(tcp_socket):
     global current_enabled_CH12
     global current_enabled_CH13
     global current_enabled_CH14
-    global current_enabled_CH15
 
     # ------------------------------------------------------------------
     # MXC control
@@ -1906,7 +2322,7 @@ def receive_tcp_telemetry(tcp_socket):
     global current_RUNID
 
     # ------------------------------------------------------------------
-    # Sample channels CH9 - CH15
+    # Sample channels CH9 - CH14
     # ------------------------------------------------------------------
 
     global current_RCH9
@@ -1915,7 +2331,6 @@ def receive_tcp_telemetry(tcp_socket):
     global current_RCH12
     global current_RCH13
     global current_RCH14
-    global current_RCH15
 
     global current_modeCH9
     global current_rangeCH9
@@ -1935,8 +2350,7 @@ def receive_tcp_telemetry(tcp_socket):
     global current_modeCH14
     global current_rangeCH14
 
-    global current_modeCH15
-    global current_rangeCH15
+    global current_sample_measurement_settings
 
     # ------------------------------------------------------------------
     # Cryo-Con
@@ -2380,7 +2794,7 @@ def receive_tcp_telemetry(tcp_socket):
                 )
 
                 # ======================================================
-                # Sample-channel resistances CH9 - CH15
+                # Sample-channel resistances CH9 - CH14
                 # ======================================================
 
                 new_RCH9 = _as_float(
@@ -2405,10 +2819,6 @@ def receive_tcp_telemetry(tcp_socket):
 
                 new_RCH14 = _as_float(
                     telemetry.get("RCH14")
-                )
-
-                new_RCH15 = _as_float(
-                    telemetry.get("RCH15")
                 )
 
                 # ======================================================
@@ -2437,10 +2847,6 @@ def receive_tcp_telemetry(tcp_socket):
 
                 new_enabled_CH14 = _as_int(
                     telemetry.get("enabledCH14")
-                )
-
-                new_enabled_CH15 = _as_int(
-                    telemetry.get("enabledCH15")
                 )
 
                 # ======================================================
@@ -2495,13 +2901,41 @@ def receive_tcp_telemetry(tcp_socket):
                     telemetry.get("rangeCH14")
                 )
 
-                new_modeCH15 = _as_int(
-                    telemetry.get("modeCH15")
-                )
+                new_sample_measurement_settings = {}
 
-                new_rangeCH15 = _as_int(
-                    telemetry.get("rangeCH15")
-                )
+                for channel in SAMPLE_CHANNELS:
+                    excitation_range = _as_int(
+                        telemetry.get(
+                            f"excitationRangeCH{channel}"
+                        )
+                    )
+
+                    # Backwards compatibility with TCP backends that only
+                    # publish the former, ambiguous ``rangeCHx`` key.
+                    if excitation_range is None:
+                        excitation_range = _as_int(
+                            telemetry.get(f"rangeCH{channel}")
+                        )
+
+                    new_sample_measurement_settings[channel] = {
+                        "excitation_mode": _as_int(
+                            telemetry.get(f"modeCH{channel}")
+                        ),
+                        "excitation_range": excitation_range,
+                        "resistance_range": _as_int(
+                            telemetry.get(
+                                f"resistanceRangeCH{channel}"
+                            )
+                        ),
+                        "autorange": _as_int(
+                            telemetry.get(f"autorangeCH{channel}")
+                        ),
+                        "excitation_on": _as_int(
+                            telemetry.get(
+                                f"excitationOnCH{channel}"
+                            )
+                        ),
+                    }
 
                 # ======================================================
                 # Cryo-Con Model 32
@@ -2694,7 +3128,6 @@ def receive_tcp_telemetry(tcp_socket):
                 current_RCH12 = new_RCH12
                 current_RCH13 = new_RCH13
                 current_RCH14 = new_RCH14
-                current_RCH15 = new_RCH15
 
                 current_enabled_CH9 = (
                     new_enabled_CH9
@@ -2720,10 +3153,6 @@ def receive_tcp_telemetry(tcp_socket):
                     new_enabled_CH14
                 )
 
-                current_enabled_CH15 = (
-                    new_enabled_CH15
-                )
-
                 current_modeCH9 = new_modeCH9
                 current_rangeCH9 = new_rangeCH9
 
@@ -2742,8 +3171,10 @@ def receive_tcp_telemetry(tcp_socket):
                 current_modeCH14 = new_modeCH14
                 current_rangeCH14 = new_rangeCH14
 
-                current_modeCH15 = new_modeCH15
-                current_rangeCH15 = new_rangeCH15
+                for channel in SAMPLE_CHANNELS:
+                    current_sample_measurement_settings[channel] = (
+                        new_sample_measurement_settings[channel]
+                    )
 
                 current_bbcon_temperature = (
                     new_bbcon_temperature
@@ -2864,7 +3295,6 @@ def receive_sensor_data(tcp_socket):
     global current_enabled_CH12
     global current_enabled_CH13
     global current_enabled_CH14
-    global current_enabled_CH15
     
     global current_mxc_temperature_setpoint
     global current_mxc_proportional_gain
@@ -2903,7 +3333,7 @@ def receive_sensor_data(tcp_socket):
     global current_curve_STILL
     global current_heater_output_MXC
     global current_RUNID
-    global current_RCH9, current_RCH10, current_RCH11, current_RCH12, current_RCH13, current_RCH14, current_RCH15
+    global current_RCH9, current_RCH10, current_RCH11, current_RCH12, current_RCH13, current_RCH14
     global current_scanning_channel
     global current_modeCH9, current_rangeCH9
     global current_modeCH10, current_rangeCH10
@@ -2911,7 +3341,6 @@ def receive_sensor_data(tcp_socket):
     global current_modeCH12, current_rangeCH12
     global current_modeCH13, current_rangeCH13
     global current_modeCH14, current_rangeCH14
-    global current_modeCH15, current_rangeCH15
     global current_sample_timestamp_ms
 
     buf = b""
@@ -3087,11 +3516,10 @@ def receive_sensor_data(tcp_socket):
                     current_RCH12 = _parse_rch(56)
                     current_RCH13 = _parse_rch(57)
                     current_RCH14 = _parse_rch(58)
-                    current_RCH15 = _parse_rch(59)
 
                 except Exception as e:
-                    print(f"Error parsing extra resistances RCH9/10/11/12/13/14/15: {e}")
-                    current_RCH9 = current_RCH10 = current_RCH11 = current_RCH12 = current_RCH13 = current_RCH14 = current_RCH15 = None
+                    print(f"Error parsing extra resistances RCH9/10/11/12/13/14: {e}")
+                    current_RCH9 = current_RCH10 = current_RCH11 = current_RCH12 = current_RCH13 = current_RCH14  = None
 
                 try:
                     current_enabled_CH9 = int(params[60].split(':')[-1])
@@ -3100,7 +3528,7 @@ def receive_sensor_data(tcp_socket):
                     current_enabled_CH12 = int(params[63].split(':')[-1])
                     current_enabled_CH13 = int(params[64].split(':')[-1])
                     current_enabled_CH14 = int(params[65].split(':')[-1])
-                    current_enabled_CH15 = int(params[66].split(':')[-1])
+
                 except Exception as e:
                     print(f"Error parsing enabled EXTRA-CHANNELS variables: {e}")
 
@@ -3115,18 +3543,18 @@ def receive_sensor_data(tcp_socket):
                         if p.startswith("modeCH"):
                             k, v = p.split(":", 1)
                             ch = int(k.replace("modeCH", ""))
-                            if 9 <= ch <= 15:
+                            if min(SAMPLE_CHANNELS) <= ch <= max(SAMPLE_CHANNELS):
                                 val = v.strip()
                                 globals()[f"current_modeCH{ch}"] = int(val) if val and val.upper() != "NONE" else None
 
                         elif p.startswith("rangeCH"):
                             k, v = p.split(":", 1)
                             ch = int(k.replace("rangeCH", ""))
-                            if 9 <= ch <= 15:
+                            if min(SAMPLE_CHANNELS) <= ch <= max(SAMPLE_CHANNELS):
                                 val = v.strip()
                                 globals()[f"current_rangeCH{ch}"] = int(val) if val and val.upper() != "NONE" else None
                 except Exception as e:
-                    print(f"Error parsing extra excitation settings CH9..15: {e}")
+                    print(f"Error parsing extra excitation settings CH9..14: {e}")
 
                 current_sample_timestamp_ms = int(time.time() * 1000)
                 _update_temperature_buffers(current_sample_timestamp_ms)

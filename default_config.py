@@ -1,5 +1,8 @@
 import datetime
 
+MIN_LAKESHORE_TEMPERATURE = 10.0
+MAX_LAKESHORE_TEMPERATURE = 900.0
+
 # Number of attempts to connect to query to check
 # after sending a command to device
 ATTEMPTS = 5
@@ -8,7 +11,7 @@ DEFAULT_SETTINGS = {
     1: ['010, 003, 01, 2'],  # 50 K stage
     2: ['010, 003, 02, 2'],  # 4 K stage
     5: ['010, 003, 03, 2'],  # STILL stage
-    6: ['001, 001, 04, 2']   # MXC stage
+    6: ['001, 003, 04, 1']   # MXC stage
 }
 
 DEFAULT_PID = {
@@ -18,11 +21,11 @@ DEFAULT_PID = {
 }
 
 DEFAULT_MXC_RESISTANCE_RANGE_SETTINGS = {
-    "excitation_mode": 0,       # 0 for voltage, 1 for current
-    "excitation_range": 4,      #63 uV 
-    "resistance_range": 14,     # 14 for 3.15 uA R = 6.32 kOhm
-    "autorange": 1,             # 0 for NO, 1 for YES
-    "excitation": 0,            # 0 for excitation on, 1 = exctiation off
+    "excitation_mode"  : 0,       # 0 for voltage, 1 for current
+    "excitation_range" : 4,      #63 uV 
+    "resistance_range" : 14,     # 14 for 3.15 uA R = 6.32 kOhm
+    "autorange"        : 1,             # 0 for NO, 1 for YES
+    "excitation"       : 0,            # 0 for excitation on, 1 = exctiation off
 }
 
 CURVE_NAMES = {
@@ -63,11 +66,19 @@ SENSOR_RESISTANCE_RANGE_LIST = {
     "8": (6.32, 'mV', 3.16, 'nA')
 }
 
-DEFAULT_CHANNELS = [1, 2, 5, 6]#, 7]
-DEFAULT_EXTRA_CHANNELS = [9, 10, 12, 13, 14]
-DEFAULT_CHANNELS_ID = ["50K", "4K", "STILL", "MXC"]#, "CH7"]
+DEFAULT_CHANNELS       = [1, 2, 5, 6]
+DEFAULT_CHANNELS_ID    = ["50K", "4K", "STILL", "MXC"]
+SAMPLE_CHANNELS        = [9, 10, 11, 12, 13, 14] 
+SUPPORTED_CHANNELS     = DEFAULT_CHANNELS + SAMPLE_CHANNELS
+
 DEFAULT_MXC_SETPOINT_MK = 0.0
 DEFAULT_MXC_HEATER_RANGE = "5"
+
+# Ramp implementation for temperature control min and max rate values in Kelvin/min
+MIN_RAMP_RATE_K_PER_MIN = 0.0001
+MAX_RAMP_RATE_K_PER_MIN = 10.0
+MIN_TARGET_TEMPERATURE_MK = 10.0
+MAX_TARGET_TEMPERATURE_MK = 900.0
 
 DEFAULT_SENSOR_RESISTANCE_SETTINGS = {
     1: {  # 50K
@@ -85,8 +96,6 @@ DEFAULT_SENSOR_RESISTANCE_SETTINGS = {
 }
 
 DB_INSERT_INTERVAL = datetime.timedelta(seconds=1)
-
-SAMPLE_CHANNELS = [9, 10, 11, 12, 13, 14, 15]
 
 BBCON_NAME = "Cryo-con"
 MAX_BBCON_SETPOINT = 25.0
