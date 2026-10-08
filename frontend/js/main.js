@@ -1,4 +1,22 @@
+import { initParticles } from './particles.js';
+import { fetchRelationStepRampLivePoints } from './api.js';
+import { refreshRelationFiles } from './api.js';
+import { fetchSensorData } from './api.js';
+import { initRunIdFromServer } from './api.js';
+import { initRelationStateFromServer } from './business.js';
+import { updateRunUI } from './ui.js';
+
+// ToDo: currentActiveRunId variable is not defined. I have defined it as null
+// but check if there's a problem because other parts of the code in other files
+// might be using it.
+
+let currentActiveRunId = null; // CHECK
+
 document.addEventListener("DOMContentLoaded", async () => {
+    
+    // ToDo: currentRelationChannel variable is not defined.
+    let currentRelationChannel;
+
     const sel = document.getElementById("relationChannelSelect");
     if (sel) currentRelationChannel = sel.value;
 

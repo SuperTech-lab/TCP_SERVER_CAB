@@ -50,7 +50,7 @@ function updateRelationStore() {
     pushRelationPointFor("CH14");
 }
 
-function sampleRangeCombinationIsValid(
+export function sampleRangeCombinationIsValid(
     excitationMode,
     excitationRange,
     resistanceRange,
@@ -238,7 +238,7 @@ async function loadRelationStepRampDefaults() {
     }
 }
 
-async function initRelationStateFromServer() {
+export async function initRelationStateFromServer() {
     const startButton = document.getElementById(
         "relationStartButton",
     );

@@ -1,4 +1,4 @@
-function initParticles() {
+export function initParticles() {
     const canvas = document.getElementById("particles-canvas");
     const ctx = canvas.getContext("2d");
     let particles = [];

@@ -1,4 +1,4 @@
-async function fetchRelationStepRampLivePoints(
+export async function fetchRelationStepRampLivePoints(
     forceFullReload = false,
     ) {
     const modeSelect = document.getElementById(
@@ -567,7 +567,7 @@ async function refreshRecentRuns() {
     }
 }
 
-async function initRunIdFromServer() {
+export async function initRunIdFromServer() {
     if (hasInitializedRunId) return;
     hasInitializedRunId = true;
 
@@ -625,7 +625,7 @@ async function initRunIdFromServer() {
     }
 }
 
-async function refreshRelationFiles() {
+export async function refreshRelationFiles() {
     if (!relationFilesSelect) return;
 
     relationFilesSelect.innerHTML = `<option value="">(cargando...)</option>`;
@@ -1044,7 +1044,7 @@ async function sendControlParameters() {
 
 // Function that handles fetching sensor data from the server
 // and updates the UI accordingly
-async function fetchSensorData(forceUpdateControls = false) {
+export async function fetchSensorData(forceUpdateControls = false) {
     try {
         // Fetch data from the server using the /get-data channel
         const response = await fetch("/get-data");

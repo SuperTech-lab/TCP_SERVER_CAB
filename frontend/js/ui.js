@@ -1,3 +1,5 @@
+import { sampleRangeCombinationIsValid } from './business.js';
+
 // Switch between tabs script
 // This script handles the tab switching functionality
 const tabButtons = document.querySelectorAll(".tab-button");
@@ -407,7 +409,7 @@ function onRelationChannelChange() {
     updateRelationCurrentLabels?.(); // por si existe en tu archivo
 }
 
-function updateRunUI() {
+export function updateRunUI() {
     const playBtn = document.getElementById("runPlayButton");
     const stopBtn = document.getElementById("runStopButton");
     const runIdInput = document.getElementById("runIdInput");

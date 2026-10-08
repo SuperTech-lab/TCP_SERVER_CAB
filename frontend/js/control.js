@@ -1,3 +1,5 @@
+import { refreshRelationFiles } from './api.js';
+
 function globalToggleChannel(channel) {
     switch (channel) {
         case "MXC":
