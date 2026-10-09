@@ -52,7 +52,6 @@
                     <input
                       type="checkbox"
                       id="autoscanToggle"
-                      onchange="toggleAutoscan()"
                     />
                     <span class="slider round"></span>
                   </label>
@@ -71,7 +70,6 @@
                         <input
                           type="checkbox"
                           id="toggleMXCGlobal"
-                          onchange="globalToggleChannel('MXC')"
                         />
                         <span class="slider round"></span>
                       </label>
@@ -83,7 +81,6 @@
                         <input
                           type="checkbox"
                           id="toggle50KGlobal"
-                          onchange="globalToggleChannel('50K')"
                         />
                         <span class="slider round"></span>
                       </label>
@@ -94,8 +91,7 @@
                       <label class="switch">
                         <input
                           type="checkbox"
-                          id="toggle4kGlobal"
-                          onchange="globalToggleChannel('4K')"
+                          id="toggle4KGlobal"
                         />
                         <span class="slider round"></span>
                       </label>
@@ -107,7 +103,6 @@
                         <input
                           type="checkbox"
                           id="toggleSTILLGlobal"
-                          onchange="globalToggleChannel('STILL')"
                         />
                         <span class="slider round"></span>
                       </label>
@@ -119,7 +114,6 @@
                     type="checkbox"
                     id="autorangeMXC"
                     checked
-                    onchange="toggleAutorangeMXC()"
                   />
                   <span></span>
                   Autorange
@@ -420,7 +414,6 @@
                   <select
                     id="timeRangeMXC"
                     style="margin-right: 50px;"
-                    onchange="updateTimeRange()"
                   >
                     <option value="21600">6 Hours</option>
                     <option value="3600">1 Hour</option>
@@ -556,7 +549,6 @@
               <select
                 id="timeRangeSTILL"
                 style="margin-right: 50px"
-                onchange="updateTimeRangeSTILL()"
               >
                 <option value="60" selected>1 Minute</option>
                 <option value="300">5 Minutes</option>
@@ -688,7 +680,6 @@
               <select
                 id="timeRange4K"
                 style="margin-right: 50px"
-                onchange="updateTimeRange4K()"
               >
                 <option value="60" selected>1 Minute</option>
                 <option value="300">5 Minutes</option>
@@ -818,7 +809,6 @@
               <select
                 id="timeRange50K"
                 style="margin-right: 50px"
-                onchange="updateTimeRange50K()"
               >
                 <option value="60" selected>1 Minute</option>
                 <option value="300">5 Minutes</option>
@@ -1016,7 +1006,6 @@
                   <input
                     type="checkbox"
                     id="toggleExtraChannel9"
-                    onchange="globalToggleChannel('9')"
                   />
                   <span class="slider round"></span>
                 </label>
@@ -1070,7 +1059,7 @@
                     </div>
                     <div class="control-row" style="margin-top: 10px">
                       <button
-                        onclick="writeSettingsExtraChannel9()"
+                        id="writeSettingsButtonCH9"
                         class="inline-button"
                       >
                         Write Settings
@@ -1106,7 +1095,6 @@
                   <input
                     type="checkbox"
                     id="toggleExtraChannel10"
-                    onchange="globalToggleChannel('10')"
                   />
                   <span class="slider round"></span>
                 </label>
@@ -1196,7 +1184,6 @@
                   <input
                     type="checkbox"
                     id="toggleExtraChannel11"
-                    onchange="globalToggleChannel('11')"
                   />
                   <span class="slider round"></span>
                 </label>
@@ -1286,7 +1273,6 @@
                   <input
                     type="checkbox"
                     id="toggleExtraChannel12"
-                    onchange="globalToggleChannel('12')"
                   />
                   <span class="slider round"></span>
                 </label>
@@ -1376,7 +1362,6 @@
                   <input
                     type="checkbox"
                     id="toggleExtraChannel13"
-                    onchange="globalToggleChannel('13')"
                   />
                   <span class="slider round"></span>
                 </label>
@@ -1466,7 +1451,6 @@
                   <input
                     type="checkbox"
                     id="toggleExtraChannel14"
-                    onchange="globalToggleChannel('14')"
                   />
                   <span class="slider round"></span>
                 </label>

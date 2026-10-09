@@ -1,4 +1,12 @@
-import { refreshRelationFiles } from './api.js';
+import { 
+    refreshRelationFiles, sendCommandToServer 
+} from './api.js';
+import {
+    sampleRangeCombinationIsValid
+} from './business.js';
+import { addLogEntry } from './ui.js'; 
+import { state } from './state.js';
+import { SAMPLE_CHANNELS } from './state.js';
 
 function globalToggleChannel(channel) {
     switch (channel) {
@@ -28,11 +36,11 @@ function toggleSampleChannelGlobal(channel) {
     );
     if (!checkbox) return;
 
-    const state = checkbox.checked ? 1 : 0;
-    const command = `set_channel_${channel}: ${state}`;
+    const int_state = checkbox.checked ? 1 : 0;
+    const command = `set_channel_${channel}: ${int_state}`;
 
     // Marcamos como pendiente para que el "fetchSensorData" no sobrescriba el toggle
-    pendingExtraChannels[channel] = true;
+    state.pendingExtraChannels[channel] = true;
 
     addLogEntry(`Sending command: ${command}`, "sent");
 
@@ -49,7 +57,7 @@ function toggleSampleChannelGlobal(channel) {
         console.error("❌ Error:", err);
         // Si hay error, revertimos el checkbox y liberamos el pendiente
         checkbox.checked = !checkbox.checked;
-        pendingExtraChannels[channel] = false;
+        state.pendingExtraChannels[channel] = false;
     });
 }
 
@@ -557,30 +565,30 @@ if (relationFilesSelect) {
 }
 
 async function toggleChannel50K() {
-const checkbox = document.getElementById("toggle50KGlobal");
-const value = checkbox.checked ? 1 : 0;
+    const checkbox = document.getElementById("toggle50KGlobal");
+    const value = checkbox.checked ? 1 : 0;
 
-const command = `set_channel_50k:${value}`;
+    const command = `set_channel_50k:${value}`;
 
-try {
-    pending50KToggle = true;
-    addLogEntry(`Sending 50K command: ${command}`, "sent");
-    const response = await sendCommandToServer(command);
-    addLogEntry(`Server response: ${response}`, "received");
+    try {
+        state.controls.pending50KToggle = true;
+        addLogEntry(`Sending 50K command: ${command}`, "sent");
+        const response = await sendCommandToServer(command);
+        addLogEntry(`Server response: ${response}`, "received");
 
-    console.log(
-    `Channel 50K is now ${checkbox.checked ? "enabled" : "disabled"}`,
-    );
-    console.log(response);
-} catch (error) {
-    checkbox.checked = !checkbox.checked;
-    pending50KToggle = false;
-    addLogEntry(
-    `Error sending set_channel_50k: ${error.message}`,
-    "received",
-    );
-    console.error(error);
-}
+        console.log(
+        `Channel 50K is now ${checkbox.checked ? "enabled" : "disabled"}`,
+        );
+        console.log(response);
+    } catch (error) {
+        checkbox.checked = !checkbox.checked;
+        state.controls.pending50KToggle = false;
+        addLogEntry(
+        `Error sending set_channel_50k: ${error.message}`,
+        "received",
+        );
+        console.error(error);
+    }
 }
 
 async function toggleChannelMXC() {
@@ -590,7 +598,7 @@ const value = checkbox.checked ? 1 : 0;
 const command = `set_channel_mxc:${value}`;
 
 try {
-    pendingMXCToggle = true;
+    state.controls.pendingMXCToggle = true;
 
     addLogEntry(`Sending MXC command: ${command}`, "sent");
     const response = await sendCommandToServer(command);
@@ -602,7 +610,7 @@ try {
     console.log(response);
 } catch (error) {
     checkbox.checked = !checkbox.checked;
-    pendingMXCToggle = false;
+    state.controls.pendingMXCToggle = false;
     addLogEntry(
     `Error sending set_channel_mxc: ${error.message}`,
     "received",
@@ -618,7 +626,7 @@ const value = checkbox.checked ? 1 : 0;
 const command = `set_channel_still:${value}`;
 
 try {
-    pendingSTILLToggle = true;
+    state.controls.pendingSTILLToggle = true;
 
     addLogEntry(`Sending STILL command: ${command}`, "sent");
     const response = await sendCommandToServer(command);
@@ -630,7 +638,7 @@ try {
     console.log(response);
 } catch (error) {
     checkbox.checked = !checkbox.checked;
-    pendingSTILLToggle = false;
+    state.controls.pendingSTILLToggle = false;
     addLogEntry(
     `Error sending set_channel_still: ${error.message}`,
     "received",
@@ -646,7 +654,7 @@ const value = checkbox.checked ? 1 : 0;
 const command = `set_channel_4k:${value}`;
 
 try {
-    pending4KToggle = true;
+    state.controls.pending4KToggle = true;
 
     addLogEntry(`Sending 4K command: ${command}`, "sent");
     const response = await sendCommandToServer(command);
@@ -658,7 +666,7 @@ try {
     console.log(response);
 } catch (error) {
     checkbox.checked = !checkbox.checked;
-    pending4KToggle = false;
+    state.controls.pending4KToggle = false;
     addLogEntry(
     `Error sending set_channel_4k: ${error.message}`,
     "received",
@@ -668,17 +676,17 @@ try {
 }
 
 async function toggleAutorangeMXC() {
-console.log("Toggling MXC autorange...");
+    console.log("Toggling MXC autorange...");
 
-//Comprobamos conexión TCP
-if (tcpConnectionStatus === false) {
-    addLogEntry(
-    "Cannot send MXC command: No connection to TCP server",
-    "status",
-    );
-    const cb = document.getElementById("autorangeMXC");
-    cb.checked = !cb.checked;
-    return;
+    //Comprobamos conexión TCP
+    if (state.connection.tcpStatus === false) {
+        addLogEntry(
+        "Cannot send MXC command: No connection to TCP server",
+        "status",
+        );
+        const cb = document.getElementById("autorangeMXC");
+        cb.checked = !cb.checked;
+        return;
 }
 
 const cb = document.getElementById("autorangeMXC");
@@ -702,7 +710,7 @@ try {
 }
 
 async function resetDefaultsMXC() {
-if (tcpConnectionStatus === false) {
+if (state.connection.tcpStatus === false) {
     addLogEntry(
     "Cannot reset MXC to default: No connection to TCP server",
     "status",
@@ -728,7 +736,7 @@ try {
 }
 
 async function resetDefaults50K() {
-if (tcpConnectionStatus === false) {
+if (state.connection.tcpStatus === false) {
     addLogEntry(
     "Cannot reset 50K to default: No connection to TCP server",
     "status",
@@ -754,7 +762,7 @@ try {
 }
 
 async function resetDefaults4K() {
-if (tcpConnectionStatus === false) {
+if (state.connection.tcpStatus === false) {
     addLogEntry(
     "Cannot reset 4K to default: No connection to TCP server",
     "status",
@@ -780,7 +788,7 @@ try {
 }
 
 async function resetDefaultsSTILL() {
-if (tcpConnectionStatus === false) {
+if (state.connection.tcpStatus === false) {
     addLogEntry(
     "Cannot reset STILL to default: No connection to TCP server",
     "status",
@@ -806,24 +814,24 @@ try {
 }
 
 async function toggleAutoscan() {
-console.log("Toggling Autoscan...");
+    console.log("Toggling Autoscan...");
 
-const cb = document.getElementById("autoscanToggle");
-const desiredState = cb.checked;
+    const cb = document.getElementById("autoscanToggle");
+    const desiredState = cb.checked;
 
-if (tcpConnectionStatus === false) {
-    addLogEntry(
-    "Cannot send Autoscan command: No connection to TCP server",
-    "status",
-    );
-    cb.checked = !desiredState;
-    return;
+    if (state.connection.tcpStatus === false) {
+        addLogEntry(
+        "Cannot send Autoscan command: No connection to TCP server",
+        "status",
+        );
+        cb.checked = !desiredState;
+        return;
 }
 
 const valueStr = desiredState ? "on" : "off";
 const command = `set_autoscan:${valueStr}`;
 
-pendingAutoscanToggle = true;
+state.controls.pendingAutoscanToggle = true;
 
 try {
     addLogEntry(`Sending Autoscan command: ${command}`, "sent");
@@ -836,22 +844,22 @@ try {
     "received",
     );
     cb.checked = !desiredState;
-    pendingAutoscanToggle = false;
+    state.controls.pendingAutoscanToggle = false;
     console.error(error);
 }
 }
 
 async function writeSensorSettingsMXC() {
-console.log("Writing sensor settings for MXC...");
+    console.log("Writing sensor settings for MXC...");
 
-//Check if we have a valid TCP connection
-if (tcpConnectionStatus === false) {
-    addLogEntry(
-    "Cannot send MXC command: No connection to TCP server",
-    "status",
-    );
-    return;
-}
+    //Check if we have a valid TCP connection
+    if (state.connection.tcpStatus === false) {
+        addLogEntry(
+        "Cannot send MXC command: No connection to TCP server",
+        "status",
+        );
+        return;
+    }
 
 const values = {
     dwellMXC: parseFloat(document.getElementById("dwellMXC").value),
@@ -992,7 +1000,7 @@ console.log("Writing control settings for MXC...");
 
 // Check if we have a valid TCP connection
 // Log error when no connection to TCP server
-if (tcpConnectionStatus === false) {
+if (state.connection.tcpStatus === false) {
     addLogEntry(
     "Cannot send MXC command: No connection to TCP server",
     "status",
@@ -1003,7 +1011,7 @@ if (tcpConnectionStatus === false) {
 async function writeExcitationMXC() {
     console.log("Writing excitation level for MXC...");
 
-    if (tcpConnectionStatus === false) {
+    if (state.connection.tcpStatus === false) {
     addLogEntry(
         "Cannot send MXC command: No connection to TCP server",
         "status",
@@ -1146,7 +1154,7 @@ setTimeout(() => {
 }
 
 async function writeSettingsSTILL() {
-if (tcpConnectionStatus === false) {
+if (state.connection.tcpStatus === false) {
     addLogEntry(
     "Cannot send STILL command: No connection to TCP server",
     "status",
@@ -1267,7 +1275,7 @@ setTimeout(() => {
 }
 
 async function writeSettings50K() {
-if (tcpConnectionStatus === false) {
+if (state.connection.tcpStatus === false) {
     addLogEntry(
     "Cannot send 50K command: No connection to TCP server",
     "status",
@@ -1388,7 +1396,7 @@ setTimeout(() => {
 }
 
 async function writeSettings4K() {
-    if (tcpConnectionStatus === false) {
+    if (state.connection.tcpStatus === false) {
         addLogEntry(
         "Cannot send 4K command: No connection to TCP server",
         "status",
@@ -1513,7 +1521,7 @@ function getSelectedExtraChannel() {
 }
 
 async function writeSettingsExtraChannel(requestedChannel = null) {
-    if (tcpConnectionStatus === false) {
+    if (state.connection.tcpStatus === false) {
         addLogEntry(
         "Cannot send sample-channel command: No connection to TCP server",
         "status",
@@ -1667,3 +1675,77 @@ async function writeSettingsExtraChannel13() {
 async function writeSettingsExtraChannel14() {
     await writeSettingsExtraChannel(14);
 }
+
+// Make functions available for external calls in index.html
+document
+    .getElementById("toggleMXCGlobal")
+    .addEventListener("change", () => {
+        globalToggleChannel("MXC");
+    });
+document
+    .getElementById("toggle50KGlobal")
+    .addEventListener("change", () => {
+        globalToggleChannel("50K");
+    });
+document
+    .getElementById("toggle4KGlobal")
+    .addEventListener("change", () => {
+        globalToggleChannel("4K");
+    });
+document
+    .getElementById("toggleSTILLGlobal")
+    .addEventListener("change", () => {
+        globalToggleChannel("STILL");
+    });
+document
+    .getElementById("autorangeMXC")
+    .addEventListener("change", () => {
+        toggleAutorangeMXC();
+    });
+document
+    .getElementById("toggleExtraChannel9")
+    .addEventListener("change", () => {
+        globalToggleChannel("9");
+    });
+
+document
+    .getElementById("toggleExtraChannel10")
+    .addEventListener("change", () => {
+        globalToggleChannel("10");
+    });
+
+document
+    .getElementById("toggleExtraChannel11")
+    .addEventListener("change", () => {
+        globalToggleChannel("11");
+    });
+
+document
+    .getElementById("toggleExtraChannel12")
+    .addEventListener("change", () => {
+        globalToggleChannel("12");
+    });
+
+document
+    .getElementById("toggleExtraChannel13")
+    .addEventListener("change", () => {
+        globalToggleChannel("13");
+    });
+
+document
+    .getElementById("toggleExtraChannel14")
+    .addEventListener("change", () => {
+        globalToggleChannel("14");
+    });
+
+document
+    .getElementById("writeSettingsButtonCH9")
+    .addEventListener("click", () => {
+        writeSettingsExtraChannel9();
+    });
+
+document
+    .getElementById("autoscanToggle")
+    .addEventListener("change", () => {
+        toggleAutoscan();
+    });

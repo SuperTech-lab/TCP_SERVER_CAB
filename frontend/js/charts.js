@@ -1,4 +1,15 @@
-function createRelationChart() {
+import { state } from './state.js';
+import { 
+    charts, chartDataStore, relationDataStore, RELATION_LIVE_POINTS
+} from './state.js'
+import { 
+    updateRelationCurrentLabels,
+    updateTimeRangeOptions50K,
+    updateTimeRangeOptions4K,
+    updateTimeRangeOptionsSTILL,
+ } from './ui.js';
+
+export function createRelationChart() {
     const canvas = document.getElementById("relationChart");
     if (!canvas) return null;
 
@@ -46,8 +57,14 @@ function createRelationChart() {
     });
 }
 
-function redrawRelationChart() {
+export function redrawRelationChart() {
+
+    const relationChart = state.relation.chart;
+
     if (!relationChart) return;
+
+    const currentRelationChannel =
+        state.relation.currentChannel;
 
     const pts =
         relationDataStore[currentRelationChannel] || [];
@@ -62,20 +79,23 @@ function redrawRelationChart() {
 
     const windowPts =
         relationMode === "STEP_RAMP"
-        ? recentPts
-        : recentPts
-            .slice()
-            .sort((a, b) => a.x - b.x);
+            ? recentPts
+            : recentPts
+                .slice()
+                .sort((a, b) => a.x - b.x);
 
     relationChart.data.datasets[0].data = windowPts;
-    relationChart.data.datasets[0].label = `R(${currentRelationChannel}) vs T(MXC)`;
+
+    relationChart.data.datasets[0].label =
+        `R(${currentRelationChannel}) vs T(MXC)`;
+
     relationChart.update("none");
 
     updateRelationCurrentLabels();
 }
 
 // General function to create any temperature chart (black body or lakeshore stages)
-function createTemperatureChart(
+export function createTemperatureChart(
     canvasId,
     includesetpoint = false,
     label = "Temperature (K)",
@@ -134,9 +154,9 @@ function createTemperatureChart(
                     max: 60, // Start with 1 minute range
                     ticks: {
                         callback: function (value) {
-                            if (currentTimeRangeMXC > 21600) {
+                            if (state.chart.currentTimeRangeMXC > 21600) {
                                 return `${(value / 3600).toFixed(1)}h`;
-                            } else if (currentTimeRangeMXC > 300) {
+                            } else if (state.chart.currentTimeRangeMXC > 300) {
                                 return `${(value / 60).toFixed(1)}m`;
                             } else {
                                 return `${value.toFixed(0)}s`;
@@ -157,7 +177,7 @@ function createTemperatureChart(
 }
 
 // Function that allows double-clicking on the Y-axis to edit limits
-function enableYAxisLimitEditing(chart, canvasId) {
+export function enableYAxisLimitEditing(chart, canvasId) {
     const canvas = document.getElementById(canvasId);
 
     canvas.addEventListener("dblclick", function (event) {
@@ -193,7 +213,7 @@ function enableYAxisLimitEditing(chart, canvasId) {
 }
 
 // Function to update any temperature chart with new data
-function updateTemperatureChart(
+export function updateTemperatureChart(
     chartId,
     temperature,
     setpoint = null,
@@ -275,15 +295,15 @@ function updateTemperatureChart(
 
     let currentRange;
     if (chartId === "MXC") {
-        currentRange = currentTimeRangeMXC;
+        currentRange = state.chart.currentTimeRangeMXC;
     } else if (chartId === "50K") {
-        currentRange = currentTimeRange50K;
+        currentRange = state.chart.currentTimeRange50K;
     } else if (chartId === "4K") {
-        currentRange = currentTimeRange4K;
+        currentRange = state.chart.currentTimeRange4K;
     } else if (chartId === "STILL") {
-        currentRange = currentTimeRangeSTILL;
+        currentRange = state.chart.currentTimeRangeSTILL;
     } else if (chartId === "BB") {
-        currentRange = currentTimeRangeBB;
+        currentRange = state.chart.currentTimeRangeBB;
     } else {
         currentRange = 60; // fallback por si acaso
     }
@@ -320,7 +340,7 @@ function updateTemperatureChart(
     chart.update("none");
 }
 
-function redrawFromStore(chartId) {
+export function redrawFromStore(chartId) {
     const chart = charts[chartId];
     const store = chartDataStore[chartId];
     if (!chart || !store) return;
@@ -329,15 +349,15 @@ function redrawFromStore(chartId) {
     const relTime = (now - store.startTime) / 1000;
     let currentRange;
     if (chartId === "MXC") {
-        currentRange = currentTimeRangeMXC;
+        currentRange = state.chart.currentTimeRangeMXC;
     } else if (chartId === "50K") {
-        currentRange = currentTimeRange50K;
+        currentRange = state.chart.currentTimeRange50K;
     } else if (chartId === "4K") {
-        currentRange = currentTimeRange4K;
+        currentRange = state.chart.currentTimeRange4K;
     } else if (chartId === "STILL") {
-        currentRange = currentTimeRangeSTILL;
+        currentRange = state.chart.currentTimeRangeSTILL;
     } else if (chartId === "BB") {
-        currentRange = currentTimeRangeBB;
+        currentRange = state.chart.currentTimeRangeBB;
     } else {
         currentRange = 60;
     }

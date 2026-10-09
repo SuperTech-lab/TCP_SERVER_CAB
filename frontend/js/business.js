@@ -1,30 +1,35 @@
-function getResistanceForChannel(channel) {
+import { state } from './state.js';
+import { 
+    addLogEntry, updateRelationLabelVisibility, updateRelationRampControls
+} from './ui.js';
+
+export function getResistanceForChannel(channel) {
     switch (channel) {
         case "STILL":
-        return currentParameters.RSTILL;
+        return state.currentParameters.RSTILL;
         case "4K":
-        return currentParameters.R4K;
+        return state.currentParameters.R4K;
         case "50K":
-        return currentParameters.R50K;
+        return state.currentParameters.R50K;
         case "CH9":
-        return currentParameters.RCH9;
+        return state.currentParameters.RCH9;
         case "CH10":
-        return currentParameters.RCH10;
+        return state.currentParameters.RCH10;
         case "CH11":
-        return currentParameters.RCH11;
+        return state.currentParameters.RCH11;
         case "CH12":
-        return currentParameters.RCH12;
+        return state.currentParameters.RCH12;
         case "CH13":
-        return currentParameters.RCH13;
+        return state.currentParameters.RCH13;
         case "CH14":
-        return currentParameters.RCH14;
+        return state.currentParameters.RCH14;
         default:
         return null;
     }
 }
 
 function pushRelationPointFor(channel) {
-    const t = currentParameters.MXC;
+    const t = state.currentParameters.MXC;
     const r = getResistanceForChannel(channel);
 
     if (!(typeof t === "number" && isFinite(t))) return;
@@ -41,7 +46,7 @@ function pushRelationPointFor(channel) {
     }
 }
 
-function updateRelationStore() {
+export function updateRelationStore() {
     pushRelationPointFor("CH9");
     pushRelationPointFor("CH10");
     pushRelationPointFor("CH11");
@@ -66,7 +71,7 @@ export function sampleRangeCombinationIsValid(
     return currentSourceRange >= 1 && currentSourceRange <= 22;
 }
 
-async function loadRelationStepRampDefaults() {
+export async function loadRelationStepRampDefaults() {
     /*
     * Defaults are loaded only once per page.
     *
@@ -74,10 +79,10 @@ async function loadRelationStepRampDefaults() {
     * is owned by the backend.
     */
     if (
-        relationStepRampDefaultsLoaded
-        || relationRunning
+        state.relation.stepRamp.defaultsLoaded
+        || state.relation.running
     ) {
-        return relationStepRampDefaultsLoaded;
+        return state.relation.stepRamp.defaultsLoaded;
     }
 
     try {
@@ -214,7 +219,7 @@ async function loadRelationStepRampDefaults() {
         }
         }
 
-        relationStepRampDefaultsLoaded = true;
+        state.relation.stepRamp.defaultsLoaded = true;
 
         console.info(
         "STEP_RAMP defaults loaded.",
@@ -273,10 +278,10 @@ export async function initRelationStateFromServer() {
         "relationStepSizeInput",
     );
 
-    const wasRunning = relationRunning;
+    const wasRunning = state.relation.running;
 
     function setRelationUiIdle() {
-        relationRunning = false;
+        state.relation.running = false;
 
         startButton.disabled = false;
         stopButton.disabled = true;
@@ -539,7 +544,7 @@ export async function initRelationStateFromServer() {
         // Lock UI while backend owns the relation
         // ================================================================
 
-        relationRunning = true;
+        state.relation.running = true;
 
         startButton.disabled = true;
 
@@ -972,7 +977,7 @@ function clearPendingExtraChannelsForSampleChannels() {
     });
 }
 
-function normalizeEnabled(v) {
+export function normalizeEnabled(v) {
     if (v === undefined || v === null) return false;
 
     if (typeof v === "boolean") return v;

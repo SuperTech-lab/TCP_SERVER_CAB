@@ -1,3 +1,16 @@
+import { state } from './state.js';
+import { 
+    chartDataStore, parameterBoxUpdateInterval, SAMPLE_CHANNELS
+} from './state.js';
+import { addLogEntry, updateRunUI,
+    updateTimeRangeOptions50K, updateTimeRangeOptions4K, updateTimeRangeOptionsSTILL, 
+    updateTimeRangeOptions, updateScanningChannel, syncSampleChannelControls,
+    update50KValues, update4KValues, updateSTILLValues, updateMXCValues,
+    updateMXCHeaterOutput, updateStageVisibility, updateParameterControls
+ } from './ui.js';
+import { normalizeEnabled, updateRelationStore } from './business.js';
+import { redrawFromStore, redrawRelationChart, updateTemperatureChart } from './charts.js';
+
 export async function fetchRelationStepRampLivePoints(
     forceFullReload = false,
     ) {
@@ -6,7 +19,7 @@ export async function fetchRelationStepRampLivePoints(
     );
 
     if (
-        !relationRunning
+        !state.relation.running
         || !modeSelect
         || modeSelect.value !== "STEP_RAMP"
     ) {
@@ -523,7 +536,7 @@ async function reconcileRelationStepRampFromFile() {
     return false;
 }
 
-async function refreshRecentRuns() {
+export async function refreshRecentRuns() {
     if (!recentRunsSelect) return;
 
     recentRunsSelect.innerHTML = `<option value="">(cargando...)</option>`;
@@ -568,8 +581,8 @@ async function refreshRecentRuns() {
 }
 
 export async function initRunIdFromServer() {
-    if (hasInitializedRunId) return;
-    hasInitializedRunId = true;
+    if (state.run.hasInitialized) return;
+    state.run.hasInitialized = true;
 
     const runIdInput = document.getElementById("runIdInput");
     if (!runIdInput) return;
@@ -585,10 +598,10 @@ export async function initRunIdFromServer() {
         m = /ACTIVE_RUN:(\d+)/.exec(response);
         if (m) {
         const activeRun = parseInt(m[1], 10);
-        currentActiveRunId = activeRun;
+        state.run.activeId = activeRun;
 
         runIdInput.value = activeRun;
-        expectedNextRunId = activeRun;
+        state.run.expectedNextId = activeRun;
         addLogEntry(`Active run detected: ${activeRun}`, "status");
         updateRunUI();
         return;
@@ -600,9 +613,9 @@ export async function initRunIdFromServer() {
         const lastRun = parseInt(m[1], 10);
         const nextRun = lastRun + 1;
 
-        currentActiveRunId = null;
+        state.run.activeId = null;
         runIdInput.value = nextRun;
-        expectedNextRunId = nextRun;
+        state.run.expectedNextId = nextRun;
 
         addLogEntry(`Next run id set to ${nextRun}`, "status");
         updateRunUI();
@@ -614,14 +627,14 @@ export async function initRunIdFromServer() {
         "status",
         );
         runIdInput.value = 1;
-        expectedNextRunId = 1;
+        state.run.expectedNextId = 1;
     } catch (error) {
         addLogEntry(
         `Error requesting run id: ${error.message}. Using 1.`,
         "received",
         );
         runIdInput.value = 1;
-        expectedNextRunId = 1;
+        state.run.expectedNextId = 1;
     }
 }
 
@@ -684,31 +697,31 @@ async function checkConnectionStatus() {
 }
 
 // Function to update connection status (only logs if status changed)
-async function updateConnectionStatus() {
+export async function updateConnectionStatus() {
     const newStatus = await checkConnectionStatus();
 
-    if (tcpConnectionStatus === null) {
+    if (state.connection.tcpStatus === null) {
         // Initial status check
-        tcpConnectionStatus = newStatus;
-        if (tcpConnectionStatus) {
+        state.connection.tcpStatus = newStatus;
+        if (state.connection.tcpStatus) {
         addLogEntry("HTTP server is connected to TCP server", "status");
         } else {
         addLogEntry("HTTP server is NOT connected to TCP server", "status");
         }
-    } else if (newStatus !== tcpConnectionStatus) {
+    } else if (newStatus !== state.connection.tcpStatus) {
         // Status changed
-        tcpConnectionStatus = newStatus;
-        if (tcpConnectionStatus) {
+        state.connection.tcpStatus = newStatus;
+        if (state.connection.tcpStatus) {
         addLogEntry("Reconnected to TCP server", "status");
         } else {
         addLogEntry("Lost connection to TCP server", "status");
         }
     }
 
-    return tcpConnectionStatus;
+    return state.connection.tcpStatus;
 }
 
-async function loadTemperatureBuffer() {
+export async function loadTemperatureBuffer() {
     try {
         const response = await fetch("/get-buffer", {
         cache: "no-store",
@@ -838,7 +851,7 @@ async function loadTemperatureBuffer() {
 }
 
 // Helper function to send a command to the server
-async function sendCommandToServer(command) {
+export async function sendCommandToServer(command) {
     const response = await fetch("/send-command", {
         method: "POST",
         headers: {
@@ -850,8 +863,8 @@ async function sendCommandToServer(command) {
     const result = await response.json();
 
     // Check if we thought we were disconnected but got a response
-    if (tcpConnectionStatus === false) {
-        tcpConnectionStatus = true;
+    if (state.connection.tcpStatus === false) {
+        state.connection.tcpStatus = true;
         addLogEntry("Reconnected to TCP server", "status");
     }
 
@@ -859,8 +872,8 @@ async function sendCommandToServer(command) {
 }
 
 // Function to send only changed parameters to the server
-async function sendControlParameters() {
-    if (tcpConnectionStatus === false) {
+export async function sendControlParameters() {
+    if (state.connection.tcpStatus === false) {
         addLogEntry(
         "Cannot send command: No connection to TCP server",
         "status",
@@ -897,7 +910,7 @@ async function sendControlParameters() {
     if (
         !isNaN(currentValues.temperatureSetpoint) &&
         currentValues.temperatureSetpoint !==
-        lastSentValues.temperatureSetpoint
+        state.lastSentValues.temperatureSetpoint
     ) {
         commandsToSend.push({
         type: "temperatureSetpoint",
@@ -908,7 +921,7 @@ async function sendControlParameters() {
     // Check heater power
     if (
         !isNaN(currentValues.heaterPower) &&
-        currentValues.heaterPower !== lastSentValues.heaterPower
+        currentValues.heaterPower !== state.lastSentValues.heaterPower
     ) {
         if (currentValues.heaterPower < 0 || currentValues.heaterPower > 1) {
         addLogEntry(
@@ -924,7 +937,7 @@ async function sendControlParameters() {
     }
 
     // Check heater range
-    if (currentValues.heaterRange !== lastSentValues.heaterRange) {
+    if (currentValues.heaterRange !== state.lastSentValues.heaterRange) {
         commandsToSend.push({
         type: "heaterRange",
         command: `set_heater_range:${currentValues.heaterRange}`,
@@ -934,7 +947,7 @@ async function sendControlParameters() {
     // Check temperature limit
     if (
         !isNaN(currentValues.temperatureLimit) &&
-        currentValues.temperatureLimit !== lastSentValues.temperatureLimit
+        currentValues.temperatureLimit !== state.lastSentValues.temperatureLimit
     ) {
         if (currentValues.temperatureLimit < 0) {
         addLogEntry(
@@ -952,7 +965,7 @@ async function sendControlParameters() {
     // Check timeout
     if (
         !isNaN(currentValues.timeout) &&
-        currentValues.timeout !== lastSentValues.timeout
+        currentValues.timeout !== state.lastSentValues.timeout
     ) {
         if (currentValues.timeout < 0) {
         addLogEntry("Error: Timeout must be non-negative", "received");
@@ -967,7 +980,7 @@ async function sendControlParameters() {
     // Check proportional gain
     if (
         !isNaN(currentValues.proportionalGain) &&
-        currentValues.proportionalGain !== lastSentValues.proportionalGain
+        currentValues.proportionalGain !== state.lastSentValues.proportionalGain
     ) {
         if (currentValues.proportionalGain < 0) {
         addLogEntry(
@@ -985,7 +998,7 @@ async function sendControlParameters() {
     // Check integral gain
     if (
         !isNaN(currentValues.integralGain) &&
-        currentValues.integralGain !== lastSentValues.integralGain
+        currentValues.integralGain !== state.lastSentValues.integralGain
     ) {
         if (currentValues.integralGain < 0) {
         addLogEntry(
@@ -1003,7 +1016,7 @@ async function sendControlParameters() {
     // Check derivative gain
     if (
         !isNaN(currentValues.derivativeGain) &&
-        currentValues.derivativeGain !== lastSentValues.derivativeGain
+        currentValues.derivativeGain !== state.lastSentValues.derivativeGain
     ) {
         if (currentValues.derivativeGain < 0) {
         addLogEntry(
@@ -1032,7 +1045,7 @@ async function sendControlParameters() {
         addLogEntry(`Server response: ${response}`, "received");
 
         // Update last sent value if successful
-        lastSentValues[cmd.type] = currentValues[cmd.type];
+        state.lastSentValues[cmd.type] = currentValues[cmd.type];
         } catch (error) {
         addLogEntry(
             `Error sending ${cmd.type}: ${error.message}`,
@@ -1049,7 +1062,7 @@ export async function fetchSensorData(forceUpdateControls = false) {
         // Fetch data from the server using the /get-data channel
         const response = await fetch("/get-data");
         if (!response.ok) {
-        if (tcpConnectionStatus !== false) {
+        if (state.connection.tcpStatus !== false) {
             await updateConnectionStatus();
         }
         return;
@@ -1063,186 +1076,186 @@ export async function fetchSensorData(forceUpdateControls = false) {
 
         // Update parameters if they changed
         if (data["50K"] !== undefined) {
-        currentParameters["50K"] = parseFloat(data["50K"]);
+        state.currentParameters["50K"] = parseFloat(data["50K"]);
         }
         if (data["4K"] !== undefined) {
-        currentParameters["4K"] = parseFloat(data["4K"]);
+        state.currentParameters["4K"] = parseFloat(data["4K"]);
         }
         if (data.STILL !== undefined) {
-        currentParameters.STILL = parseFloat(data.STILL);
+        state.currentParameters.STILL = parseFloat(data.STILL);
         }
         if (data.MXC !== undefined) {
-        currentParameters.MXC = parseFloat(data.MXC);
+        state.currentParameters.MXC = parseFloat(data.MXC);
         }
         if (data.RMXC !== undefined) {
-        currentParameters.RMXC = parseFloat(data.RMXC);
+        state.currentParameters.RMXC = parseFloat(data.RMXC);
         }
         if (data.PMXC !== undefined) {
-        currentParameters.PMXC = parseFloat(data.PMXC);
+        state.currentParameters.PMXC = parseFloat(data.PMXC);
         }
         if (data.enabledMXC !== undefined) {
-        currentParameters.enabledMXC = parseInt(data.enabledMXC);
+        state.currentParameters.enabledMXC = parseInt(data.enabledMXC);
         }
         if (data.enabled50K !== undefined) {
-        currentParameters.enabled50K = parseInt(data.enabled50K);
+        state.currentParameters.enabled50K = parseInt(data.enabled50K);
         }
         if (data.enabled4K !== undefined) {
-        currentParameters.enabled4K = parseInt(data.enabled4K);
+        state.currentParameters.enabled4K = parseInt(data.enabled4K);
         }
         if (data.enabledSTILL !== undefined) {
-        currentParameters.enabledSTILL = parseInt(data.enabledSTILL);
+        state.currentParameters.enabledSTILL = parseInt(data.enabledSTILL);
         }
         if (data.setpoint !== undefined) {
-        currentParameters.temperatureSetpoint = parseFloat(data.setpoint);
+        state.currentParameters.temperatureSetpoint = parseFloat(data.setpoint);
         }
         if (data.heater_power !== undefined) {
-        currentParameters.heaterPower = parseFloat(data.heater_power);
+        state.currentParameters.heaterPower = parseFloat(data.heater_power);
         }
         if (data.heater_range !== undefined) {
-        currentParameters.heaterRange = data.heater_range;
+        state.currentParameters.heaterRange = data.heater_range;
         }
         if (data.temperature_limit !== undefined) {
-        currentParameters.temperatureLimit = parseFloat(
+        state.currentParameters.temperatureLimit = parseFloat(
             data.temperature_limit,
         );
         }
         if (data.timeout !== undefined) {
-        currentParameters.timeout = parseFloat(data.timeout);
+        state.currentParameters.timeout = parseFloat(data.timeout);
         }
         if (data.proportional_gain !== undefined) {
-        currentParameters.proportionalGain = parseFloat(
+        state.currentParameters.proportionalGain = parseFloat(
             data.proportional_gain,
         );
         }
         if (data.integral_gain !== undefined) {
-        currentParameters.integralGain = parseFloat(data.integral_gain);
+        state.currentParameters.integralGain = parseFloat(data.integral_gain);
         }
         if (data.derivative_gain !== undefined) {
-        currentParameters.derivativeGain = parseFloat(data.derivative_gain);
+        state.currentParameters.derivativeGain = parseFloat(data.derivative_gain);
         }
         if (data.MXCSP !== undefined) {
-        currentParameters.MXCSP = parseFloat(data.MXCSP);
+        state.currentParameters.MXCSP = parseFloat(data.MXCSP);
         }
         if (data.MXCP !== undefined) {
-        currentParameters.MXCP = parseFloat(data.MXCP);
+        state.currentParameters.MXCP = parseFloat(data.MXCP);
         }
         if (data.MXCI !== undefined) {
-        currentParameters.MXCI = parseFloat(data.MXCI);
+        state.currentParameters.MXCI = parseFloat(data.MXCI);
         }
         if (data.MXCD !== undefined) {
-        currentParameters.MXCD = parseFloat(data.MXCD);
+        state.currentParameters.MXCD = parseFloat(data.MXCD);
         }
         if (data.MXCHR !== undefined) {
-        currentParameters.MXCHR = parseFloat(data.MXCHR);
+        state.currentParameters.MXCHR = parseFloat(data.MXCHR);
         }
         if (data.dwellMXC !== undefined) {
-        currentParameters.dwellMXC = parseFloat(data.dwellMXC);
+        state.currentParameters.dwellMXC = parseFloat(data.dwellMXC);
         }
         if (data.pauseMXC !== undefined) {
-        currentParameters.pauseMXC = parseFloat(data.pauseMXC);
+        state.currentParameters.pauseMXC = parseFloat(data.pauseMXC);
         }
         if (data.modeMXC !== undefined) {
-        currentParameters.modeMXC = parseInt(data.modeMXC);
+        state.currentParameters.modeMXC = parseInt(data.modeMXC);
         }
         if (data.rangeMXC !== undefined) {
-        currentParameters.rangeMXC = parseInt(data.rangeMXC);
+        state.currentParameters.rangeMXC = parseInt(data.rangeMXC);
         }
         if (data.autorangeMXC !== undefined) {
-        currentParameters.autorangeMXC = parseInt(data.autorangeMXC);
+        state.currentParameters.autorangeMXC = parseInt(data.autorangeMXC);
         }
         if (data.dwell50K !== undefined) {
-        currentParameters.dwell50K = parseFloat(data.dwell50K);
+        state.currentParameters.dwell50K = parseFloat(data.dwell50K);
         }
         if (data.pause50K !== undefined) {
-        currentParameters.pause50K = parseFloat(data.pause50K);
+        state.currentParameters.pause50K = parseFloat(data.pause50K);
         }
 
         if (data.dwell4K !== undefined) {
-        currentParameters.dwell4K = parseFloat(data.dwell4K);
+        state.currentParameters.dwell4K = parseFloat(data.dwell4K);
         }
         if (data.pause4K !== undefined) {
-        currentParameters.pause4K = parseFloat(data.pause4K);
+        state.currentParameters.pause4K = parseFloat(data.pause4K);
         }
 
         if (data.dwellSTILL !== undefined) {
-        currentParameters.dwellSTILL = parseFloat(data.dwellSTILL);
+        state.currentParameters.dwellSTILL = parseFloat(data.dwellSTILL);
         }
         if (data.pauseSTILL !== undefined) {
-        currentParameters.pauseSTILL = parseFloat(data.pauseSTILL);
+        state.currentParameters.pauseSTILL = parseFloat(data.pauseSTILL);
         }
         if (data.mode50K !== undefined) {
-        currentParameters.mode50K = parseInt(data.mode50K);
+        state.currentParameters.mode50K = parseInt(data.mode50K);
         }
         if (data.range50K !== undefined) {
-        currentParameters.range50K = parseInt(data.range50K);
+        state.currentParameters.range50K = parseInt(data.range50K);
         }
 
         if (data.mode4K !== undefined) {
-        currentParameters.mode4K = parseInt(data.mode4K);
+        state.currentParameters.mode4K = parseInt(data.mode4K);
         }
         if (data.range4K !== undefined) {
-        currentParameters.range4K = parseInt(data.range4K);
+        state.currentParameters.range4K = parseInt(data.range4K);
         }
 
         if (data.modeSTILL !== undefined) {
-        currentParameters.modeSTILL = parseInt(data.modeSTILL);
+        state.currentParameters.modeSTILL = parseInt(data.modeSTILL);
         }
         if (data.rangeSTILL !== undefined) {
-        currentParameters.rangeSTILL = parseInt(data.rangeSTILL);
+        state.currentParameters.rangeSTILL = parseInt(data.rangeSTILL);
         }
         if (data.autoscan !== undefined) {
-        currentParameters.autoscan = data.autoscan;
+        state.currentParameters.autoscan = data.autoscan;
         }
         if (data.curveMXC !== undefined) {
-        currentParameters.curveMXC = parseInt(data.curveMXC);
+        state.currentParameters.curveMXC = parseInt(data.curveMXC);
         }
         if (data.curve50K !== undefined) {
-        currentParameters.curve50K = parseInt(data.curve50K);
+        state.currentParameters.curve50K = parseInt(data.curve50K);
         }
         if (data.curve4K !== undefined) {
-        currentParameters.curve4K = parseInt(data.curve4K);
+        state.currentParameters.curve4K = parseInt(data.curve4K);
         }
         if (data.curveSTILL !== undefined) {
-        currentParameters.curveSTILL = parseInt(data.curveSTILL);
+        state.currentParameters.curveSTILL = parseInt(data.curveSTILL);
         }
         if (data.R50K !== undefined) {
-        currentParameters.R50K = parseFloat(data.R50K);
+        state.currentParameters.R50K = parseFloat(data.R50K);
         }
         if (data.P50K !== undefined) {
-        currentParameters.P50K = parseFloat(data.P50K);
+        state.currentParameters.P50K = parseFloat(data.P50K);
         }
         if (data.R4K !== undefined) {
-        currentParameters.R4K = parseFloat(data.R4K);
+        state.currentParameters.R4K = parseFloat(data.R4K);
         }
         if (data.P4K !== undefined) {
-        currentParameters.P4K = parseFloat(data.P4K);
+        state.currentParameters.P4K = parseFloat(data.P4K);
         }
         if (data.RSTILL !== undefined) {
-        currentParameters.RSTILL = parseFloat(data.RSTILL);
+        state.currentParameters.RSTILL = parseFloat(data.RSTILL);
         }
         if (data.PSTILL !== undefined) {
-        currentParameters.PSTILL = parseFloat(data.PSTILL);
+        state.currentParameters.PSTILL = parseFloat(data.PSTILL);
         }
         if (data.heaterOutputMXC !== undefined) {
-        currentParameters.heaterOutputMXC = parseFloat(
+        state.currentParameters.heaterOutputMXC = parseFloat(
             data.heaterOutputMXC,
         );
         }
         if (data.RCH9 !== undefined)
-        currentParameters.RCH9 = parseFloat(data.RCH9);
+        state.currentParameters.RCH9 = parseFloat(data.RCH9);
         if (data.RCH10 !== undefined)
-        currentParameters.RCH10 = parseFloat(data.RCH10);
+        state.currentParameters.RCH10 = parseFloat(data.RCH10);
         if (data.RCH11 !== undefined)
-        currentParameters.RCH11 = parseFloat(data.RCH11);
+        state.currentParameters.RCH11 = parseFloat(data.RCH11);
         if (data.RCH12 !== undefined)
-        currentParameters.RCH12 = parseFloat(data.RCH12);
+        state.currentParameters.RCH12 = parseFloat(data.RCH12);
         if (data.RCH13 !== undefined)
-        currentParameters.RCH13 = parseFloat(data.RCH13);
+        state.currentParameters.RCH13 = parseFloat(data.RCH13);
         if (data.RCH14 !== undefined)
-        currentParameters.RCH14 = parseFloat(data.RCH14);
+        state.currentParameters.RCH14 = parseFloat(data.RCH14);
         SAMPLE_CHANNELS.forEach((channel) => {
         if (data[`enabledCH${channel}`] !== undefined) {
-            currentParameters[`enabledCH${channel}`] = normalizeEnabled(
+            state.currentParameters[`enabledCH${channel}`] = normalizeEnabled(
             data[`enabledCH${channel}`],
             )
             ? 1
@@ -1250,7 +1263,7 @@ export async function fetchSensorData(forceUpdateControls = false) {
         }
         });
         if (data.scanning_channel !== undefined) {
-        currentParameters.scanning_channel = parseInt(
+        state.currentParameters.scanning_channel = parseInt(
             data.scanning_channel,
         );
         updateScanningChannel(data.scanning_channel);
@@ -1258,7 +1271,7 @@ export async function fetchSensorData(forceUpdateControls = false) {
 
         SAMPLE_CHANNELS.forEach((channel) => {
         if (data[`modeCH${channel}`] !== undefined) {
-            currentParameters[`modeCH${channel}`] =
+            state.currentParameters[`modeCH${channel}`] =
             data[`modeCH${channel}`] === null
                 ? null
                 : parseInt(data[`modeCH${channel}`]);
@@ -1270,14 +1283,14 @@ export async function fetchSensorData(forceUpdateControls = false) {
             data[excitationRangeKey] ?? data[legacyRangeKey];
 
         if (excitationRangeValue !== undefined) {
-            currentParameters[excitationRangeKey] =
+            state.currentParameters[excitationRangeKey] =
             excitationRangeValue === null
                 ? null
                 : parseInt(excitationRangeValue);
 
             // Keep the old key populated for older code paths.
-            currentParameters[legacyRangeKey] =
-            currentParameters[excitationRangeKey];
+            state.currentParameters[legacyRangeKey] =
+            state.currentParameters[excitationRangeKey];
         }
 
         ["resistanceRange", "autorange", "excitationOn"].forEach(
@@ -1285,7 +1298,7 @@ export async function fetchSensorData(forceUpdateControls = false) {
             const key = `${prefix}CH${channel}`;
 
             if (data[key] !== undefined) {
-                currentParameters[key] =
+                state.currentParameters[key] =
                 data[key] === null ? null : parseInt(data[key]);
             }
             },
@@ -1299,112 +1312,112 @@ export async function fetchSensorData(forceUpdateControls = false) {
         const now = Date.now();
         if (
         forceUpdateControls ||
-        now - lastParameterBoxUpdateTime > parameterBoxUpdateInterval
+        now - state.controls.lastParameterBoxUpdateTime > parameterBoxUpdateInterval
         ) {
         console.log("🔄 Updating parameter controls with new values");
-        lastParameterBoxUpdateTime = now;
+        state.controls.lastParameterBoxUpdateTime = now;
         updateParameterControls();
         }
 
         // Update last sent values to prevent unnecessary updates
-        lastSentValues = {
-        temperatureSetpoint: currentParameters.temperatureSetpoint,
-        heaterPower: currentParameters.heaterPower,
-        heaterRange: currentParameters.heaterRange,
-        temperatureLimit: currentParameters.temperatureLimit,
-        timeout: currentParameters.timeout,
-        proportionalGain: currentParameters.proportionalGain,
-        integralGain: currentParameters.integralGain,
-        derivativeGain: currentParameters.derivativeGain,
-        temperatureSetpointMXC: currentParameters.MXCSP,
-        dwellMXC: currentParameters.dwellMXC,
-        pauseMXC: currentParameters.pauseMXC,
-        modeMXC: currentParameters.modeMXC,
-        rangeMXC: currentParameters.rangeMXC,
-        autorangeMXC: currentParameters.autorangeMXC,
+        state.lastSentValues = {
+        temperatureSetpoint: state.currentParameters.temperatureSetpoint,
+        heaterPower: state.currentParameters.heaterPower,
+        heaterRange: state.currentParameters.heaterRange,
+        temperatureLimit: state.currentParameters.temperatureLimit,
+        timeout: state.currentParameters.timeout,
+        proportionalGain: state.currentParameters.proportionalGain,
+        integralGain: state.currentParameters.integralGain,
+        derivativeGain: state.currentParameters.derivativeGain,
+        temperatureSetpointMXC: state.currentParameters.MXCSP,
+        dwellMXC: state.currentParameters.dwellMXC,
+        pauseMXC: state.currentParameters.pauseMXC,
+        modeMXC: state.currentParameters.modeMXC,
+        rangeMXC: state.currentParameters.rangeMXC,
+        autorangeMXC: state.currentParameters.autorangeMXC,
         };
 
         // Update the 50k chart with the new temperature
-        if (currentParameters["50K"] !== null) {
+        if (state.currentParameters["50K"] !== null) {
         updateTemperatureChart(
             "50K",
-            currentParameters["50K"],
+            state.currentParameters["50K"],
             null,
             sampleTimestamp,
         );
         update50KValues(
-            currentParameters["50K"],
-            currentParameters.R50K,
-            currentParameters.P50K,
+            state.currentParameters["50K"],
+            state.currentParameters.R50K,
+            state.currentParameters.P50K,
         );
         }
 
         //Update the 4k chart with the new temperature
-        if (currentParameters["4K"] !== null) {
+        if (state.currentParameters["4K"] !== null) {
         updateTemperatureChart(
             "4K",
-            currentParameters["4K"],
+            state.currentParameters["4K"],
             null,
             sampleTimestamp,
         );
         update4KValues(
-            currentParameters["4K"],
-            currentParameters.R4K,
-            currentParameters.P4K,
+            state.currentParameters["4K"],
+            state.currentParameters.R4K,
+            state.currentParameters.P4K,
         );
         }
         // Update the STILL chart with the new temperature
-        if (currentParameters.STILL !== null) {
+        if (state.currentParameters.STILL !== null) {
         console.log(
             "📈 Updating STILL chart with:",
-            currentParameters.STILL,
+            state.currentParameters.STILL,
         );
 
         updateTemperatureChart(
             "STILL",
-            currentParameters.STILL,
+            state.currentParameters.STILL,
             null,
             sampleTimestamp,
         );
         updateSTILLValues(
-            currentParameters.STILL,
-            currentParameters.RSTILL,
-            currentParameters.PSTILL,
+            state.currentParameters.STILL,
+            state.currentParameters.RSTILL,
+            state.currentParameters.PSTILL,
         );
         }
 
         // Update the MXC chart with the new temperature
-        if (currentParameters.MXC !== null) {
+        if (state.currentParameters.MXC !== null) {
         console.log(
             "📈 Updating MXC chart with:",
-            currentParameters.MXC,
-            currentParameters.temperatureSetpoint,
+            state.currentParameters.MXC,
+            state.currentParameters.temperatureSetpoint,
         );
 
         updateTemperatureChart(
             "MXC",
-            currentParameters.MXC,
-            currentParameters.temperatureSetpoint,
+            state.currentParameters.MXC,
+            state.currentParameters.temperatureSetpoint,
             sampleTimestamp,
         );
 
         updateMXCValues(
-            currentParameters.MXC, // Temperature in mK
-            currentParameters.RMXC, // Resistance in Ohms
-            currentParameters.PMXC,
+            state.currentParameters.MXC, // Temperature in mK
+            state.currentParameters.RMXC, // Resistance in Ohms
+            state.currentParameters.PMXC,
         ); // Power in Watts
 
-        updateMXCHeaterOutput(currentParameters.heaterOutputMXC);
+        updateMXCHeaterOutput(state.currentParameters.heaterOutputMXC);
         }
 
         // MXC
         const gMXC = document.getElementById("toggleMXCGlobal");
-        const enabledMXC = !!currentParameters.enabledMXC;
+        const enabledMXC = !!state.currentParameters.enabledMXC;
 
         if (gMXC) {
-        if (pendingMXCToggle) {
+        if (state.controls.pendingMXCToggle) {
             if (gMXC.checked === enabledMXC) {
-            pendingMXCToggle = false;
+            state.controls.pendingMXCToggle = false;
             console.log(
                 `✅ MXC backend synced with UI (${enabledMXC ? "ON" : "OFF"})`,
             );
@@ -1423,12 +1436,12 @@ export async function fetchSensorData(forceUpdateControls = false) {
 
         // 50K
         const g50K = document.getElementById("toggle50KGlobal");
-        const enabled50K = !!currentParameters.enabled50K;
+        const enabled50K = !!state.currentParameters.enabled50K;
 
         if (g50K) {
-        if (pending50KToggle) {
+        if (state.controls.pending50KToggle) {
             if (g50K.checked === enabled50K) {
-            pending50KToggle = false;
+            state.controls.pending50KToggle = false;
             console.log(
                 `✅ 50K backend synced with UI (${enabled50K ? "ON" : "OFF"})`,
             );
@@ -1447,12 +1460,12 @@ export async function fetchSensorData(forceUpdateControls = false) {
 
         // STILL
         const gSTILL = document.getElementById("toggleSTILLGlobal");
-        const enabledSTILL = !!currentParameters.enabledSTILL;
+        const enabledSTILL = !!state.currentParameters.enabledSTILL;
 
         if (gSTILL) {
-        if (pendingSTILLToggle) {
+        if (state.controls.pendingSTILLToggle) {
             if (gSTILL.checked === enabledSTILL) {
-            pendingSTILLToggle = false;
+            state.controls.pendingSTILLToggle = false;
             console.log(
                 `✅ STILL backend synced with UI (${
                 enabledSTILL ? "ON" : "OFF"
@@ -1473,10 +1486,10 @@ export async function fetchSensorData(forceUpdateControls = false) {
 
         // 4K
         const g4K = document.getElementById("toggle4kGlobal");
-        const enabled4K = !!currentParameters.enabled4K;
+        const enabled4K = !!state.currentParameters.enabled4K;
 
         if (g4K) {
-        if (pending4KToggle) {
+        if (state.controls.pending4KToggle) {
             if (g4K.checked === enabled4K) {
             pending4KToggle = false;
             console.log(
@@ -1501,13 +1514,13 @@ export async function fetchSensorData(forceUpdateControls = false) {
             `toggleExtraChannel${chNum}`,
         );
         const backendEnabled = normalizeEnabled(
-            currentParameters[`enabledCH${chNum}`],
+            state.currentParameters[`enabledCH${chNum}`],
         );
 
         if (checkbox) {
-            if (pendingExtraChannels[chNum]) {
+            if (state.pendingExtraChannels[chNum]) {
             if (checkbox.checked === backendEnabled) {
-                pendingExtraChannels[chNum] = false;
+                state.pendingExtraChannels[chNum] = false;
                 console.log(`✅ Extra Channel ${chNum} synced.`);
             } else {
                 console.log(`⏳ Waiting for Channel ${chNum} backend...`);
@@ -1528,7 +1541,7 @@ export async function fetchSensorData(forceUpdateControls = false) {
             if (!backendEnabled) {
             rBox.textContent = "--";
             } else {
-            const rVal = currentParameters[`RCH${chNum}`];
+            const rVal = state.currentParameters[`RCH${chNum}`];
             if (rVal === undefined || rVal === null || Number.isNaN(rVal)) {
                 rBox.textContent = "--";
             } else {
@@ -1539,12 +1552,12 @@ export async function fetchSensorData(forceUpdateControls = false) {
         });
 
         const autoscanToggle = document.getElementById("autoscanToggle");
-        if (autoscanToggle && currentParameters.autoscan !== undefined) {
-        const backendAutoscanOn = currentParameters.autoscan === "on";
+        if (autoscanToggle && state.currentParameters.autoscan !== undefined) {
+        const backendAutoscanOn = state.currentParameters.autoscan === "on";
 
-        if (pendingAutoscanToggle) {
+        if (state.controls.pendingAutoscanToggle) {
             if (autoscanToggle.checked === backendAutoscanOn) {
-            pendingAutoscanToggle = false;
+            state.controls.pendingAutoscanToggle = false;
             console.log(
                 `✅ Autoscan backend synced with UI (${
                 backendAutoscanOn ? "ON" : "OFF"
@@ -1574,12 +1587,12 @@ export async function fetchSensorData(forceUpdateControls = false) {
         redrawRelationChart();
         }
 
-        if (tcpConnectionStatus === false) {
+        if (state.connection.tcpStatus === false) {
         await updateConnectionStatus();
         }
     } catch (error) {
         console.error("Error fetching data:", error);
-        if (tcpConnectionStatus !== false) {
+        if (state.connection.tcpStatus !== false) {
         await updateConnectionStatus();
         }
     }

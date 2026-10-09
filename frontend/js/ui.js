@@ -1,4 +1,13 @@
-import { sampleRangeCombinationIsValid } from './business.js';
+import { state } from './state.js'
+import { SAMPLE_VOLTAGE_EXCITATION_RANGES } from './state.js'
+import {
+    chartDataStore, timeRangeOptions, 
+    SAMPLE_CHANNELS, SAMPLE_RESISTANCE_RANGES, SAMPLE_CURRENT_EXCITATION_RANGES 
+} from './state.js';
+import { 
+    sampleRangeCombinationIsValid, getResistanceForChannel 
+} from './business.js';
+import { redrawRelationChart, redrawFromStore } from './charts.js';
 
 // Switch between tabs script
 // This script handles the tab switching functionality
@@ -28,11 +37,11 @@ function toggleStageElements(stageClass, visible) {
     }
 }
 
-function updateStageVisibility() {
-    const enabledMXC = !!currentParameters.enabledMXC;
-    const enabled50K = !!currentParameters.enabled50K;
-    const enabled4K = !!currentParameters.enabled4K;
-    const enabledSTILL = !!currentParameters.enabledSTILL;
+export function updateStageVisibility() {
+    const enabledMXC = !!state.currentParameters.enabledMXC;
+    const enabled50K = !!state.currentParameters.enabled50K;
+    const enabled4K = !!state.currentParameters.enabled4K;
+    const enabledSTILL = !!state.currentParameters.enabledSTILL;
 
     toggleStageElements("stage-mxc", enabledMXC);
     toggleStageElements("stage-50k", enabled50K);
@@ -40,13 +49,13 @@ function updateStageVisibility() {
     toggleStageElements("stage-still", enabledSTILL);
 }
 
-function updateRelationCurrentLabels() {
+export function updateRelationCurrentLabels() {
     const mxcSpan = document.getElementById("relationCurrentMXC");
     const rSpan = document.getElementById("relationCurrentR");
     if (!mxcSpan || !rSpan) return;
 
-    const t = currentParameters.MXC;
-    const r = getResistanceForChannel(currentRelationChannel);
+    const t = state.currentParameters.MXC;
+    const r = getResistanceForChannel(state.relation.currentChannel);
 
     if (typeof t === "number" && isFinite(t)) {
         mxcSpan.textContent =
@@ -62,7 +71,7 @@ function updateRelationCurrentLabels() {
     }
 }
 
-function updateScanningChannel(scanningChannel) {
+export function updateScanningChannel(scanningChannel) {
     document.querySelectorAll(".status-indicator-circle").forEach((el) => {
         el.classList.remove("active");
     });
@@ -171,7 +180,7 @@ function createSampleSettingRow(
     return row;
 }
 
-function initializeSampleChannelControls() {
+export function initializeSampleChannelControls() {
     SAMPLE_CHANNELS.forEach((channel) => {
         const modeSelect = document.getElementById(`sensorModeCH${channel}`);
         const excitationSelect = document.getElementById(
@@ -253,15 +262,15 @@ function initializeSampleChannelControls() {
     });
 }
 
-function syncSampleChannelControls(channel) {
-    const mode = currentParameters[`modeCH${channel}`];
+export function syncSampleChannelControls(channel) {
+    const mode = state.currentParameters[`modeCH${channel}`];
     const excitationRange =
-        currentParameters[`excitationRangeCH${channel}`]
-        ?? currentParameters[`rangeCH${channel}`];
+        state.currentParameters[`excitationRangeCH${channel}`]
+        ?? state.currentParameters[`rangeCH${channel}`];
     const resistanceRange =
-        currentParameters[`resistanceRangeCH${channel}`];
-    const autorange = currentParameters[`autorangeCH${channel}`];
-    const excitationOn = currentParameters[`excitationOnCH${channel}`];
+        state.currentParameters[`resistanceRangeCH${channel}`];
+    const autorange = state.currentParameters[`autorangeCH${channel}`];
+    const excitationOn = state.currentParameters[`excitationOnCH${channel}`];
     const details = document
         .getElementById(`sensorModeCH${channel}`)
         ?.closest("details");
@@ -314,7 +323,7 @@ function syncSampleChannelControls(channel) {
     populateSampleExcitationOptions(channel, excitationRange);
 }
 
-function updateRelationLabelVisibility() {
+export function updateRelationLabelVisibility() {
     const ch = document.getElementById("relationChannelSelect").value;
     const input = document.getElementById("relationLabelInput");
 
@@ -333,7 +342,7 @@ document
 
 updateRelationLabelVisibility();
 
-function updateRelationRampControls() {
+export function updateRelationRampControls() {
     const modeSelect = document.getElementById(
         "relationModeSelect",
     );
@@ -402,7 +411,7 @@ function onRelationChannelChange() {
     const sel = document.getElementById("relationChannelSelect");
     if (!sel) return;
 
-    currentRelationChannel = sel.value; // "CH9".."CH14"
+    state.relation.currentChannel = sel.value; // "CH9".."CH14"
 
     updateRelationLabelVisibility();
     redrawRelationChart();
@@ -417,7 +426,7 @@ export function updateRunUI() {
 
     if (!playBtn || !stopBtn) return;
 
-    const hasActiveRun = currentActiveRunId !== null;
+    const hasActiveRun = state.run.activeId !== null;
 
     playBtn.disabled = hasActiveRun;
 
@@ -438,7 +447,7 @@ function openHistoricalRelationWindow(fileName) {
     );
 }
 
-function setupCollapsibleSections(context = document) {
+export function setupCollapsibleSections(context = document) {
     const sectionTitles = context.querySelectorAll(".section-title");
 
     sectionTitles.forEach((title) => {
@@ -493,7 +502,7 @@ function setupCollapsibleSections(context = document) {
 }
 
 // Function to update available time range options based on data duration
-function updateTimeRangeOptions() {
+export function updateTimeRangeOptions() {
     const select = document.getElementById("timeRangeMXC");
     const store = chartDataStore["MXC"];
     if (!store || !store.startTime) return;
@@ -521,7 +530,7 @@ function updateTimeRangeOptions() {
         opt.disabled = totalElapsedSec < prevValue;
         }
 
-        if (option.value === currentTimeRangeMXC) opt.selected = true;
+        if (option.value === state.chart.currentTimeRangeMXC) opt.selected = true;
         select.appendChild(opt);
     }
 
@@ -530,14 +539,14 @@ function updateTimeRangeOptions() {
         for (let i = select.options.length - 1; i >= 0; i--) {
         if (!select.options[i].disabled) {
             select.selectedIndex = i;
-            currentTimeRangeMXC = parseInt(select.options[i].value, 10);
+            state.chart.currentTimeRangeMXC = parseInt(select.options[i].value, 10);
             break;
         }
         }
     }
 }
 
-function updateTimeRangeOptions50K() {
+export function updateTimeRangeOptions50K() {
     const select = document.getElementById("timeRange50K");
     const store = chartDataStore["50K"];
     if (!store || !store.startTime) return;
@@ -561,7 +570,7 @@ function updateTimeRangeOptions50K() {
         opt.disabled = totalElapsedSec < prevValue;
         }
 
-        if (option.value === currentTimeRange50K) opt.selected = true;
+        if (option.value === state.chart.currentTimeRange50K) opt.selected = true;
         select.appendChild(opt);
     }
 
@@ -569,14 +578,14 @@ function updateTimeRangeOptions50K() {
         for (let i = select.options.length - 1; i >= 0; i--) {
         if (!select.options[i].disabled) {
             select.selectedIndex = i;
-            currentTimeRange50K = parseInt(select.options[i].value, 10);
+            state.chart.currentTimeRange50K = parseInt(select.options[i].value, 10);
             break;
         }
         }
     }
 }
 
-function updateTimeRangeOptions4K() {
+export function updateTimeRangeOptions4K() {
     const select = document.getElementById("timeRange4K");
     const store = chartDataStore["4K"];
     if (!store || !store.startTime) return;
@@ -601,7 +610,7 @@ function updateTimeRangeOptions4K() {
         opt.disabled = totalElapsedSec < prevValue;
         }
 
-        if (parseInt(option.value, 10) === currentTimeRange4K) {
+        if (parseInt(option.value, 10) === state.chart.currentTimeRange4K) {
         opt.selected = true;
         }
 
@@ -612,14 +621,14 @@ function updateTimeRangeOptions4K() {
         for (let i = select.options.length - 1; i >= 0; i--) {
         if (!select.options[i].disabled) {
             select.selectedIndex = i;
-            currentTimeRange4K = parseInt(select.options[i].value, 10);
+            state.chart.currentTimeRange4K = parseInt(select.options[i].value, 10);
             break;
         }
         }
     }
 }
 
-function updateTimeRangeOptionsSTILL() {
+export function updateTimeRangeOptionsSTILL() {
     const select = document.getElementById("timeRangeSTILL");
     const store = chartDataStore["STILL"];
     if (!store || !store.startTime) return;
@@ -644,7 +653,7 @@ function updateTimeRangeOptionsSTILL() {
         opt.disabled = totalElapsedSec < prevValue;
         }
 
-        if (parseInt(option.value, 10) === currentTimeRangeSTILL) {
+        if (parseInt(option.value, 10) === state.chart.currentTimeRangeSTILL) {
         opt.selected = true;
         }
 
@@ -655,7 +664,7 @@ function updateTimeRangeOptionsSTILL() {
         for (let i = select.options.length - 1; i >= 0; i--) {
         if (!select.options[i].disabled) {
             select.selectedIndex = i;
-            currentTimeRangeSTILL = parseInt(select.options[i].value, 10);
+            state.chart.currentTimeRangeSTILL = parseInt(select.options[i].value, 10);
             break;
         }
         }
@@ -663,294 +672,294 @@ function updateTimeRangeOptionsSTILL() {
 }
 
 // Function to update UI controls with current parameter values
-function updateParameterControls() {
+export function updateParameterControls() {
     // Update input fields with server values on first load
-    if (!initialParametersLoaded) {
-        if (currentParameters.temperatureSetpoint !== null) {
+    if (!state.controls.initialParametersLoaded) {
+        if (state.currentParameters.temperatureSetpoint !== null) {
         document.getElementById("temperatureSetpoint").value =
-            currentParameters.temperatureSetpoint;
+            state.currentParameters.temperatureSetpoint;
         }
-        if (currentParameters.heaterPower !== null) {
+        if (state.currentParameters.heaterPower !== null) {
         document.getElementById("heaterPower").value =
-            currentParameters.heaterPower;
+            state.currentParameters.heaterPower;
         }
-        if (currentParameters.heaterRange !== null) {
+        if (state.currentParameters.heaterRange !== null) {
         document.getElementById("heaterRange").value =
-            currentParameters.heaterRange;
+            state.currentParameters.heaterRange;
         }
-        if (currentParameters.temperatureLimit !== null) {
+        if (state.currentParameters.temperatureLimit !== null) {
         document.getElementById("temperatureLimit").value =
-            currentParameters.temperatureLimit;
+            state.currentParameters.temperatureLimit;
         }
-        if (currentParameters.timeout !== null) {
+        if (state.currentParameters.timeout !== null) {
         document.getElementById("timeout").value =
-            currentParameters.timeout;
+            state.currentParameters.timeout;
         }
-        if (currentParameters.proportionalGain !== null) {
+        if (state.currentParameters.proportionalGain !== null) {
         document.getElementById("proportionalGain").value =
-            currentParameters.proportionalGain;
+            state.currentParameters.proportionalGain;
         }
-        if (currentParameters.integralGain !== null) {
+        if (state.currentParameters.integralGain !== null) {
         document.getElementById("integralGain").value =
-            currentParameters.integralGain;
+            state.currentParameters.integralGain;
         }
-        if (currentParameters.derivativeGain !== null) {
+        if (state.currentParameters.derivativeGain !== null) {
         document.getElementById("derivativeGain").value =
-            currentParameters.derivativeGain;
+            state.currentParameters.derivativeGain;
         }
-        if (currentParameters.MXCSP !== null) {
+        if (state.currentParameters.MXCSP !== null) {
         document.getElementById("temperatureSetpointMXC").value =
-            currentParameters.MXCSP;
+            state.currentParameters.MXCSP;
         }
-        if (currentParameters.MXCP !== null) {
+        if (state.currentParameters.MXCP !== null) {
         document.getElementById("proportionalGainMXC").value =
-            currentParameters.MXCP;
+            state.currentParameters.MXCP;
         }
-        if (currentParameters.MXCI !== null) {
+        if (state.currentParameters.MXCI !== null) {
         document.getElementById("integralGainMXC").value =
-            currentParameters.MXCI;
+            state.currentParameters.MXCI;
         }
-        if (currentParameters.MXCD !== null) {
+        if (state.currentParameters.MXCD !== null) {
         document.getElementById("derivativeGainMXC").value =
-            currentParameters.MXCD;
+            state.currentParameters.MXCD;
         }
-        if (currentParameters.MXCHR !== null) {
+        if (state.currentParameters.MXCHR !== null) {
         document.getElementById("heaterRangeMXC").value =
-            currentParameters.MXCHR;
+            state.currentParameters.MXCHR;
         }
-        if (currentParameters.dwellMXC !== null) {
+        if (state.currentParameters.dwellMXC !== null) {
         document.getElementById("dwellMXC").value =
-            currentParameters.dwellMXC;
+            state.currentParameters.dwellMXC;
         }
-        if (currentParameters.pauseMXC !== null) {
+        if (state.currentParameters.pauseMXC !== null) {
         document.getElementById("pauseMXC").value =
-            currentParameters.pauseMXC;
+            state.currentParameters.pauseMXC;
         }
-        if (currentParameters.rangeMXC !== null) {
+        if (state.currentParameters.rangeMXC !== null) {
         document.getElementById("sensorRangeMXC").value =
-            currentParameters.rangeMXC;
+            state.currentParameters.rangeMXC;
         }
-        if (currentParameters.modeMXC !== null) {
+        if (state.currentParameters.modeMXC !== null) {
         document.getElementById("sensorModeMXC").value =
-            currentParameters.modeMXC;
+            state.currentParameters.modeMXC;
         }
-        if (currentParameters.autorangeMXC !== null) {
+        if (state.currentParameters.autorangeMXC !== null) {
         document.getElementById("autorangeMXC").checked =
-            currentParameters.autorangeMXC;
+            state.currentParameters.autorangeMXC;
         }
-        if (currentParameters.dwell50K !== null) {
+        if (state.currentParameters.dwell50K !== null) {
         document.getElementById("dwell50K").value =
-            currentParameters.dwell50K;
+            state.currentParameters.dwell50K;
         }
-        if (currentParameters.pause50K !== null) {
+        if (state.currentParameters.pause50K !== null) {
         document.getElementById("pause50K").value =
-            currentParameters.pause50K;
+            state.currentParameters.pause50K;
         }
 
-        if (currentParameters.dwell4K !== null) {
+        if (state.currentParameters.dwell4K !== null) {
         document.getElementById("dwell4K").value =
-            currentParameters.dwell4K;
+            state.currentParameters.dwell4K;
         }
-        if (currentParameters.pause4K !== null) {
+        if (state.currentParameters.pause4K !== null) {
         document.getElementById("pause4K").value =
-            currentParameters.pause4K;
+            state.currentParameters.pause4K;
         }
 
-        if (currentParameters.dwellSTILL !== null) {
+        if (state.currentParameters.dwellSTILL !== null) {
         document.getElementById("dwellSTILL").value =
-            currentParameters.dwellSTILL;
+            state.currentParameters.dwellSTILL;
         }
-        if (currentParameters.pauseSTILL !== null) {
+        if (state.currentParameters.pauseSTILL !== null) {
         document.getElementById("pauseSTILL").value =
-            currentParameters.pauseSTILL;
+            state.currentParameters.pauseSTILL;
         }
-        if (currentParameters.range50K !== null) {
+        if (state.currentParameters.range50K !== null) {
         document.getElementById("sensorRange50K").value =
-            currentParameters.range50K;
+            state.currentParameters.range50K;
         }
-        if (currentParameters.mode50K !== null) {
+        if (state.currentParameters.mode50K !== null) {
         document.getElementById("sensorMode50K").value =
-            currentParameters.mode50K;
+            state.currentParameters.mode50K;
         }
-        if (currentParameters.range4K !== null) {
+        if (state.currentParameters.range4K !== null) {
         document.getElementById("sensorRange4K").value =
-            currentParameters.range4K;
+            state.currentParameters.range4K;
         }
-        if (currentParameters.mode4K !== null) {
+        if (state.currentParameters.mode4K !== null) {
         document.getElementById("sensorMode4K").value =
-            currentParameters.mode4K;
+            state.currentParameters.mode4K;
         }
-        if (currentParameters.rangeSTILL !== null) {
+        if (state.currentParameters.rangeSTILL !== null) {
         document.getElementById("sensorRangeSTILL").value =
-            currentParameters.rangeSTILL;
+            state.currentParameters.rangeSTILL;
         }
-        if (currentParameters.modeSTILL !== null) {
+        if (state.currentParameters.modeSTILL !== null) {
         document.getElementById("sensorModeSTILL").value =
-            currentParameters.modeSTILL;
+            state.currentParameters.modeSTILL;
         }
-        if (currentParameters.curveMXC !== null) {
+        if (state.currentParameters.curveMXC !== null) {
         document.getElementById("curveMXCSelect").value =
-            currentParameters.curveMXC;
+            state.currentParameters.curveMXC;
         }
 
-        if (currentParameters.curve50K !== null) {
+        if (state.currentParameters.curve50K !== null) {
         document.getElementById("curve50KSelect").value =
-            currentParameters.curve50K;
+            state.currentParameters.curve50K;
         }
-        if (currentParameters.curve4K !== null) {
+        if (state.currentParameters.curve4K !== null) {
         document.getElementById("curve4KSelect").value =
-            currentParameters.curve4K;
+            state.currentParameters.curve4K;
         }
-        if (currentParameters.curveSTILL !== null) {
+        if (state.currentParameters.curveSTILL !== null) {
         document.getElementById("curveSTILLSelect").value =
-            currentParameters.curveSTILL;
+            state.currentParameters.curveSTILL;
         }
-        initialParametersLoaded = true;
+        state.controls.initialParametersLoaded = true;
     }
 
     // Update current value displays
-    if (currentParameters.temperatureSetpoint !== null) {
+    if (state.currentParameters.temperatureSetpoint !== null) {
         document.getElementById("currentTemperatureSetpoint").textContent =
-        currentParameters.temperatureSetpoint.toFixed(1);
+        state.currentParameters.temperatureSetpoint.toFixed(1);
     }
-    if (currentParameters.heaterPower !== null) {
+    if (state.currentParameters.heaterPower !== null) {
         document.getElementById("currentHeaterPower").textContent =
-        currentParameters.heaterPower.toFixed(2);
+        state.currentParameters.heaterPower.toFixed(2);
     }
-    if (currentParameters.heaterRange !== null) {
+    if (state.currentParameters.heaterRange !== null) {
         document.getElementById("currentHeaterRange").textContent =
-        currentParameters.heaterRange;
+        state.currentParameters.heaterRange;
     }
-    if (currentParameters.temperatureLimit !== null) {
+    if (state.currentParameters.temperatureLimit !== null) {
         document.getElementById("currentTemperatureLimit").textContent =
-        currentParameters.temperatureLimit.toFixed(1);
+        state.currentParameters.temperatureLimit.toFixed(1);
     }
-    if (currentParameters.timeout !== null) {
+    if (state.currentParameters.timeout !== null) {
         document.getElementById("currentTimeout").textContent =
-        currentParameters.timeout.toFixed(0);
+        state.currentParameters.timeout.toFixed(0);
     }
-    if (currentParameters.proportionalGain !== null) {
+    if (state.currentParameters.proportionalGain !== null) {
         document.getElementById("currentProportionalGain").textContent =
-        currentParameters.proportionalGain.toFixed(3);
+        state.currentParameters.proportionalGain.toFixed(3);
     }
-    if (currentParameters.integralGain !== null) {
+    if (state.currentParameters.integralGain !== null) {
         document.getElementById("currentIntegralGain").textContent =
-        currentParameters.integralGain.toFixed(3);
+        state.currentParameters.integralGain.toFixed(3);
     }
-    if (currentParameters.derivativeGain !== null) {
+    if (state.currentParameters.derivativeGain !== null) {
         document.getElementById("currentDerivativeGain").textContent =
-        currentParameters.derivativeGain.toFixed(3);
+        state.currentParameters.derivativeGain.toFixed(3);
     }
-    if (currentParameters.MXCSP !== null) {
+    if (state.currentParameters.MXCSP !== null) {
         document.getElementById("temperatureSetpointMXC").value =
-        currentParameters.MXCSP;
+        state.currentParameters.MXCSP;
     }
-    if (currentParameters.MXCP !== null) {
+    if (state.currentParameters.MXCP !== null) {
         document.getElementById("proportionalGainMXC").value =
-        currentParameters.MXCP;
+        state.currentParameters.MXCP;
     }
-    if (currentParameters.MXCI !== null) {
+    if (state.currentParameters.MXCI !== null) {
         document.getElementById("integralGainMXC").value =
-        currentParameters.MXCI;
+        state.currentParameters.MXCI;
     }
-    if (currentParameters.MXCD !== null) {
+    if (state.currentParameters.MXCD !== null) {
         document.getElementById("derivativeGainMXC").value =
-        currentParameters.MXCD;
+        state.currentParameters.MXCD;
     }
-    if (currentParameters.MXCHR !== null) {
+    if (state.currentParameters.MXCHR !== null) {
         document.getElementById("heaterRangeMXC").value =
-        currentParameters.MXCHR;
+        state.currentParameters.MXCHR;
     }
-    if (currentParameters.dwellMXC !== null) {
+    if (state.currentParameters.dwellMXC !== null) {
         document.getElementById("dwellMXC").value =
-        currentParameters.dwellMXC;
+        state.currentParameters.dwellMXC;
     }
-    if (currentParameters.pauseMXC !== null) {
+    if (state.currentParameters.pauseMXC !== null) {
         document.getElementById("pauseMXC").value =
-        currentParameters.pauseMXC;
+        state.currentParameters.pauseMXC;
     }
-    if (currentParameters.rangeMXC !== null) {
+    if (state.currentParameters.rangeMXC !== null) {
         document.getElementById("sensorRangeMXC").value =
-        currentParameters.rangeMXC;
+        state.currentParameters.rangeMXC;
     }
-    if (currentParameters.modeMXC !== null) {
+    if (state.currentParameters.modeMXC !== null) {
         document.getElementById("sensorModeMXC").value =
-        currentParameters.modeMXC;
+        state.currentParameters.modeMXC;
     }
-    if (currentParameters.autorangeMXC !== null) {
+    if (state.currentParameters.autorangeMXC !== null) {
         document.getElementById("autorangeMXC").checked =
-        currentParameters.autorangeMXC;
+        state.currentParameters.autorangeMXC;
     }
-    if (currentParameters.dwell50K !== null) {
+    if (state.currentParameters.dwell50K !== null) {
         document.getElementById("dwell50K").value =
-        currentParameters.dwell50K;
+        state.currentParameters.dwell50K;
     }
-    if (currentParameters.pause50K !== null) {
+    if (state.currentParameters.pause50K !== null) {
         document.getElementById("pause50K").value =
-        currentParameters.pause50K;
+        state.currentParameters.pause50K;
     }
 
-    if (currentParameters.dwell4K !== null) {
-        document.getElementById("dwell4K").value = currentParameters.dwell4K;
+    if (state.currentParameters.dwell4K !== null) {
+        document.getElementById("dwell4K").value = state.currentParameters.dwell4K;
     }
-    if (currentParameters.pause4K !== null) {
-        document.getElementById("pause4K").value = currentParameters.pause4K;
+    if (state.currentParameters.pause4K !== null) {
+        document.getElementById("pause4K").value = state.currentParameters.pause4K;
     }
 
-    if (currentParameters.dwellSTILL !== null) {
+    if (state.currentParameters.dwellSTILL !== null) {
         document.getElementById("dwellSTILL").value =
-        currentParameters.dwellSTILL;
+        state.currentParameters.dwellSTILL;
     }
-    if (currentParameters.pauseSTILL !== null) {
+    if (state.currentParameters.pauseSTILL !== null) {
         document.getElementById("pauseSTILL").value =
-        currentParameters.pauseSTILL;
+        state.currentParameters.pauseSTILL;
     }
-    if (currentParameters.range50K !== null) {
+    if (state.currentParameters.range50K !== null) {
         document.getElementById("sensorRange50K").value =
-        currentParameters.range50K;
+        state.currentParameters.range50K;
     }
-    if (currentParameters.mode50K !== null) {
+    if (state.currentParameters.mode50K !== null) {
         document.getElementById("sensorMode50K").value =
-        currentParameters.mode50K;
+        state.currentParameters.mode50K;
     }
-    if (currentParameters.range4K !== null) {
+    if (state.currentParameters.range4K !== null) {
         document.getElementById("sensorRange4K").value =
-        currentParameters.range4K;
+        state.currentParameters.range4K;
     }
-    if (currentParameters.mode4K !== null) {
+    if (state.currentParameters.mode4K !== null) {
         document.getElementById("sensorMode4K").value =
-        currentParameters.mode4K;
+        state.currentParameters.mode4K;
     }
-    if (currentParameters.rangeSTILL !== null) {
+    if (state.currentParameters.rangeSTILL !== null) {
         document.getElementById("sensorRangeSTILL").value =
-        currentParameters.rangeSTILL;
+        state.currentParameters.rangeSTILL;
     }
-    if (currentParameters.modeSTILL !== null) {
+    if (state.currentParameters.modeSTILL !== null) {
         document.getElementById("sensorModeSTILL").value =
-        currentParameters.modeSTILL;
+        state.currentParameters.modeSTILL;
     }
-    if (currentParameters.curveMXC !== null) {
+    if (state.currentParameters.curveMXC !== null) {
         document.getElementById("curveMXCSelect").value =
-        currentParameters.curveMXC;
+        state.currentParameters.curveMXC;
     }
-    if (currentParameters.curve50K !== null) {
+    if (state.currentParameters.curve50K !== null) {
         document.getElementById("curve50KSelect").value =
-        currentParameters.curve50K;
+        state.currentParameters.curve50K;
     }
-    if (currentParameters.curve4K !== null) {
+    if (state.currentParameters.curve4K !== null) {
         document.getElementById("curve4KSelect").value =
-        currentParameters.curve4K;
+        state.currentParameters.curve4K;
     }
-    if (currentParameters.curveSTILL !== null) {
+    if (state.currentParameters.curveSTILL !== null) {
         document.getElementById("curveSTILLSelect").value =
-        currentParameters.curveSTILL;
+        state.currentParameters.curveSTILL;
     }
 }
 
 // Update chart time range function
-function updateTimeRange() {
+function updateTimeRangeMXC() {
     const timeRangeSelect = document.getElementById("timeRangeMXC");
-    currentTimeRangeMXC = parseInt(timeRangeSelect.value, 10); // <-- use the right variable
+    state.chart.currentTimeRangeMXC = parseInt(timeRangeSelect.value, 10); // <-- use the right variable
 
     // Re-slice from the store immediately so the axis updates now
     redrawFromStore("MXC");
@@ -958,28 +967,28 @@ function updateTimeRange() {
 
 function updateTimeRange50K() {
     const timeRangeSelect = document.getElementById("timeRange50K");
-    currentTimeRange50K = parseInt(timeRangeSelect.value, 10);
+    state.chart.currentTimeRange50K = parseInt(timeRangeSelect.value, 10);
     redrawFromStore("50K");
 }
 
 function updateTimeRange4K() {
     const timeRangeSelect = document.getElementById("timeRange4K");
-    currentTimeRange4K = parseInt(timeRangeSelect.value, 10);
+    state.chart.currentTimeRange4K = parseInt(timeRangeSelect.value, 10);
     redrawFromStore("4K");
 }
 
 function updateTimeRangeSTILL() {
     const timeRangeSelect = document.getElementById("timeRangeSTILL");
-    currentTimeRangeSTILL = parseInt(timeRangeSelect.value, 10);
+    state.chart.currentTimeRangeSTILL = parseInt(timeRangeSelect.value, 10);
     redrawFromStore("STILL");
 }
 
-function updateMXCTemperature(value_mK) {
+export function updateMXCTemperature(value_mK) {
     document.getElementById("currentTemperatureMXC").textContent =
         value_mK.toFixed(4);
-    }
+}
 
-    function updateMXCValues(temp_K, res_ohm, power_watt) {
+export function updateMXCValues(temp_K, res_ohm, power_watt) {
     const select = document.getElementById("currentMXCValue");
 
     let tempLabel;
@@ -996,7 +1005,7 @@ function updateMXCTemperature(value_mK) {
     select.options[2].text = `${power_watt.toExponential(2)} W`;
 }
 
-function updateMXCHeaterOutput(percent) {
+export function updateMXCHeaterOutput(percent) {
     const span = document.getElementById("heaterOutputMXC");
     if (!span) return;
 
@@ -1007,7 +1016,7 @@ function updateMXCHeaterOutput(percent) {
     }
 }
 
-function update50KValues(temp_K, res_ohm, power_watt) {
+export function update50KValues(temp_K, res_ohm, power_watt) {
     const select = document.getElementById("current50KValue");
 
     let tempLabel =
@@ -1032,7 +1041,7 @@ function update50KValues(temp_K, res_ohm, power_watt) {
     select.options[2].text = powerLabel;
 }
 
-function update4KValues(temp_K, res_ohm, power_watt) {
+export function update4KValues(temp_K, res_ohm, power_watt) {
     const select = document.getElementById("current4KValue");
 
     let tempLabel =
@@ -1057,7 +1066,7 @@ function update4KValues(temp_K, res_ohm, power_watt) {
     select.options[2].text = powerLabel;
 }
 
-function updateSTILLValues(temp_K, res_ohm, power_watt) {
+export function updateSTILLValues(temp_K, res_ohm, power_watt) {
     const select = document.getElementById("currentSTILLValue");
 
     let tempLabel =
@@ -1083,7 +1092,7 @@ function updateSTILLValues(temp_K, res_ohm, power_watt) {
 }
 
 // Function to add a log entry to the log box
-function addLogEntry(message, type) {
+export function addLogEntry(message, type) {
     const logEntry = document.createElement("div");
     logEntry.className = `log-entry log-${type}`;
     logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
@@ -1101,3 +1110,21 @@ function addLogEntry(message, type) {
         logBoxLS.scrollTop = logBoxLS.scrollHeight;
     }
 }
+
+// Connect active functions with index.html
+
+document
+    .getElementById("timeRange50K")
+    ?.addEventListener("change", updateTimeRange50K);
+
+document
+    .getElementById("timeRange4K")
+    ?.addEventListener("change", updateTimeRange4K);
+
+document
+    .getElementById("timeRangeSTILL")
+    ?.addEventListener("change", updateTimeRangeSTILL);
+
+document
+    .getElementById("timeRangeMXC")
+    ?.addEventListener("change", updateTimeRangeMXC);

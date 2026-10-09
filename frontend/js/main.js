@@ -1,31 +1,51 @@
 import { initParticles } from './particles.js';
-import { fetchRelationStepRampLivePoints } from './api.js';
-import { refreshRelationFiles } from './api.js';
-import { fetchSensorData } from './api.js';
-import { initRunIdFromServer } from './api.js';
-import { initRelationStateFromServer } from './business.js';
-import { updateRunUI } from './ui.js';
+import { 
+    refreshRelationFiles, fetchRelationStepRampLivePoints, 
+    refreshRecentRuns, initRunIdFromServer, 
+    updateConnectionStatus, fetchSensorData, loadTemperatureBuffer, 
+    sendCommandToServer, sendControlParameters,
+} from './api.js';
+import {
+    createRelationChart, redrawRelationChart, createTemperatureChart, enableYAxisLimitEditing,
+} from "./charts.js";
+import { 
+    initRelationStateFromServer, loadRelationStepRampDefaults
+} from './business.js';
+import { 
+    updateRunUI, addLogEntry, setupCollapsibleSections, initializeSampleChannelControls
+} from './ui.js';
+import { state } from './state.js';
+import { charts, MXC_CONTROL_IDS, MXC_SENSOR_IDS } from './state.js';
 
-// ToDo: currentActiveRunId variable is not defined. I have defined it as null
-// but check if there's a problem because other parts of the code in other files
-// might be using it.
-
-let currentActiveRunId = null; // CHECK
 
 document.addEventListener("DOMContentLoaded", async () => {
-    
-    // ToDo: currentRelationChannel variable is not defined.
-    let currentRelationChannel;
 
-    const sel = document.getElementById("relationChannelSelect");
-    if (sel) currentRelationChannel = sel.value;
+    const sel = document.getElementById(
+        "relationChannelSelect",
+    );
 
+    if (sel) {
+        state.relation.currentChannel = sel.value;
+    }
+
+    // Initialize relation chart.
+    state.relation.chart = createRelationChart();
+
+    if (!state.relation.chart) {
+        console.error(
+            "Failed to initialize relation chart.",
+        );
+        return;
+    }
+
+    // Recover relation state from the backend.
     await initRelationStateFromServer();
 
-    if (!relationRunning) {
+    if (!state.relation.running) {
         await loadRelationStepRampDefaults();
     }
-    relationChart = createRelationChart();
+
+    // Render available relation data.
     redrawRelationChart();
 });
 
@@ -53,15 +73,15 @@ document.addEventListener("DOMContentLoaded", function () {
     runPlayButton.addEventListener("click", async () => {
         const runId = parseInt(runIdInput.value, 10);
 
-        if (currentActiveRunId !== null) {
+        if (state.run.activeId !== null) {
         addLogEntry("⚠️ A run is already active", "status");
         return;
         }
 
         const isHistorical =
-        currentActiveRunId === null &&
-        expectedNextRunId !== null &&
-        runId < expectedNextRunId;
+            state.run.activeId === null &&
+            state.run.expectedNextId !== null &&
+            runId < state.run.expectedNextId;
 
         if (isNaN(runId) || runId <= 0) {
         addLogEntry("Error: RUN_ID must be a positive integer", "received");
@@ -121,8 +141,8 @@ document.addEventListener("DOMContentLoaded", function () {
             startedMatch &&
             parseInt(startedMatch[1], 10) === runID
         ){
-            currentActiveRunId = runId;
-            expectedNextRunId
+            state.run.activeId = runId;
+            state.run.expectedNextId = state.run.expectedNextId;
             updateRunUI();
         } else {
             addLogEntry("❌ Run not started; local state won't change", "received");
@@ -150,9 +170,9 @@ document.addEventListener("DOMContentLoaded", function () {
             startedMatch &&
             parseInt(startedMatch[1], 10) === runID
         ){
-            currentActiveRunId = null;
-            expectedNextRunId = ended + 1;
-            runIdInput.value = expectedNextRunId;
+            state.run.activeId = null;
+            state.run.expectedNextId = ended + 1;
+            runIdInput.value = state.run.expectedNextId;
             updateRunUI();
         } else {
             addLogEntry("❌ Run not ended; local state won't change", "received");
