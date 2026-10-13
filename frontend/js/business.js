@@ -1,4 +1,4 @@
-import { state } from './state.js';
+import { state, relationDataStore } from './state.js';
 import { 
     addLogEntry, updateRelationLabelVisibility, updateRelationRampControls
 } from './ui.js';
@@ -447,7 +447,7 @@ export async function initRelationStateFromServer() {
         `CH${channelNumber}`;
 
         channelSelect.value = channelName;
-        currentRelationChannel = channelName;
+        state.relation.currentChannel = channelName;
 
         labelInput.value =
         payload.label ?? "";
@@ -522,20 +522,20 @@ export async function initRelationStateFromServer() {
         }
 
         const trackingChanged =
-            relationStepRampLiveRelationId
+            state.relation.stepRamp.relationId
             !== restoredRelationId
-            || relationStepRampLiveChannel
+            || state.relation.stepRamp.channel
             !== channelName;
 
         if (trackingChanged) {
             relationDataStore[channelName].length = 0;
 
-            relationStepRampLiveRelationId =
+            state.relation.stepRamp.relationId =
             restoredRelationId;
 
-            relationStepRampLiveNextSeq = 0;
+            state.relation.stepRamp.nextSeq = 0;
 
-            relationStepRampLiveChannel =
+            state.relation.stepRamp.channel =
             channelName;
         }
         }
@@ -611,7 +611,7 @@ export async function initRelationStateFromServer() {
     }
 }
 
-function buildRelationStepRampPayload(
+export function buildRelationStepRampPayload(
     channelNumber,
     label,
     ) {
@@ -952,7 +952,7 @@ function buildRelationStepRampPayload(
     return payload;
 }
 
-function loadHistoricalRun(runPayload) {
+export function loadHistoricalRun(runPayload) {
     if (!runPayload || !runPayload.run_id) {
         addLogEntry("Error: RUN_DATA sin run_id", "received");
         return;
@@ -969,7 +969,7 @@ function loadHistoricalRun(runPayload) {
     );
 }
 
-function clearPendingExtraChannelsForSampleChannels() {
+export function clearPendingExtraChannelsForSampleChannels() {
     SAMPLE_CHANNELS.forEach((ch) => {
         if (pendingExtraChannels && pendingExtraChannels[ch] !== undefined) {
         pendingExtraChannels[ch] = false;

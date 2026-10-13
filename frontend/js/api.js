@@ -1,6 +1,7 @@
 import { state } from './state.js';
 import { 
-    chartDataStore, parameterBoxUpdateInterval, SAMPLE_CHANNELS
+    chartDataStore, parameterBoxUpdateInterval, SAMPLE_CHANNELS,
+    relationDataStore
 } from './state.js';
 import { addLogEntry, updateRunUI,
     updateTimeRangeOptions50K, updateTimeRangeOptions4K, updateTimeRangeOptionsSTILL, 
@@ -30,11 +31,11 @@ export async function fetchRelationStepRampLivePoints(
     * Avoid overlapping HTTP requests if one poll takes
     * longer than the polling interval.
     */
-    if (relationStepRampLiveFetchInProgress) {
+    if (state.relation.stepRamp.fetchInProgress) {
         return;
     }
 
-    relationStepRampLiveFetchInProgress = true;
+    state.relation.stepRamp.fetchInProgress = true;
 
     try {
         async function requestFrom(fromSeq) {
@@ -70,7 +71,7 @@ export async function fetchRelationStepRampLivePoints(
         let requestedFromSeq =
         forceFullReload
             ? 0
-            : relationStepRampLiveNextSeq;
+            : state.relation.stepRamp.nextSeq;
 
         let payload = await requestFrom(
         requestedFromSeq,
@@ -136,13 +137,13 @@ export async function fetchRelationStepRampLivePoints(
         * from sequence zero.
         */
         const relationChanged =
-        relationStepRampLiveRelationId !== null
-        && relationStepRampLiveRelationId
+        state.relation.stepRamp.relationId !== null
+        && state.relation.stepRamp.relationId
             !== relationId;
 
         const channelChanged =
-        relationStepRampLiveChannel !== null
-        && relationStepRampLiveChannel
+        state.relation.stepRamp.channel !== null
+        && state.relation.stepRamp.channel
             !== channelName;
 
         if (
@@ -195,18 +196,18 @@ export async function fetchRelationStepRampLivePoints(
         const mustResetLocalStore =
         forceFullReload
         || payload.reset_required === true
-        || relationStepRampLiveRelationId
+        || state.relation.stepRamp.relationId
             !== relationId
-        || relationStepRampLiveChannel
+        || state.relation.stepRamp.channel
             !== channelName;
 
         if (mustResetLocalStore) {
         relationDataStore[channelName].length = 0;
 
-        relationStepRampLiveNextSeq = 0;
-        relationStepRampLiveRelationId =
+        state.relation.stepRamp.nextSeq = 0;
+        state.relation.stepRamp.relationId =
             relationId;
-        relationStepRampLiveChannel =
+        state.relation.stepRamp.channel =
             channelName;
         }
 
@@ -240,7 +241,7 @@ export async function fetchRelationStepRampLivePoints(
         * A repeated request cannot duplicate points.
         */
         if (
-            seq < relationStepRampLiveNextSeq
+            seq < state.relation.stepRamp.nextSeq
         ) {
             continue;
         }
@@ -250,11 +251,11 @@ export async function fetchRelationStepRampLivePoints(
         * draw an incomplete relation.
         */
         if (
-            seq !== relationStepRampLiveNextSeq
+            seq !== state.relation.stepRamp.nextSeq
         ) {
             throw new Error(
             `STEP_RAMP sequence gap: expected `
-            + `${relationStepRampLiveNextSeq}, `
+            + `${state.relation.stepRamp.nextSeq}, `
             + `received ${seq}.`,
             );
         }
@@ -267,7 +268,7 @@ export async function fetchRelationStepRampLivePoints(
             point.ts_utc_iso ?? null,
         });
 
-        relationStepRampLiveNextSeq =
+        state.relation.stepRamp.nextSeq =
             seq + 1;
         }
 
@@ -285,12 +286,12 @@ export async function fetchRelationStepRampLivePoints(
         }
 
         if (
-        relationStepRampLiveNextSeq
+        state.relation.stepRamp.nextSeq
         !== backendNextSeq
         ) {
         throw new Error(
             `STEP_RAMP sequence mismatch: local `
-            + `${relationStepRampLiveNextSeq}, `
+            + `${state.relation.stepRamp.nextSeq}, `
             + `backend ${backendNextSeq}.`,
         );
         }
@@ -313,7 +314,7 @@ export async function fetchRelationStepRampLivePoints(
         }
 
         if (
-        currentRelationChannel
+        state.relation.currentChannel
         === channelName
         ) {
         redrawRelationChart();
@@ -329,17 +330,17 @@ export async function fetchRelationStepRampLivePoints(
         error,
         );
     } finally {
-        relationStepRampLiveFetchInProgress =
+        state.relation.stepRamp.fetchInProgress =
         false;
     }
 }
 
 async function reconcileRelationStepRampFromFile() {
     const relationId =
-        relationStepRampLiveRelationId;
+        state.relation.stepRamp.relationId;
 
     const channelName =
-        relationStepRampLiveChannel;
+        state.relation.stepRamp.channel;
 
     if (
         !relationId
@@ -497,11 +498,11 @@ async function reconcileRelationStepRampFromFile() {
         relationDataStore[channelName] =
             finalPoints;
 
-        relationStepRampLiveNextSeq =
+        state.relation.stepRamp.nextSeq =
             finalPoints.length;
 
         if (
-            currentRelationChannel
+            state.relation.currentChannel
             === channelName
         ) {
             redrawRelationChart();

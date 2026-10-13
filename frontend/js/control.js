@@ -2,11 +2,23 @@ import {
     refreshRelationFiles, sendCommandToServer 
 } from './api.js';
 import {
-    sampleRangeCombinationIsValid
+    sampleRangeCombinationIsValid,
+    buildRelationStepRampPayload,
+    clearPendingExtraChannelsForSampleChannels,
+    loadHistoricalRun,
 } from './business.js';
-import { addLogEntry } from './ui.js'; 
-import { state } from './state.js';
+import {
+    addLogEntry,
+    openHistoricalRelationWindow,
+    updateRelationRampControls,
+} from './ui.js'; 
+import { state, relationDataStore } from './state.js';
 import { SAMPLE_CHANNELS } from './state.js';
+
+const relationFilesRefreshButton =
+    document.getElementById("relationFilesRefreshButton");
+const relationFilesSelect =
+    document.getElementById("relationFilesSelect");
 
 function globalToggleChannel(channel) {
     switch (channel) {
@@ -63,8 +75,8 @@ function toggleSampleChannelGlobal(channel) {
 
 document
 .getElementById("relationStartButton")
-.addEventListener("click", async () => {
-    if (relationRunning) return;
+?.addEventListener("click", async () => {
+    if (state.relation.running) return;
 
     const startButton = document.getElementById(
     "relationStartButton",
@@ -291,15 +303,15 @@ document
         */
         relationDataStore[ch].length = 0;
 
-        relationStepRampLiveRelationId =
+        state.relation.stepRamp.relationId =
         relationId;
-        relationStepRampLiveNextSeq = 0;
-        relationStepRampLiveChannel = ch;
+        state.relation.stepRamp.nextSeq = 0;
+        state.relation.stepRamp.channel = ch;
 
         redrawRelationChart();
     }
 
-    relationRunning = true;
+    state.relation.running = true;
 
     startButton.disabled = true;
     stopButton.disabled = false;
@@ -309,7 +321,7 @@ document
 
     updateRelationRampControls();
     } catch (error) {
-        relationRunning = false;
+        state.relation.running = false;
 
         startButton.disabled = false;
         stopButton.disabled = true;
@@ -328,8 +340,8 @@ document
 
 document
 .getElementById("relationStopButton")
-.addEventListener("click", async () => {
-    if (!relationRunning) return;
+?.addEventListener("click", async () => {
+    if (!state.relation.running) return;
 
     const startButton = document.getElementById(
     "relationStartButton",
@@ -401,7 +413,7 @@ document
         * Rare but valid: relation was finalized
         * synchronously before returning.
         */
-        relationRunning = false;
+        state.relation.running = false;
 
         startButton.disabled = false;
         stopButton.disabled = true;
@@ -425,7 +437,7 @@ document
         * 19E will poll /get-relation-status and release the UI
         * only when the backend reports that the relation is gone.
         */
-        relationRunning = true;
+        state.relation.running = true;
 
         startButton.disabled = true;
         stopButton.disabled = true;
@@ -484,7 +496,7 @@ document
         );
     }
 
-    relationRunning = false;
+    state.relation.running = false;
 
     startButton.disabled = false;
     stopButton.disabled = true;
@@ -499,7 +511,7 @@ document
         * Stop was not confirmed.
         * Keep the relation treated as active.
         */
-        relationRunning = true;
+        state.relation.running = true;
 
         startButton.disabled = true;
         stopButton.disabled = false;
@@ -1679,73 +1691,87 @@ async function writeSettingsExtraChannel14() {
 // Make functions available for external calls in index.html
 document
     .getElementById("toggleMXCGlobal")
-    .addEventListener("change", () => {
+    ?.addEventListener("change", () => {
         globalToggleChannel("MXC");
     });
 document
     .getElementById("toggle50KGlobal")
-    .addEventListener("change", () => {
+    ?.addEventListener("change", () => {
         globalToggleChannel("50K");
     });
 document
     .getElementById("toggle4KGlobal")
-    .addEventListener("change", () => {
+    ?.addEventListener("change", () => {
         globalToggleChannel("4K");
     });
 document
     .getElementById("toggleSTILLGlobal")
-    .addEventListener("change", () => {
+    ?.addEventListener("change", () => {
         globalToggleChannel("STILL");
     });
 document
     .getElementById("autorangeMXC")
-    .addEventListener("change", () => {
+    ?.addEventListener("change", () => {
         toggleAutorangeMXC();
     });
 document
     .getElementById("toggleExtraChannel9")
-    .addEventListener("change", () => {
+    ?.addEventListener("change", () => {
         globalToggleChannel("9");
     });
 
 document
     .getElementById("toggleExtraChannel10")
-    .addEventListener("change", () => {
+    ?.addEventListener("change", () => {
         globalToggleChannel("10");
     });
 
 document
     .getElementById("toggleExtraChannel11")
-    .addEventListener("change", () => {
+    ?.addEventListener("change", () => {
         globalToggleChannel("11");
     });
 
 document
     .getElementById("toggleExtraChannel12")
-    .addEventListener("change", () => {
+    ?.addEventListener("change", () => {
         globalToggleChannel("12");
     });
 
 document
     .getElementById("toggleExtraChannel13")
-    .addEventListener("change", () => {
+    ?.addEventListener("change", () => {
         globalToggleChannel("13");
     });
 
 document
     .getElementById("toggleExtraChannel14")
-    .addEventListener("change", () => {
+    ?.addEventListener("change", () => {
         globalToggleChannel("14");
     });
 
 document
     .getElementById("writeSettingsButtonCH9")
-    .addEventListener("click", () => {
+    ?.addEventListener("click", () => {
         writeSettingsExtraChannel9();
     });
 
 document
     .getElementById("autoscanToggle")
-    .addEventListener("change", () => {
+    ?.addEventListener("change", () => {
         toggleAutoscan();
     });
+
+Object.assign(window, {
+    globalToggleChannel,
+    toggleChannel50K,
+    toggleChannelMXC,
+    toggleChannelSTILL,
+    toggleChannel4k,
+    toggleAutorangeMXC,
+    toggleAutoscan,
+    writeControlSettingsMXC,
+    writeSettingsSTILL,
+    writeSettings50K,
+    writeSettings4K,
+});

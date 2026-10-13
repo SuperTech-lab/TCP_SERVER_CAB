@@ -324,8 +324,11 @@ export function syncSampleChannelControls(channel) {
 }
 
 export function updateRelationLabelVisibility() {
-    const ch = document.getElementById("relationChannelSelect").value;
+    const channelSelect = document.getElementById("relationChannelSelect");
     const input = document.getElementById("relationLabelInput");
+    if (!channelSelect || !input) return;
+
+    const ch = channelSelect.value;
 
     if (
         ["CH9", "CH10", "CH11", "CH12", "CH13", "CH14"].includes(ch)
@@ -336,11 +339,11 @@ export function updateRelationLabelVisibility() {
         input.value = "";
     }
 }
-document
-.getElementById("relationChannelSelect")
-.addEventListener("change", updateRelationLabelVisibility);
-
-updateRelationLabelVisibility();
+const relationChannelSelect = document.getElementById("relationChannelSelect");
+if (relationChannelSelect) {
+    relationChannelSelect.addEventListener("change", updateRelationLabelVisibility);
+    updateRelationLabelVisibility();
+}
 
 export function updateRelationRampControls() {
     const modeSelect = document.getElementById(
@@ -371,15 +374,15 @@ export function updateRelationRampControls() {
         : "none";
 
     targetInput.disabled =
-        !isRamp || relationRunning;
+        !isRamp || state.relation.running;
     rateInput.disabled =
-        !isRamp || relationRunning;
+        !isRamp || state.relation.running;
 
     stepRampControls
         .querySelectorAll("input")
         .forEach((input) => {
         input.disabled =
-            !isStepRamp || relationRunning;
+            !isStepRamp || state.relation.running;
         });
 
     const relationSection =
@@ -398,16 +401,13 @@ export function updateRelationRampControls() {
         }
 }
 
-document
-.getElementById("relationModeSelect")
-.addEventListener(
-    "change",
-    updateRelationRampControls,
-);
+const relationModeSelect = document.getElementById("relationModeSelect");
+if (relationModeSelect) {
+    relationModeSelect.addEventListener("change", updateRelationRampControls);
+    updateRelationRampControls();
+}
 
-updateRelationRampControls();
-
-function onRelationChannelChange() {
+export function onRelationChannelChange() {
     const sel = document.getElementById("relationChannelSelect");
     if (!sel) return;
 
@@ -438,7 +438,7 @@ export function updateRunUI() {
     if (runDescInput) runDescInput.disabled = hasActiveRun;
 }
 
-function openHistoricalRelationWindow(fileName) {
+export function openHistoricalRelationWindow(fileName) {
     const url = `/plot_relation?file_name=${encodeURIComponent(fileName)}`;
     window.open(url, "_blank", "width=1200,height=800");
     addLogEntry(
@@ -957,7 +957,7 @@ export function updateParameterControls() {
 }
 
 // Update chart time range function
-function updateTimeRangeMXC() {
+export function updateTimeRangeMXC() {
     const timeRangeSelect = document.getElementById("timeRangeMXC");
     state.chart.currentTimeRangeMXC = parseInt(timeRangeSelect.value, 10); // <-- use the right variable
 
@@ -965,19 +965,19 @@ function updateTimeRangeMXC() {
     redrawFromStore("MXC");
 }
 
-function updateTimeRange50K() {
+export function updateTimeRange50K() {
     const timeRangeSelect = document.getElementById("timeRange50K");
     state.chart.currentTimeRange50K = parseInt(timeRangeSelect.value, 10);
     redrawFromStore("50K");
 }
 
-function updateTimeRange4K() {
+export function updateTimeRange4K() {
     const timeRangeSelect = document.getElementById("timeRange4K");
     state.chart.currentTimeRange4K = parseInt(timeRangeSelect.value, 10);
     redrawFromStore("4K");
 }
 
-function updateTimeRangeSTILL() {
+export function updateTimeRangeSTILL() {
     const timeRangeSelect = document.getElementById("timeRangeSTILL");
     state.chart.currentTimeRangeSTILL = parseInt(timeRangeSelect.value, 10);
     redrawFromStore("STILL");
@@ -1128,3 +1128,12 @@ document
 document
     .getElementById("timeRangeMXC")
     ?.addEventListener("change", updateTimeRangeMXC);
+
+Object.assign(window, {
+    onRelationChannelChange,
+    updateTimeRange: updateTimeRangeOptions,
+    updateTimeRangeMXC,
+    updateTimeRange50K,
+    updateTimeRange4K,
+    updateTimeRangeSTILL,
+});

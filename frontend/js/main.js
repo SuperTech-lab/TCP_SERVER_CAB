@@ -9,13 +9,19 @@ import {
     createRelationChart, redrawRelationChart, createTemperatureChart, enableYAxisLimitEditing,
 } from "./charts.js";
 import { 
-    initRelationStateFromServer, loadRelationStepRampDefaults
+    initRelationStateFromServer, loadRelationStepRampDefaults,
+    loadHistoricalRun
 } from './business.js';
 import { 
     updateRunUI, addLogEntry, setupCollapsibleSections, initializeSampleChannelControls
 } from './ui.js';
 import { state } from './state.js';
 import { charts, MXC_CONTROL_IDS, MXC_SENSOR_IDS } from './state.js';
+
+Object.assign(window, {
+    loadHistoricalRun,
+    sendControlParameters,
+});
 
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -139,7 +145,7 @@ document.addEventListener("DOMContentLoaded", function () {
         addLogEntry(`Server response: ${response}`, "received");
         if(
             startedMatch &&
-            parseInt(startedMatch[1], 10) === runID
+            parseInt(startedMatch[1], 10) === runId
         ){
             state.run.activeId = runId;
             state.run.expectedNextId = state.run.expectedNextId;
@@ -168,7 +174,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const ended = parseInt(runIdInput.value, 10);
         if(
             startedMatch &&
-            parseInt(startedMatch[1], 10) === runID
+            parseInt(startedMatch[1], 10) === ended
         ){
             state.run.activeId = null;
             state.run.expectedNextId = ended + 1;

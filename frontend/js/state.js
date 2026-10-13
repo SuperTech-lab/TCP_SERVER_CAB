@@ -96,7 +96,11 @@ export const MXC_SENSOR_IDS = [
 export const parameterBoxUpdateInterval = 60000; // 1 minute = 60000 milliseconds
 
 
-// Mutable constants
+/* 
+=========================================================
+Mutable constants
+=========================================================
+*/
 
 export const relationDataStore = {
     CH9 : [], CH10: [], CH11: [], CH12: [], CH13: [], CH14: [],
