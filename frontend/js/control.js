@@ -6,6 +6,7 @@ import {
     buildRelationStepRampPayload,
     clearPendingExtraChannelsForSampleChannels,
     loadHistoricalRun,
+    sleep,
 } from './business.js';
 import {
     addLogEntry,
@@ -1754,6 +1755,90 @@ document
     .getElementById("writeSettingsButtonCH9")
     ?.addEventListener("click", () => {
         writeSettingsExtraChannel9();
+    });
+
+document
+    .getElementById("writeSensorSettingsButtonMXC")
+    ?.addEventListener("click", () => {
+        writeSensorSettingsMXC();
+    });
+
+document
+    .getElementById("resetDefaultsButtonMXC")
+    ?.addEventListener("click", () => {
+        resetDefaultsMXC();
+    });
+
+document
+    .getElementById("writeControlSettingsButtonMXC")
+    ?.addEventListener("click", () => {
+        writeControlSettingsMXC();
+    });
+
+document
+    .getElementById("writeSettingsButtonSTILL")
+    ?.addEventListener("click", () => {
+        writeSettingsSTILL();
+    });
+
+document
+    .getElementById("writeSettingsButton50K")
+    ?.addEventListener("click", () => {
+        writeSettings50K();
+    });
+
+document
+    .getElementById("writeSettingsButton4K")
+    ?.addEventListener("click", () => {
+        writeSettings4K();
+    });
+
+document
+    .getElementById("writeSettingsButtonCH10")
+    ?.addEventListener("click", () => {
+        writeSettingsExtraChannel10();
+    });
+
+document
+    .getElementById("writeSettingsButtonCH11")
+    ?.addEventListener("click", () => {
+        writeSettingsExtraChannel11();
+    });
+
+document
+    .getElementById("writeSettingsButtonCH12")
+    ?.addEventListener("click", () => {
+        writeSettingsExtraChannel12();
+    });
+
+document
+    .getElementById("writeSettingsButtonCH13")
+    ?.addEventListener("click", () => {
+        writeSettingsExtraChannel13();
+    });
+
+document
+    .getElementById("writeSettingsButtonCH14")
+    ?.addEventListener("click", () => {
+        writeSettingsExtraChannel14();
+    });
+
+document
+    .getElementById("resetDefaultsButtonSTILL")
+    ?.addEventListener("click", () => {
+        resetDefaultsSTILL();
+    });
+
+document
+    .getElementById("resetDefaultsButton50K")
+    ?.addEventListener("click", () => {
+        resetDefaults50K();
+    });
+
+document
+    .getElementById("resetDefaultsButton4K")
+    ?.addEventListener("click", () => {
+        resetDefaults4K();
     });
 
 document

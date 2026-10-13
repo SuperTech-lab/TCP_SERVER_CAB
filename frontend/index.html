@@ -196,15 +196,15 @@
             <div id="mxcTitleControls" class="mxc-title-controls">
               <div class="mxc-header-row mxc-header-row-top">
                 <button
+                  id="writeSensorSettingsButtonMXC"
                   class="inline-button mxc-header-button"
-                  onclick="writeSensorSettingsMXC()"
                 >
                   Write Sensor Settings
                 </button>
 
                 <button
+                  id="resetDefaultsButtonMXC"
                   class="inline-button mxc-header-button"
-                  onclick="resetDefaultsMXC()"
                 >
                   Reset to default
                 </button>
@@ -366,7 +366,7 @@
                     </div>
 
                     <div class="control-row" style="margin-top: 10px">
-                      <button onclick="writeControlSettingsMXC()">
+                      <button id="writeControlSettingsButtonMXC">
                         Write Control Settings
                       </button>
                     </div>
@@ -510,7 +510,7 @@
                 </select>
               </div>
               <div class="control-row">
-                <button onclick="writeSettingsSTILL()">Write Settings</button>
+                <button id="writeSettingsButtonSTILL">Write Settings</button>
               </div>
               <div
                 id="progressContainerSTILL"
@@ -534,9 +534,9 @@
           <div class="lakeshore-plot-panel">
             <div class="control-row" style="align-items: center">
               <button
+                id="resetDefaultsButtonSTILL"
                 class="inline-button"
                 style="margin-right: 25px; padding: 8px 18px; min-width: 160px"
-                onclick="resetDefaultsSTILL()"
               >
                 Reset to default
               </button>
@@ -641,7 +641,7 @@
                 </select>
               </div>
               <div class="control-row">
-                <button onclick="writeSettings4K()">Write Settings</button>
+                <button id="writeSettingsButton4K">Write Settings</button>
               </div>
               <div
                 id="progressContainer4K"
@@ -665,9 +665,9 @@
           <div class="lakeshore-plot-panel">
             <div class="control-row" style="align-items: center">
               <button
+                id="resetDefaultsButton4K"
                 class="inline-button"
                 style="margin-right: 25px; padding: 8px 18px; min-width: 160px"
-                onclick="resetDefaults4K()"
               >
                 Reset to default
               </button>
@@ -769,7 +769,7 @@
                 </select>
               </div>
               <div class="control-row">
-                <button onclick="writeSettings50K()">Write Settings</button>
+                <button id="writeSettingsButton50K">Write Settings</button>
               </div>
               <div
                 id="progressContainer50K"
@@ -793,9 +793,9 @@
           <div class="lakeshore-plot-panel">
             <div class="control-row" style="margin-bottom: 10px">
               <button
+                id="resetDefaultsButton50K"
                 class="inline-button"
                 style="margin-right: 25px; padding: 8px 18px; min-width: 160px"
-                onclick="resetDefaults50K()"
               >
                 Reset to default
               </button>
@@ -1148,7 +1148,7 @@
                     </div>
                     <div class="control-row" style="margin-top: 10px">
                       <button
-                        onclick="writeSettingsExtraChannel10()"
+                        id="writeSettingsButtonCH10"
                         class="inline-button"
                       >
                         Write Settings
@@ -1237,7 +1237,7 @@
                     </div>
                     <div class="control-row" style="margin-top: 10px">
                       <button
-                        onclick="writeSettingsExtraChannel11()"
+                        id="writeSettingsButtonCH11"
                         class="inline-button"
                       >
                         Write Settings
@@ -1326,7 +1326,7 @@
                     </div>
                     <div class="control-row" style="margin-top: 10px">
                       <button
-                        onclick="writeSettingsExtraChannel12()"
+                        id="writeSettingsButtonCH12"
                         class="inline-button"
                       >
                         Write Settings
@@ -1415,7 +1415,7 @@
                     </div>
                     <div class="control-row" style="margin-top: 10px">
                       <button
-                        onclick="writeSettingsExtraChannel13()"
+                        id="writeSettingsButtonCH13"
                         class="inline-button"
                       >
                         Write Settings
@@ -1504,7 +1504,7 @@
                     </div>
                     <div class="control-row" style="margin-top: 10px">
                       <button
-                        onclick="writeSettingsExtraChannel14()"
+                        id="writeSettingsButtonCH14"
                         class="inline-button"
                       >
                         Write Settings

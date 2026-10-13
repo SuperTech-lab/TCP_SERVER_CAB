@@ -4,6 +4,7 @@ import {
 } from './state.js'
 import { 
     updateRelationCurrentLabels,
+    updateTimeRangeOptions,
     updateTimeRangeOptions50K,
     updateTimeRangeOptions4K,
     updateTimeRangeOptionsSTILL,
