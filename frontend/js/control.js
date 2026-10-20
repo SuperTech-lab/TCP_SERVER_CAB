@@ -661,7 +661,7 @@ try {
 }
 
 async function toggleChannel4k() {
-const checkbox = document.getElementById("toggle4kGlobal");
+const checkbox = document.getElementById("toggle4KGlobal");
 const value = checkbox.checked ? 1 : 0;
 
 const command = `set_channel_4k:${value}`;

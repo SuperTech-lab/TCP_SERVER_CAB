@@ -1486,27 +1486,27 @@ export async function fetchSensorData(forceUpdateControls = false) {
         }
 
         // 4K
-        const g4K = document.getElementById("toggle4kGlobal");
+        const g4K = document.getElementById("toggle4KGlobal");
         const enabled4K = !!state.currentParameters.enabled4K;
 
         if (g4K) {
-        if (state.controls.pending4KToggle) {
-            if (g4K.checked === enabled4K) {
-            pending4KToggle = false;
-            console.log(
-                `✅ 4K backend synced with UI (${enabled4K ? "ON" : "OFF"})`,
-            );
-            } else {
-            console.log("⏳ Waiting for 4K backend to catch up...");
+            if (state.controls.pending4KToggle) {
+                if (g4K.checked === enabled4K) {
+                state.controls.pending4KToggle = false;
+                console.log(
+                    `✅ 4K backend synced with UI (${enabled4K ? "ON" : "OFF"})`,
+                );
+                } else {
+                console.log("⏳ Waiting for 4K backend to catch up...");
+                }
+            } else if (g4K.checked !== enabled4K) {
+                g4K.checked = enabled4K;
+                console.log(
+                `🔁 Sync 4K toggle -> ${
+                    enabled4K ? "ON" : "OFF"
+                } (from controller)`,
+                );
             }
-        } else if (g4K.checked !== enabled4K) {
-            g4K.checked = enabled4K;
-            console.log(
-            `🔁 Sync 4K toggle -> ${
-                enabled4K ? "ON" : "OFF"
-            } (from controller)`,
-            );
-        }
         }
         updateStageVisibility();
 

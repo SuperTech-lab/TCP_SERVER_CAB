@@ -438,9 +438,48 @@ export function updateRunUI() {
     if (runDescInput) runDescInput.disabled = hasActiveRun;
 }
 
+export function openResponsivePlotWindow(url) {
+    const availableWidth = window.screen?.availWidth || window.innerWidth;
+    const availableHeight = window.screen?.availHeight || window.innerHeight;
+    const width = Math.max(
+        240,
+        Math.min(
+            700,
+            availableWidth - 20,
+            Math.floor(availableWidth * 0.9),
+        ),
+    );
+    const height = Math.max(
+        180,
+        Math.min(
+            450,
+            availableHeight - 20,
+            Math.floor(availableHeight * 0.9),
+        ),
+    );
+    const left = Math.max(0, Math.floor((availableWidth - width) / 2));
+    const top = Math.max(0, Math.floor((availableHeight - height) / 2));
+    const features = [
+        `width=${width}`,
+        `height=${height}`,
+        `left=${left}`,
+        `top=${top}`,
+        "resizable=yes",
+        "scrollbars=yes",
+    ].join(",");
+
+    return window.open(url, "_blank", features);
+}
+
 export function openHistoricalRelationWindow(fileName) {
-    const url = `/plot_relation?file_name=${encodeURIComponent(fileName)}`;
-    window.open(url, "_blank", "width=1200,height=800");
+    const viewportWidth = window.screen?.availWidth || window.innerWidth;
+    const viewportHeight = window.screen?.availHeight || window.innerHeight;
+    const url = [
+        `/plot_relation?file_name=${encodeURIComponent(fileName)}`,
+        `viewport_width=${encodeURIComponent(viewportWidth)}`,
+        `viewport_height=${encodeURIComponent(viewportHeight)}`,
+    ].join("&");
+    openResponsivePlotWindow(url);
     addLogEntry(
         `✅ Abierta ventana con gráfica Python de relation: ${fileName}`,
         "status",

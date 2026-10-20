@@ -1,6 +1,9 @@
 import { state, relationDataStore } from './state.js';
 import { 
-    addLogEntry, updateRelationLabelVisibility, updateRelationRampControls
+    addLogEntry,
+    openResponsivePlotWindow,
+    updateRelationLabelVisibility,
+    updateRelationRampControls
 } from './ui.js';
 
 export function getResistanceForChannel(channel) {
@@ -961,7 +964,7 @@ export function loadHistoricalRun(runPayload) {
     const runId = runPayload.run_id;
 
     const url = `/plot_run?run_id=${encodeURIComponent(runId)}`;
-    window.open(url, "_blank", "width=1200,height=800");
+    openResponsivePlotWindow(url);
 
     addLogEntry(
         `✅ Abierta ventana con gráficas Python del RUN histórico ${runId}`,

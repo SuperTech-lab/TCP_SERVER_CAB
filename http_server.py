@@ -62,6 +62,23 @@ BUFFER_CHANNELS = ("50K", "4K", "STILL", "MXC")
 # A new identifier is generated whenever http_server.py restarts
 SERVER_INSTANCE_ID = uuid.uuid4().hex
 
+
+def _positive_int_query_value(
+    query: dict[str, list[str]],
+    name: str,
+) -> int | None:
+    values = query.get(name)
+    if not values:
+        return None
+
+    try:
+        value = int(values[0])
+    except (TypeError, ValueError):
+        return None
+
+    return value if value > 0 else None
+
+
 # One independent buffer per channel
 temperature_buffer_lock = threading.Lock()
 temperature_buffers = {
@@ -1456,7 +1473,19 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
                 self.send_error(500, "Could not retrieve RELATION_FILE")
                 return
 
-            html = self.render_relation_plot_html(relation_payload)
+            viewport_width = _positive_int_query_value(
+                query,
+                "viewport_width",
+            )
+            viewport_height = _positive_int_query_value(
+                query,
+                "viewport_height",
+            )
+            html = self.render_relation_plot_html(
+                relation_payload,
+                viewport_width=viewport_width,
+                viewport_height=viewport_height,
+            )
             _respond_browser(self, 'text/html; charset=utf-8', html)
 
         else:
@@ -2125,10 +2154,27 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
                 print("JSON candidate was:", json_str)
                 return None
 
-    def render_relation_plot_html(self, relation_payload: dict) -> str:
+    def render_relation_plot_html(
+        self,
+        relation_payload: dict,
+        viewport_width: int | None = None,
+        viewport_height: int | None = None,
+    ) -> str:
         import io, base64
         import matplotlib.pyplot as plt
         import numpy as np
+
+        fig_width_inches = 9
+        if viewport_width is None:
+            try:
+                import pyautogui
+
+                viewport_width, _ = pyautogui.size()
+            except Exception:
+                viewport_width = 1200
+
+        desired_px_width = max(320, min(viewport_width * 0.9, 1800))
+        dpi_val = max(90, min(int(desired_px_width / fig_width_inches), 220))
 
         file_name = relation_payload.get("file_name", "relation")
         ch = relation_payload.get("channel_number", "?")
@@ -2150,7 +2196,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
                 except Exception:
                     continue
 
-        figure, ax = plt.subplots(figsize = (9, 6), dpi = 400, constrained_layout = True)
+        figure, ax = plt.subplots(figsize = (9, 6), dpi = dpi_val, constrained_layout = True)
 
         if len(xs) == 0:
             ax.set_title(f"Relation CH{ch} — {file_name}")
@@ -2195,7 +2241,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
 
         buf = io.BytesIO()
         figure.tight_layout()
-        figure.savefig(buf, format="png", dpi=130)
+        figure.savefig(buf, format="png", dpi=dpi_val)
         plt.close(figure)
 
         img_b64 = base64.b64encode(buf.getvalue()).decode("ascii")
@@ -2205,10 +2251,12 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
 <html lang="en">
 <head>
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Relation plot — {file_name}</title>
   <style>
-    body {{ font-family: Arial, sans-serif; margin: 16px; background: #f5f5f5; }}
-    .card {{ background: white; border-radius: 10px; padding: 14px; box-shadow: 0 2px 8px rgba(0,0,0,.08); }}
+    * {{ box-sizing: border-box; }}
+    body {{ font-family: Arial, sans-serif; margin: 0; padding: 16px; background: #f5f5f5; }}
+    .card {{ width: 100%; max-width: 100%; background: white; border-radius: 10px; padding: 14px; box-shadow: 0 2px 8px rgba(0,0,0,.08); }}
     img {{ width: 100%; height: auto; border-radius: 8px; }}
     .small {{ color:#666; margin-top: 8px; font-size: 13px; }}
   </style>
