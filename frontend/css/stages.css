@@ -1,0 +1,151 @@
+.stage-card {
+width: 100%;
+background-color: white;
+border-radius: 12px;
+margin-top: 30px;
+box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+overflow: hidden;
+transition: all 0.3s ease;
+}
+
+/* Colores por canal */
+.stage-card.stage-mxc {
+border-left: 5px solid #3b82f6;
+box-shadow: 0 4px 12px rgba(34, 103, 214, 0.2);
+}
+
+.stage-card.stage-still {
+border-left: 5px solid #10b981;
+box-shadow: 0 4px 12px rgba(13, 168, 116, 0.2);
+}
+
+.stage-card.stage-4k {
+border-left: 5px solid #dd8f08;
+box-shadow: 0 4px 12px rgba(212, 138, 10, 0.2);
+}
+
+.stage-card.stage-50k {
+border-left: 5px solid #da2b2b;
+box-shadow: 0 4px 12px rgba(233, 48, 48, 0.2);
+}
+
+/* Cabecera del canal */
+.stage-title {
+margin: 0;
+padding: 34px 24px;
+border-bottom: none;
+background-color: white;
+box-shadow: none;
+border-radius: 0;
+}
+
+.stage-title h2 {
+margin: 0;
+font-size: 1.8rem;
+font-weight: 700;
+}
+
+/* Contenido abierto */
+.stage-body {
+margin: 0;
+margin-bottom: 0;
+padding: 24px;
+display: flex;
+flex-direction: row;
+gap: 20px;
+align-items: flex-start;
+overflow: hidden;
+max-height: 1000px;
+transition:
+    max-height 0.3s ease-in-out,
+    padding 0.3s ease-in-out;
+}
+
+/* Contenido cerrado */
+.stage-body.collapsed {
+max-height: 0 !important;
+padding-top: 0;
+padding-bottom: 0;
+margin-bottom: 0;
+}
+
+/* Evita que row-container deje margen residual */
+.stage-card .row-container {
+margin-bottom: 0;
+}
+/* Remove
+.stage-mxc,
+.stage-still,
+.stage-4k,
+.stage-50k {
+background-color: white;
+padding: 24px;
+border-radius: 12px;
+margin-top: 30px;
+box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+transition: all 0.3s ease;
+}
+
+.stage-mxc {
+border-left: 5px solid #3b82f6;
+box-shadow: 0 4px 12px rgba(34, 103, 214, 0.2);
+}
+.stage-still {
+border-left: 5px solid #10b981;
+box-shadow: 0 4px 12px rgba(13, 168, 116, 0.2);
+}
+.stage-4k {
+border-left: 5px solid #dd8f08;
+box-shadow: 0 4px 12px rgba(212, 138, 10, 0.2);
+}
+.stage-50k {
+border-left: 5px solid #da2b2b;
+box-shadow: 0 4px 12px rgba(233, 48, 48, 0.2);
+} */
+.current-stage-value {
+width: 120px;
+margin-left: 30px;
+margin-top: 0;      
+align-self: center; 
+}
+.run-control {
+display: flex;
+align-items: center;
+gap: 8px; /* Espacio entre los elementos de control */
+padding: 8px 12px;
+border: 1px solid #d1d5db;
+border-radius: 8px;
+background-color: #f9fafb;
+flex-shrink: 0;
+}
+
+.run-control .run-label {
+width: auto;
+font-weight: 700;
+margin-right: 0; /* Elimina el margen derecho si se usa gap */
+}
+
+.run-control .run-input {
+width: 40px; /* Tamaño adecuado para el ID */
+padding: 4px 6px;
+font-size: 14px;
+}
+
+.run-control .inline-button {
+padding: 6px 10px; /* Botones más pequeños para la barra de ajustes */
+min-width: unset;
+}
+.run-control-floating {
+margin-left: auto;
+flex-shrink: 0;
+}
+.autoscan-panel {
+margin-right: 26px;
+}
+.autoscan-panel,
+.channel-dropdown-summary,
+.run-control {
+height: 40px;
+display: flex;
+align-items: center;
+}

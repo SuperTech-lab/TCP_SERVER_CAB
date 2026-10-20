@@ -22,14 +22,25 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 INDEX_HTML_PATH = PROJECT_ROOT / "frontend" / "index.html"
 SCTLAB_LOGO_PATH = PROJECT_ROOT / "frontend" / "assets" / "SCTLab_logo.png"
 FRONTEND_CSS_PATH = PROJECT_ROOT / "frontend" / "css" / "style.css"
-FRONTEND_JS_PATH = PROJECT_ROOT / "frontend" / "js" / "main.js"
-FRONTEND_JS_API_PATH = PROJECT_ROOT / "frontend" / "js" / "api.js"
-FRONTEND_JS_PARTICLES_PATH = PROJECT_ROOT / "frontend" / "js" / "particles.js"
-FRONTEND_JS_CHARTS_PATH = PROJECT_ROOT / "frontend" / "js" / "charts.js"
-FRONTEND_JS_BUSINESS_PATH = PROJECT_ROOT / "frontend" / "js" / "business.js"
-FRONTEND_JS_CONTROL_PATH = PROJECT_ROOT / "frontend" / "js" / "control.js"
-FRONTEND_JS_UI_PATH = PROJECT_ROOT / "frontend" / "js" / "ui.js"
-FRONTEND_JS_STATE_PATH = PROJECT_ROOT / "frontend" / "js" / "state.js"
+FRONTEND_CSS_MODULES = {
+    '/css/base.css': PROJECT_ROOT / "frontend" / "css" / "base.css",
+    '/css/controls.css': PROJECT_ROOT / "frontend" / "css" / "controls.css",
+    '/css/dropdown.css': PROJECT_ROOT / "frontend" / "css" / "dropdown.css",
+    '/css/header.css': PROJECT_ROOT / "frontend" / "css" / "header.css",
+    '/css/relations.css': PROJECT_ROOT / "frontend" / "css" / "relations.css",
+    '/css/settings.css': PROJECT_ROOT / "frontend" / "css" / "settings.css",
+    '/css/stages.css': PROJECT_ROOT / "frontend" / "css" / "stages.css",
+}
+FRONTEND_JS_MODULES = {
+    '/js/api.js': PROJECT_ROOT / "frontend" / "js" / "api.js",
+    '/js/business.js': PROJECT_ROOT / "frontend" / "js" / "business.js",
+    '/js/charts.js': PROJECT_ROOT / "frontend" / "js" / "charts.js",
+    '/js/control.js': PROJECT_ROOT / "frontend" / "js" / "control.js",
+    '/js/main.js': PROJECT_ROOT / "frontend" / "js" / "main.js",
+    '/js/particles.js': PROJECT_ROOT / "frontend" / "js" / "particles.js",
+    '/js/state.js': PROJECT_ROOT / "frontend" / "js" / "state.js",
+    '/js/ui.js': PROJECT_ROOT / "frontend" / "js" / "ui.js",
+}
 
 
 # Configuration for the TCP socket server
@@ -514,32 +525,16 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
             with FRONTEND_CSS_PATH.open('rb') as file:
                 _respond_browser(self, 'text/css; charset=utf-8', file.read())
 
+        elif path in FRONTEND_CSS_MODULES:
+            with FRONTEND_CSS_MODULES[path].open('rb') as file:
+                _respond_browser(self, 'text/css; charset=utf-8', file.read())
+
         elif path == '/js/script.js':
-            with FRONTEND_JS_PATH.open('rb') as file:
+            with FRONTEND_JS_MODULES['/js/main.js'].open('rb') as file:
                 _respond_browser(self, 'application/javascript; charset=utf-8', file.read())
-        elif path == '/js/main.js':
-            with FRONTEND_JS_PATH.open('rb') as file:
-                _respond_browser(self, 'application/javascript; charset=utf-8', file.read())
-        elif path == '/js/particles.js':
-            with FRONTEND_JS_PARTICLES_PATH.open('rb') as file:
-                _respond_browser(self, 'application/javascript; charset=utf-8', file.read())
-        elif path == '/js/api.js':
-            with FRONTEND_JS_API_PATH.open('rb') as file:
-                _respond_browser(self, 'application/javascript; charset=utf-8', file.read())
-        elif path == '/js/charts.js':
-            with FRONTEND_JS_CHARTS_PATH.open('rb') as file:
-                _respond_browser(self, 'application/javascript; charset=utf-8', file.read())
-        elif path == '/js/business.js':
-            with FRONTEND_JS_BUSINESS_PATH.open('rb') as file:
-                _respond_browser(self, 'application/javascript; charset=utf-8', file.read())
-        elif path == '/js/control.js':
-            with FRONTEND_JS_CONTROL_PATH.open('rb') as file:
-                _respond_browser(self, 'application/javascript; charset=utf-8', file.read())
-        elif path == '/js/ui.js':
-            with FRONTEND_JS_UI_PATH.open('rb') as file:
-                _respond_browser(self, 'application/javascript; charset=utf-8', file.read())
-        elif path == '/js/state.js':
-            with FRONTEND_JS_STATE_PATH.open('rb') as file:
+
+        elif path in FRONTEND_JS_MODULES:
+            with FRONTEND_JS_MODULES[path].open('rb') as file:
                 _respond_browser(self, 'application/javascript; charset=utf-8', file.read())
 
         elif path == '/get-step-ramp-defaults':

@@ -1,0 +1,188 @@
+.top-header {
+align-items: center;
+gap: 14px;
+margin-bottom: 30px;
+}
+
+.sctlab-logo {
+width: 140px;
+height: auto;
+max-height: 60px;
+object-fit: contain;
+flex: 0 0 auto;
+}
+
+.top-header .tab-menu {
+flex: 1;
+margin-bottom: 0;
+gap: 10px;
+max-width: none;
+}
+
+.top-header .tab-button {
+flex: 1 1 0;
+min-width: 0;
+padding: 13px 16px;
+margin-top: 0;
+}
+
+.stage-title-mxc {
+display: grid;
+
+grid-template-columns: minmax(250px, 1fr) minmax(750px, 3fr) auto;
+
+column-gap: 20px;
+row-gap: 0;
+align-items: center;
+
+min-height: 0;
+padding: 14px 24px 8px 24px;
+
+cursor: default;
+}
+
+.stage-title-mxc h2 {
+grid-column: 1;
+margin: 0;
+white-space: nowrap;
+cursor: pointer;
+}
+
+.stage-title-mxc::after {
+grid-column: 3;
+justify-self: end;
+align-self: center;
+margin-left: 0;
+cursor: pointer;
+}
+
+.mxc-title-controls {
+grid-column: 2;
+width: 100%;
+min-width: 0;
+box-sizing: border-box;
+
+display: flex;
+flex-direction: column;
+gap: 10px;
+
+padding: 12px 14px;
+margin-left: 0;
+
+background-color: white;
+border-radius: 8px;
+border: 1px solid #e5e7eb;
+box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+
+cursor: default;
+}
+
+.mxc-header-row {
+display: grid;
+align-items: center;
+column-gap: 16px;
+row-gap: 8px;
+}
+
+.mxc-header-row-top {
+grid-template-columns: auto auto minmax(260px, 1fr);
+}
+
+.mxc-header-row-bottom {
+grid-template-columns: auto minmax(260px, 1fr) auto auto;
+}
+
+.mxc-header-button {
+margin-top: 0;
+min-width: 145px;
+padding: 8px 12px;
+white-space: nowrap;
+}
+
+.mxc-header-field {
+display: flex;
+align-items: center;
+gap: 6px;
+}
+
+.mxc-header-field label {
+width: auto;
+margin: 0;
+font-size: 14px;
+white-space: nowrap;
+}
+
+.mxc-header-field input {
+width: 64px;
+height: 32px;
+padding: 4px 6px;
+}
+
+.mxc-header-field select {
+height: 32px;
+margin-left: 0;
+padding: 4px 8px;
+}
+
+#mxcTitleControls #sensorModeMXC {
+width: 105px;
+}
+
+#mxcTitleControls #sensorRangeMXC {
+width: 190px;
+}
+
+#mxcTitleControls #curveMXCSelect {
+width: 230px;
+}
+
+#mxcTitleControls #dwellMXC,
+#mxcTitleControls #pauseMXC {
+width: 64px;
+}
+.mxc-title-mini-chart {
+display: none;
+flex: 1;
+height: 70px;
+min-width: 420px;
+margin-left: 20px;
+}
+
+.mxc-title-mini-chart canvas {
+width: 100% !important;
+height: 70px !important;
+}
+
+.stage-title-mxc.collapsed .mxc-title-controls {
+display: none;
+}
+
+.stage-title-mxc.collapsed .mxc-title-mini-chart {
+display: block;
+}
+
+.mxc-plot-toolbar {
+margin-bottom: 15px;
+align-items: center;
+justify-content: flex-end;
+gap: 18px;
+}
+
+.mxc-plot-toolbar label {
+width: auto;
+margin: 0;
+}
+
+.mxc-plot-toolbar #timeRangeMXC {
+width: 150px;
+margin-left: 0;
+}
+
+.mxc-plot-toolbar .current-stage-value {
+width: 120px;
+margin-left: 10px;
+}
+
+.stage-card.stage-mxc .stage-body {
+padding-top: 8px;
+}

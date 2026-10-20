@@ -1,0 +1,231 @@
+select {
+padding: 8px;
+font-size: 14px;
+border-radius: 5px;
+border: 1px solid #ccc;
+margin-left: 10px;
+width: 300px;
+}
+
+select option:disabled {
+color: #ccc;
+}
+.section-title {
+font-size: 18px;
+margin: 15px 0 10px 0;
+color: #333;
+border-bottom: 1px solid #eee;
+padding-bottom: 5px;
+cursor: pointer;
+display: flex;
+justify-content: space-between;
+align-items: center;
+}
+.section-title:after {
+content: "▼";
+font-size: 12px;
+transition: transform 0.3s;
+}
+.section-title.collapsed:after {
+transform: rotate(-90deg);
+}
+.section-content {
+overflow: hidden;
+max-height: 1000px; /* allow transition to work */
+transition: max-height 0.3s ease-in-out;
+}
+.section-content.collapsed {
+max-height: 0 !important;
+}
+
+.circular-checkbox {
+display: inline-flex;
+align-items: center;
+cursor: pointer;
+font-weight: bold;
+margin-left: 10px;
+}
+
+.circular-checkbox input {
+display: none; /* hide default checkbox */
+}
+
+.circular-checkbox span {
+width: 18px;
+height: 18px;
+border: 2px solid #007bff; /* blue border */
+border-radius: 50%;
+display: inline-block;
+margin-right: 6px;
+background-color: transparent; /* no fill when unchecked */
+transition: background-color 0.2s ease;
+}
+
+.circular-checkbox input:checked + span {
+background-color: #007bff; /* blue fill when checked */
+}
+
+.reset-toggle {
+display: flex;
+align-items: center;
+justify-content: flex-start;
+gap: 6px;
+font-size: 0.9rem;
+margin-top: 4px;
+
+background-color: #e6f9e6;
+border: 1px solid #2ecc71;
+color: #1e8f4b;
+border-radius: 6px;
+font-weight: 600;
+
+width: 150px;
+height: 48px;
+padding: 4px 8px;
+line-height: 1.1;
+}
+
+.reset-toggle-2 {
+display: flex;
+align-items: center;
+justify-content: flex-start;
+gap: 6px;
+font-size: 0.9rem;
+margin-top: 4px;
+
+background-color: #e6f9e6;
+border: 1px solid #2ecc71;
+color: #1e8f4b;
+border-radius: 6px;
+font-weight: 600;
+
+width: 120px;
+height: 40px;
+padding: 4px 8px;
+line-height: 1.1;
+}
+.lakeshore-control-panel .section-content {
+overflow: visible !important;
+}
+.particles-canvas {
+position: fixed;
+top: 0;
+left: 0;
+width: 100%;
+height: 100%;
+z-index: -1; /* Move the canvas to the background */
+}
+.global-settings-title {
+display: flex;
+align-items: center;
+gap: 10px; /* Espacio entre el icono y el texto */
+font-size: 1.2rem;
+font-weight: 700;
+color: #361f37;
+margin-bottom: 15px; /* Separación del título con los controles */
+}
+
+.global-settings-title .icon {
+font-size: 1.5rem;
+color: #3b82f6; /* Color azul */
+}
+
+.global-controls-row {
+display: flex;
+flex-wrap: wrap;
+align-items: center;
+gap: 18px;
+width: 100%;
+min-width: 0;
+}
+
+.autoscan-panel {
+display: flex;
+align-items: center;
+flex: 0 1 auto;
+min-width: 0;
+padding: 8px 12px;
+border: 1px solid #d1d5db;
+border-radius: 8px;
+background-color: #f9fafb;
+}
+
+.global-controls-row .channel-dropdown,
+.global-controls-row .circular-checkbox {
+flex: 0 1 auto;
+min-width: 0;
+}
+
+.global-controls-row .recent-runs {
+flex: 1 1 140px;
+min-width: 0;
+}
+
+.global-controls-row .run-control {
+flex: 1 1 300px;
+min-width: 0;
+max-width: 100%;
+box-sizing: border-box;
+flex-wrap: wrap;
+}
+
+.global-controls-row .run-control .run-input {
+max-width: 100%;
+box-sizing: border-box;
+}
+
+.global-controls-row #runDescInput {
+min-width: 0 !important;
+width: clamp(100px, 18vw, 240px);
+flex: 1 1 100px;
+}
+
+/* Ajuste del desplegable para que se parezca al panel anterior */
+
+.log-card {
+width: 100%;
+background-color: white;
+border-radius: 8px;
+box-shadow: 0 4px 8px rgba(0, 0, 0, 0.10);
+margin: 15px 0 30px 0;
+overflow: hidden;
+}
+
+.log-section-title {
+display: flex;
+align-items: center;
+gap: 10px;
+font-size: 1.1rem;
+font-weight: 700;
+color: #1f2937;
+margin: 0;
+padding: 18px 24px;
+cursor: pointer;
+justify-content: space-between;
+background-color: white;
+border-radius: 8px 8px 0 0;
+box-shadow: none;
+border-bottom: none;
+}
+.log-card .section-title {
+border-bottom: none;
+padding-bottom: 0;
+}
+
+.log-section-title .icon {
+font-size: 1.2rem;
+}
+
+.log-section {
+padding: 10px 24px 18px 24px;
+margin: 0;
+}
+
+.log-card .log-box {
+width: 100%;
+height: 120px;
+margin-top: 0;
+box-sizing: border-box;
+background-color: #f9f9f9;
+}
+

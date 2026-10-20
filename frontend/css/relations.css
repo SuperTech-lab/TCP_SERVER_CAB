@@ -1,0 +1,236 @@
+.relation-container {
+display: flex;
+max-width: 1400px;
+margin: 0 auto;
+gap: 20px;
+align-items: flex-start;
+}
+
+.relation-control-panel {
+flex: 1;
+background-color: white;
+padding: 20px;
+border-radius: 8px;
+box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+min-width: 250px;
+}
+
+.relation-plot-panel {
+flex: 3;
+background-color: white;
+padding: 20px;
+border-radius: 8px;
+box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+min-width: 750px;
+}
+
+#relationChart {
+height: 420px;
+}
+
+.run-play-button {
+background-color: #22c55e;
+color: white;
+}
+
+.run-play-button:hover:not(:disabled) {
+background-color: #16a34a;
+}
+
+.run-play-button:disabled {
+background-color: #9ca3af;
+color: #f3f4f6;
+cursor: not-allowed;
+opacity: 0.7;
+box-shadow: none;
+transform: none;
+}
+.run-stop-button {
+background-color: #ef4444;
+color: white;
+}
+
+.run-stop-button:hover:not(:disabled) {
+background-color: #dc2626;
+}
+
+.run-stop-button:disabled {
+background-color: #fca5a5;
+cursor: not-allowed;
+opacity: 0.7;
+}
+.run-control-floating {
+justify-self: end; /* ← CLAVE EN GRID */
+display: flex;
+align-items: center;
+gap: 10px;
+}
+
+.run-select {
+width: 100%;
+max-width: 420px; /* ← MISMO ANCHO QUE EL CONTENEDOR */
+padding: 8px 10px;
+
+border-radius: 8px;
+border: 1px solid #2a2a2a;
+background: #111;
+color: #fff;
+}
+
+.run-select:disabled {
+opacity: 0.7;
+cursor: not-allowed;
+}
+.recent-runs {
+display: flex;
+flex-direction: column;
+gap: 6px;
+
+max-width: 420px; /* ← ANCHO CONTROLADO */
+width: 100%;
+
+margin: 0;
+text-align: left;
+margin-left: -6px;
+margin-right: 6px;
+}
+
+.recent-runs label {
+text-align: center;
+font-size: 13px;
+font-weight: 600;
+color: #374151;
+}
+
+.relation-control-panel .current-value {
+width: auto;
+white-space: nowrap;
+text-align: left;
+margin-left: 8px;
+}
+
+#relationLabelInput {
+width: 90px;
+max-width: 90px;
+height: 32px;
+padding: 4px 6px;
+box-sizing: border-box;
+flex: 0 0 auto;
+}
+
+.control-row select,
+.control-row input[type="text"] {
+height: 32px;
+box-sizing: border-box;
+}
+
+.relation-reconstruction {
+max-width: 1400px;
+margin: 14px auto 0 auto;
+background: white;
+padding: 14px 18px;
+border-radius: 8px;
+box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
+}
+
+.relation-reconstruction h3 {
+margin: 0 0 10px 0;
+font-size: 16px;
+}
+
+.relation-reconstruction .row {
+display: flex;
+gap: 10px;
+align-items: center;
+}
+
+.relation-reconstruction .meta {
+margin-top: 8px;
+font-size: 13px;
+color: #4b5563;
+}
+
+.relation-reconstruction-section {
+max-width: 1360px;
+margin: 32px auto 40px;
+background: white;
+padding: 20px 24px;
+border-radius: 10px;
+box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.relation-reconstruction-section h2 {
+margin: 0 0 18px 0;
+font-size: 24px;
+font-weight: 700;
+color: #222;
+}
+
+.relation-reconstruction-row {
+display: flex;
+align-items: center;
+gap: 10px;
+}
+
+.relation-reconstruction-row select {
+min-width: 520px;
+}
+
+.relation-reconstruction-section h2 {
+position: relative;
+display: inline-block;
+}
+
+.relation-reconstruction-section h2::after {
+content: "";
+position: absolute;
+left: 0;
+bottom: -6px;
+width: 100%;
+height: 3px;
+background: #3b82f6;
+border-radius: 2px;
+}
+
+.channel-dropdown-menu .rch-box {
+min-width: 70px;
+text-align: right;
+padding: 2px 6px;
+border: 1px solid #ddd;
+border-radius: 4px;
+background: #f8f8f8;
+font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+font-size: 12px;
+}
+
+.status-indicator-circle {
+width: 20px;
+height: 20px;
+border-radius: 50%;
+background-color: #000000;
+border: 2px solid #333;
+display: inline-block;
+align-self: center;
+transition:
+    background-color 0.3s ease,
+    box-shadow 0.3s ease;
+flex-shrink: 0;
+}
+
+.status-indicator-circle.active {
+background-color: #22c55e;
+border-color: #16a34a;
+box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
+}
+
+/* Ajuste fino del círculo para que no mueva el texto */
+.channel-dropdown-menu .status-indicator-circle {
+width: 10px !important;
+height: 10px !important;
+border-width: 1px !important;
+flex-shrink: 0;
+margin-left: 6px; /* Separación del texto "Ch X" */
+}
+
